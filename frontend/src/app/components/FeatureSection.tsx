@@ -4,77 +4,109 @@ import { styled } from '@mui/material/styles';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import HeadsetMicIcon from '@mui/icons-material/HeadsetMic';
+import BuildIcon from '@mui/icons-material/Build';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 
-// Styled Box for the section
 const SectionBox = styled(Box)(({ theme }) => ({
-  background: '#ffffffff', // White background
-  padding: theme.spacing(4),
-  color: '#000000', // Black text
+  background: 'linear-gradient(180deg, #fff 0%, #a29fa6 100%)',
+  padding: theme.spacing(3),
+  color: '#000000',
   textAlign: 'center',
+  [theme.breakpoints.up('sm')]: {
+    padding: theme.spacing(3.5),
+  },
+  [theme.breakpoints.up('md')]: {
+    padding: theme.spacing(4),
+  },
+  [theme.breakpoints.up('lg')]: {
+    padding: theme.spacing(4.5),
+  },
+  [theme.breakpoints.up('xl')]: {
+    padding: theme.spacing(5),
+  },
 }));
 
-// Styled Card for shadow effect
 const StyledCard = styled(Card)(({ theme }) => ({
-  padding: theme.spacing(2),
-  boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)', // Subtle shadow
-  borderRadius: 8,
+  padding: theme.spacing(1.5),
+  boxShadow: '0 3px 6px rgba(0, 0, 0, 0.1)',
   transition: 'transform 0.2s',
-  height: 200, // Fixed height for even content distribution
+  height: 150,
   display: 'flex',
   flexDirection: 'column',
   justifyContent: 'space-between',
   '&:hover': {
-    transform: 'translateY(-4px)',
-    boxShadow: '0 6px 12px rgba(0, 0, 0, 0.15)',
+    transform: 'translateY(-3px)',
+    boxShadow: '0 4.5px 9px rgba(0, 0, 0, 0.15)',
+  },
+  [theme.breakpoints.down('sm')]: {
+    height: 120,
   },
 }));
 
-// Example component
 const FeatureSection = () => {
   return (
     <SectionBox>
-      <Grid container spacing={3} justifyContent="center" alignItems="stretch">
-        <Grid item xs={12} sm={3}>
+      <Grid container spacing={2} justifyContent="center" alignItems="stretch">
+        <Grid item xs={12} sm={2.4}>
           <StyledCard>
             <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-              <Box sx={{ mb: 2 }}>
-                <LocalShippingIcon sx={{ fontSize: 40, color: '#333333' }} />
+              <Box sx={{ mb: 1.5 }}>
+                <LocalShippingIcon sx={{ fontSize: 'clamp(30px, 4vw, 32px)', color: '#333333' }} />
               </Box>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333333', mb: 1 }}>
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 'bold', color: '#333333', mb: 0.75, fontSize: 'clamp(0.9rem, 2vw, 1rem)' }}
+              >
                 Fast Delivery
               </Typography>
-              <Typography variant="body2" sx={{ color: '#666666', flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-                Lorem ipsum is a place commonly used.
+              <Typography
+                variant="body2"
+                sx={{ color: '#666666', flexGrow: 1, display: 'flex', alignItems: 'center', fontSize: 'clamp(0.65rem, 1.8vw, 0.75rem)' }}
+              >
+                Get your gadgets delivered in 1-3 days across the country.
               </Typography>
             </CardContent>
           </StyledCard>
         </Grid>
-        <Grid item xs={12} sm={3}>
+
+        <Grid item xs={12} sm={2.4}>
           <StyledCard>
             <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-              <Box sx={{ mb: 2 }}>
-                <ShoppingCartIcon sx={{ fontSize: 40, color: '#333333' }} />
+              <Box sx={{ mb: 1.5 }}>
+                <BuildIcon sx={{ fontSize: 'clamp(30px, 4vw, 32px)', color: '#333333' }} />
               </Box>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333333', mb: 1 }}>
-                Free Delivery
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 'bold', color: '#333333', mb: 0.75, fontSize: 'clamp(0.9rem, 2vw, 1rem)' }}
+              >
+                Device Repairs
               </Typography>
-              <Typography variant="body2" sx={{ color: '#666666', flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-                Lorem ipsum is a place commonly used.
+              <Typography
+                variant="body2"
+                sx={{ color: '#666666', flexGrow: 1, display: 'flex', alignItems: 'center', fontSize: 'clamp(0.65rem, 1.8vw, 0.75rem)' }}
+              >
+                Expert repairs for phones, tablets, and more.
               </Typography>
             </CardContent>
           </StyledCard>
         </Grid>
-        <Grid item xs={12} sm={3}>
+        <Grid item xs={12} sm={2.4}>
           <StyledCard>
             <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-              <Box sx={{ mb: 2 }}>
-                <HeadsetMicIcon sx={{ fontSize: 40, color: '#333333' }} />
+              <Box sx={{ mb: 1.5 }}>
+                <SwapHorizIcon sx={{ fontSize: 'clamp(30px, 4vw, 32px)', color: '#333333' }} />
               </Box>
-              <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#333333', mb: 1 }}>
-                Online Support
+              <Typography
+                variant="h6"
+                sx={{ fontWeight: 'bold', color: '#333333', mb: 0.75, fontSize: 'clamp(0.9rem, 2vw, 1rem)' }}
+              >
+                Trade-In Program
               </Typography>
-              <Typography variant="body2" sx={{ color: '#666666', flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-                Lorem ipsum is a place commonly used.
+              <Typography
+                variant="body2"
+                sx={{ color: '#666666', flexGrow: 1, display: 'flex', alignItems: 'center', fontSize: 'clamp(0.65rem, 1.8vw, 0.75rem)' }}
+              >
+                Trade in your old devices for store credit.
               </Typography>
             </CardContent>
           </StyledCard>

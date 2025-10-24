@@ -1,131 +1,257 @@
 "use client";
-import { Box, Grid, Typography, Card, CardContent, styled, useTheme } from '@mui/material';
-import PhoneAndroidIcon from '@mui/icons-material/PhoneAndroid';
-import LaptopIcon from '@mui/icons-material/Laptop';
-import HeadsetIcon from '@mui/icons-material/Headset';
-import TvIcon from '@mui/icons-material/Tv';
-import React from 'react';
+import { Box, Typography } from '@mui/material';
+import { useRouter } from 'next/navigation';
 
-// Styled Box for the section
-const SectionBox = styled(Box)(({ theme }) => ({
-  backgroundColor: '#fff',
+const GadgetRepairSection = () => {
+  const router = useRouter();
 
-  color: '#fff',
-  textAlign: 'center',
-  position: 'relative',
-  margin: theme.spacing(4, 0),
-}));
-
-// Styled Title for the section
-const Title = styled(Typography)(({ theme }) => ({
-  fontSize: '3rem',
-  fontWeight: 700,
-  marginBottom: theme.spacing(6),
-  textTransform: 'uppercase',
-  letterSpacing: '2px',
-  [theme.breakpoints.down('sm')]: {
-    fontSize: '2rem',
-    marginBottom: theme.spacing(4),
-  },
-}));
-
-// Styled Subtitle
-const Subtitle = styled(Typography)(({ theme }) => ({
-  fontSize: '1.2rem',
-  color: '#fff',
-  marginBottom: theme.spacing(6),
-  maxWidth: '700px',
-  margin: '0 auto',
-  [theme.breakpoints.down('sm')]: {
-    fontSize: '1rem',
-    marginBottom: theme.spacing(4),
-  },
-}));
-
-// Styled Card for repair services
-const RepairCard = styled(Card)(({ theme }) => ({
-  backgroundColor: '#F9FAFB',
-  padding: theme.spacing(3),
-  height: 250,
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'center',
-  alignItems: 'center',
-  transition: 'transform 0.3s, box-shadow 0.3s',
-  '&:hover': {
-    transform: 'translateY(-8px)',
-    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
-  },
-  [theme.breakpoints.down('sm')]: {
-    height: 200,
-  },
-}));
-
-// Styled Icon
-const ServiceIcon = styled(Box)(({ theme }) => ({
-  fontSize: '2.5rem',
-  color: '#4B5EAA',
-  marginBottom: theme.spacing(2),
-  [theme.breakpoints.down('sm')]: {
-    fontSize: '2rem',
-  },
-}));
-
-// Styled Grid for horizontal layout
-const HorizontalGrid = styled(Grid)(({ theme }) => ({
-  overflowX: 'auto',
-  whiteSpace: 'nowrap',
-  paddingBottom: theme.spacing(2),
-  '& .MuiGrid-item': {
-    display: 'inline-flex',
-    verticalAlign: 'top',
-  },
-}));
-
-const RepairSection = () => {
-  const theme = useTheme();
-
-  const repairServices = [
-    {
-      icon: <PhoneAndroidIcon />,
-      title: 'Smartphone Repairs',
-      description: 'Fix screens, batteries, and more with expert care.',
-    },
-    {
-      icon: <LaptopIcon />,
-      title: 'Laptop Repairs',
-      description: 'Resolve hardware and software issues efficiently.',
-    },
-    {
-      icon: <HeadsetIcon />,
-      title: 'Headphone Repairs',
-      description: 'Restore sound with specialized headphone fixes.',
-    },
-  ];
+  const handleClick = (path: string) => {
+    router.push(path);
+  };
 
   return (
-    <SectionBox>
-      <Title>We Repair Gadgets</Title>
-      <Subtitle>Trust our skilled technicians to restore your devices with precision and top-quality service.</Subtitle>
-      <HorizontalGrid container spacing={4} justifyContent="center" alignItems="stretch">
-        {repairServices.map((service, index) => (
-          <Grid item key={index}>
-            <RepairCard>
-              <CardContent>
-                <ServiceIcon>{service.icon}</ServiceIcon>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                  {service.title}
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#666666' }}>
-                  {service.description}
-                </Typography>
-              </CardContent>
-            </RepairCard>
-          </Grid>
-        ))}
-      </HorizontalGrid>
-    </SectionBox>
+    <Box
+      sx={{
+        background: 'linear-gradient(180deg, #9a979fff 40%, #fff 100%)',
+        color: '#000',
+        padding: { xs: '24px 16px', md: '40px 24px' },
+        minHeight: '60vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+      }}
+    >
+      {/* Horizontal Black Line */}
+      <Box sx={{ width: '100%', height: '2px', backgroundColor: '#000', mb: 4 }} />
+
+      {/* Title Section */}
+      <Box sx={{ mb: 4, textAlign: 'center' }}>
+        <Typography
+          variant="h3"
+          sx={{
+            fontSize: { xs: '28px', md: '36px' },
+            fontWeight: 700,
+            lineHeight: 1.2,
+            color: '#000',
+            mb: 1,
+          }}
+        >
+          Discover the expertise in our Repair Services
+        </Typography>
+      </Box>
+
+      {/* Features List */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Feature 1 */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '20px 0',
+            borderBottom: '1px solid #333',
+            '&:last-child': {
+              borderBottom: 'none',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+            <Typography
+              sx={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#000',
+                mr: 3,
+                minWidth: '24px',
+              }}
+            >
+              1
+            </Typography>
+            <Typography
+              sx={{
+                fontSize: '16px',
+                fontWeight: 500,
+                color: '#000',
+                flex: 1,
+              }}
+            >
+              Smartphone screen repairs
+            </Typography>
+          </Box>
+          <Typography
+            onClick={() => handleClick('/repair')}
+            sx={{
+              fontSize: '24px',
+              fontWeight: 300,
+              color: '#000',
+              cursor: 'pointer',
+              '&:hover': {
+                color: '#ccc',
+              },
+            }}
+          >
+            →
+          </Typography>
+        </Box>
+
+        {/* Feature 2 */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '20px 0',
+            borderBottom: '1px solid #333',
+            '&:last-child': {
+              borderBottom: 'none',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+            <Typography
+              sx={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#000',
+                mr: 3,
+                minWidth: '24px',
+              }}
+            >
+              2
+            </Typography>
+            <Typography
+              sx={{
+                fontSize: '16px',
+                fontWeight: 500,
+                color: '#000',
+                flex: 1,
+              }}
+            >
+              Laptop hardware fixes
+            </Typography>
+          </Box>
+          <Typography
+            onClick={() => handleClick('/repair')}
+            sx={{
+              fontSize: '24px',
+              fontWeight: 300,
+              color: '#000',
+              cursor: 'pointer',
+              '&:hover': {
+                color: '#ccc',
+              },
+            }}
+          >
+            →
+          </Typography>
+        </Box>
+
+        {/* Feature 3 */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '20px 0',
+            borderBottom: '1px solid #333',
+            '&:last-child': {
+              borderBottom: 'none',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+            <Typography
+              sx={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#000',
+                mr: 3,
+                minWidth: '24px',
+              }}
+            >
+              3
+            </Typography>
+            <Typography
+              sx={{
+                fontSize: '16px',
+                fontWeight: 500,
+                color: '#000',
+                flex: 1,
+              }}
+            >
+              Headphone audio restoration
+            </Typography>
+          </Box>
+          <Typography
+            onClick={() => handleClick('/repair')}
+            sx={{
+              fontSize: '24px',
+              fontWeight: 300,
+              color: '#000',
+              cursor: 'pointer',
+              '&:hover': {
+                color: '#ccc',
+              },
+            }}
+          >
+            →
+          </Typography>
+        </Box>
+
+        {/* Feature 4 */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '20px 0',
+            borderBottom: '1px solid #333',
+            '&:last-child': {
+              borderBottom: 'none',
+            },
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+            <Typography
+              sx={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#000',
+                mr: 3,
+                minWidth: '24px',
+              }}
+            >
+              4
+            </Typography>
+            <Typography
+              sx={{
+                fontSize: '16px',
+                fontWeight: 500,
+                color: '#000',
+                flex: 1,
+              }}
+            >
+              Tv display repairs
+            </Typography>
+          </Box>
+          <Typography
+            onClick={() => handleClick('/repair')}
+            sx={{
+              fontSize: '24px',
+              fontWeight: 300,
+              color: '#000',
+              cursor: 'pointer',
+              '&:hover': {
+                color: '#ccc',
+              },
+            }}
+          >
+            →
+          </Typography>
+        </Box>
+      </Box>
+    </Box>
   );
 };
 
-export default RepairSection;
+export default GadgetRepairSection;

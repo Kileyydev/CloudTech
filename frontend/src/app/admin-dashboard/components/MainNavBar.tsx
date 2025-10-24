@@ -7,6 +7,8 @@ import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import ContactMailIcon from "@mui/icons-material/ContactMail";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import PeopleIcon from "@mui/icons-material/People";
+import BuildIcon from "@mui/icons-material/Build"; // 🛠️ for Repairs
+import StarIcon from "@mui/icons-material/Star"; // 🌟 for Testimonials
 import LogoutIcon from "@mui/icons-material/Logout";
 import { useRouter } from "next/navigation";
 
@@ -15,12 +17,15 @@ type Props = {
   setActiveSection: React.Dispatch<React.SetStateAction<string>>;
 };
 
+// 💎 Updated Navigation Items
 const navItems = [
   { text: "Dashboard", icon: <DashboardIcon />, section: "dashboard" },
   { text: "Products", icon: <ShoppingCartIcon />, section: "products" },
   { text: "Orders", icon: <ShoppingCartIcon />, section: "orders" },
   { text: "Contacts", icon: <ContactMailIcon />, section: "contacts" },
   { text: "Discounts", icon: <LocalOfferIcon />, section: "discounts" },
+  { text: "Repairs", icon: <BuildIcon />, section: "repairs" }, // ✨ NEW
+  { text: "Testimonials", icon: <StarIcon />, section: "testimonials" }, // ✨ NEW
   { text: "Users", icon: <PeopleIcon />, section: "users" },
 ];
 
@@ -34,26 +39,59 @@ const MainNavBar: React.FC<Props> = ({ activeSection, setActiveSection }) => {
   };
 
   return (
-    <Box sx={{ display: "flex", borderBottom: "1px solid #E0E0E0", px: 4, py: 1, gap: 2 }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexWrap: "wrap",
+        borderBottom: "1px solid #E0E0E0",
+        px: 4,
+        py: 1.5,
+        gap: 1.5,
+        alignItems: "center",
+        backgroundColor: "#fff",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
+        position: "sticky",
+        top: 0,
+        zIndex: 10,
+      }}
+    >
       {navItems.map((item) => (
         <Button
           key={item.text}
           startIcon={item.icon}
           onClick={() => setActiveSection(item.section)}
           sx={{
-            borderRadius: 1,
+            textTransform: "none",
+            fontWeight: 600,
+            borderRadius: 2,
+            px: 2.5,
+            py: 1,
             backgroundColor: activeSection === item.section ? "#DC1A8A" : "transparent",
             color: activeSection === item.section ? "#fff" : "#333",
-            "&:hover": { backgroundColor: "#B00053", color: "#fff" },
+            transition: "0.3s",
+            "&:hover": {
+              backgroundColor: activeSection === item.section ? "#B00053" : "rgba(220, 26, 138, 0.08)",
+              color: "#B00053",
+            },
           }}
         >
           {item.text}
         </Button>
       ))}
+
       <Button
         startIcon={<LogoutIcon />}
         onClick={handleLogout}
-        sx={{ borderRadius: 1, marginLeft: "auto", backgroundColor: "#f44336", color: "#fff", "&:hover": { backgroundColor: "#d32f2f" } }}
+        sx={{
+          textTransform: "none",
+          borderRadius: 2,
+          marginLeft: "auto",
+          backgroundColor: "#f44336",
+          color: "#fff",
+          px: 2.5,
+          py: 1,
+          "&:hover": { backgroundColor: "#d32f2f" },
+        }}
       >
         Logout
       </Button>

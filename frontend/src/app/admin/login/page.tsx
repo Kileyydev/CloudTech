@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { TextField, Button, Box, Typography } from "@mui/material";
 import { useRouter } from "next/navigation";
+import TopNavBar from "@/app/components/TopNavBar";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -60,7 +61,9 @@ export default function AdminLogin() {
   };
 
   return (
+
     <Box
+
       sx={{
         minHeight: "100vh",
         display: "flex",

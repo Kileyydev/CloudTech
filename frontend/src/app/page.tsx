@@ -22,7 +22,6 @@ export default function Home() {
       <DealsSection />
       <RepairSection />
       <TestimonialsSection />
-      <Footer />
     </div>
   );
 }

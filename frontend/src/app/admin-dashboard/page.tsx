@@ -5,9 +5,13 @@ import TopNavBar from "../components/TopNavBar";
 import MainNavBar from "@/app/admin-dashboard/components/MainNavBar";
 import UsersSection from "./components/UsersSection";
 import ProductsSection from "@/app/admin-dashboard/components/ProductSection";
-import Footer from "../components/FooterSection";
+import DashboardSection from "./components/DashboardSection";
+import DiscountsSection from "./components/DiscountSection";
+import ContactsSection from "./components/ContactsSection";
+import TestimonialsAdminPage from "./components/TestimonialsSection";
+import AdminRepairsPage from "./components/RepairSection";
 
-export default function AdminDashboardPage() {
+export default function AdminDashboardPageComponent() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
 
   return (
@@ -22,15 +26,16 @@ export default function AdminDashboardPage() {
       <TopNavBar />
       <MainNavBar activeSection={activeSection} setActiveSection={setActiveSection} />
       <Box sx={{ padding: "16px", flexGrow: 1 }}>
-        {activeSection === "dashboard" && <Box>Dashboard content here...</Box>}
+        {activeSection === "dashboard" && <DashboardSection />}
         {activeSection === "products" && <ProductsSection />}
         {activeSection === "orders" && <Box>Orders content here...</Box>}
-        {activeSection === "contacts" && <Box>Contacts content here...</Box>}
-        {activeSection === "discounts" && <Box>Discounts content here...</Box>}
+        {activeSection === "contacts" && <ContactsSection />}
+        {activeSection === "discounts" && <DiscountsSection />}
         {activeSection === "users" && <UsersSection />}
+        {activeSection === "testimonials" && <TestimonialsAdminPage />}
+        {activeSection === "repairs" && <AdminRepairsPage />}
         
       </Box>
-      <Footer />
     </Box>
   );
 }
