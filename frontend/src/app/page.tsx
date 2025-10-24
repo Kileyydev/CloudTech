@@ -9,6 +9,7 @@ import DealsSection from './components/DealsSection';
 import TestimonialsSection from './components/TestimonialsSection';
 import Footer from './components/FooterSection';
 import RepairSection from './components/RepairSection';
+import ShopSection from './components/mostwanted';
 
 export default function Home() {
   return (
@@ -19,7 +20,8 @@ export default function Home() {
       <FeaturedProductsSection />
       <TopCategoriesSection />
       <PromoSection />
-      <DealsSection />
+      <DealsSection /> 
+      <ShopSection />
       <RepairSection />
       <TestimonialsSection />
     </div>

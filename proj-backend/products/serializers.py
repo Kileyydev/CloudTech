@@ -1,4 +1,4 @@
-from rest_framework import serializers
+from rest_framework import serializers 
 from .models import Category, Brand, Tag, Product, ProductVariant, ProductImage
 
 
@@ -34,7 +34,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 # ---------- LIST / VIEW SERIALIZER ----------
 class ProductListSerializer(serializers.ModelSerializer):
     brand = BrandSerializer(read_only=True)
-    categories = CategorySerializer(many=True, read_only=True)  # ✅ Updated
+    categories = CategorySerializer(many=True, read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
     tags = serializers.SlugRelatedField(
@@ -46,37 +46,41 @@ class ProductListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'slug', 'description', 'brand', 'categories',
             'tags', 'is_active', 'is_featured', 'cover_image',
-            'variants', 'images', 'created_at', 'price', 'stock', 'discount'
+            'variants', 'images', 'created_at', 'price', 'stock', 'discount',
+            'final_price', 'colors', 'storage_options', 'condition_options', 'features'
         ]
 
 
 # ---------- CREATE / UPDATE SERIALIZER ----------
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     brand = serializers.CharField()
-    categories = serializers.ListField(
-        child=serializers.CharField(),
-        required=True
-    )  # ✅ Replaces single category
-    tags = serializers.ListField(
-        child=serializers.CharField(),
-        required=False
-    )
+    categories = serializers.ListField(child=serializers.CharField(), required=True)
+    tags = serializers.ListField(child=serializers.CharField(), required=False)
+    colors = serializers.ListField(child=serializers.CharField(), required=False)
+    storage_options = serializers.ListField(child=serializers.CharField(), required=False)
+    condition_options = serializers.ListField(child=serializers.CharField(), required=False)
+    features = serializers.ListField(child=serializers.CharField(), required=False)
 
     class Meta:
         model = Product
         fields = [
             'id', 'title', 'slug', 'description', 'brand', 'categories',
             'tags', 'is_active', 'is_featured', 'cover_image',
-            'price', 'stock', 'discount'
+            'price', 'stock', 'discount', 'final_price',
+            'colors', 'storage_options', 'condition_options', 'features'
         ]
-        read_only_fields = ['slug']
+        read_only_fields = ['slug', 'final_price']
 
     def create(self, validated_data):
         brand_val = validated_data.pop('brand')
         categories_val = validated_data.pop('categories', [])
         tag_names = validated_data.pop('tags', [])
+        colors = validated_data.pop('colors', [])
+        storage_options = validated_data.pop('storage_options', [])
+        condition_options = validated_data.pop('condition_options', [])
+        features = validated_data.pop('features', [])
 
-        # ✅ Handle brand
+        # Handle brand
         try:
             brand_obj = Brand.objects.get(id=int(brand_val))
         except (ValueError, Brand.DoesNotExist):
@@ -84,10 +88,14 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         product = Product.objects.create(
             brand=brand_obj,
+            colors=colors,
+            storage_options=storage_options,
+            condition_options=condition_options,
+            features=features,
             **validated_data
         )
 
-        # ✅ Handle categories (multiple)
+        # Handle categories
         for val in categories_val:
             try:
                 cat_obj = Category.objects.get(id=int(val))
@@ -95,7 +103,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                 cat_obj, _ = Category.objects.get_or_create(name=val)
             product.categories.add(cat_obj)
 
-        # ✅ Handle tags
+        # Handle tags
         for t in tag_names:
             tag_obj, _ = Tag.objects.get_or_create(name=t)
             product.tags.add(tag_obj)
@@ -106,6 +114,10 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         brand_val = validated_data.pop('brand', None)
         categories_val = validated_data.pop('categories', None)
         tag_names = validated_data.pop('tags', None)
+        colors = validated_data.pop('colors', None)
+        storage_options = validated_data.pop('storage_options', None)
+        condition_options = validated_data.pop('condition_options', None)
+        features = validated_data.pop('features', None)
 
         if brand_val:
             try:
@@ -129,6 +141,16 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                 tag_obj, _ = Tag.objects.get_or_create(name=tag_name)
                 instance.tags.add(tag_obj)
 
+        # Update new fields
+        if colors is not None:
+            instance.colors = colors
+        if storage_options is not None:
+            instance.storage_options = storage_options
+        if condition_options is not None:
+            instance.condition_options = condition_options
+        if features is not None:
+            instance.features = features
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
@@ -148,6 +170,11 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             "is_featured": instance.is_featured,
             "cover_image": instance.cover_image.url if instance.cover_image else None,
             "price": instance.price,
+            "final_price": instance.final_price,
             "stock": instance.stock,
             "discount": instance.discount,
+            "colors": instance.colors or [],
+            "storage_options": instance.storage_options or [],
+            "condition_options": instance.condition_options or [],
+            "features": instance.features or [],
         }

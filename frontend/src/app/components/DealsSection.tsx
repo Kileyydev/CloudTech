@@ -1,180 +1,379 @@
 'use client';
 
-import { Box, Typography, Card, CardContent, Button, Tabs, Tab, Grid } from '@mui/material';
-import { styled } from '@mui/material/styles';
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  Card,
+  CardMedia,
+  CardContent,
+  IconButton,
+  Button,
+  Tabs,
+  Tab,
+  useTheme,
+  useMediaQuery,
+} from '@mui/material';
+import { Favorite, ShoppingCart, Add, Remove } from '@mui/icons-material';
+import { useRouter } from 'next/navigation';
 
-// Compact section container
-const SectionBox = styled(Box)(({ theme }) => ({
-  background: 'linear-gradient(180deg, #fff 40%, #9a979fff 100%)',
-  padding: theme.spacing(2, 0), // reduced padding
-  color: '#000',
-  textAlign: 'left',
-  position: 'relative',
-}));
+type ProductT = {
+  id: number;
+  title: string;
+  price: number;
+  discount?: number;
+  description: string;
+  cover_image?: string;
+  images?: string[];
+  categories?: { id: number; name: string }[];
+  stock: number;
+  is_active?: boolean;
+};
 
-// Compact title
-const Title = styled(Typography)(({ theme }) => ({
-  fontSize: '1.8rem', // smaller font
-  fontWeight: 700,
-  color: '#333',
-  textAlign: 'center',
-  marginBottom: theme.spacing(2), // reduced margin
-  letterSpacing: '1px',
-  [theme.breakpoints.down('sm')]: {
-    fontSize: '1.5rem',
-    marginBottom: theme.spacing(1),
-  },
-}));
+export default function DealsSection() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const router = useRouter();
 
-// Compact product card
-const ProductCard = styled(Card)(({ theme }) => ({
-  padding: theme.spacing(1),
-  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-  borderRadius: 0,
-  height: 200, // reduced height
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'space-between',
-  transition: 'transform 0.2s',
-  '&:hover': {
-    transform: 'translateY(-2px)',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.12)',
-  },
-}));
+  const [products, setProducts] = useState<ProductT[]>([]);
+  const [wishlist, setWishlist] = useState<Set<number>>(new Set());
+  const [cart, setCart] = useState<Record<number, any>>({});
+  const [currentIndexes, setCurrentIndexes] = useState<Record<number, number>>({});
+  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
+  const [activeCategory, setActiveCategory] = useState<number | 'all'>('all');
 
-// Compact image box
-const ImageBox = styled(Box)(({ theme }) => ({
-  height: 120, // smaller image height
-  width: '100%',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  overflow: 'hidden',
-  '& img': {
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
-  },
-}));
+  const MEDIA_BASE = "http://localhost:8000";
+  const API_PRODUCTS = "http://localhost:8000/api/products/";
+  const API_CATEGORIES = "http://localhost:8000/api/categories/";
 
-const DealsSection = () => {
-  const [value, setValue] = useState(0);
-
-  type Product = {
-    name: string;
-    image: string;
-    price: string | number;
-    oldPrice?: string | number;
-    rating?: string | number;
-    category: string;
-  };
-
-  type ProductsByCategory = {
-    [key: string]: Product[];
-  };
-
-  const [products, setProducts] = useState<ProductsByCategory>({});
-  const categories = ['All', 'Samsung', 'Apple', 'Smartphones', 'Audio', 'PowerBanks', 'Laptops', 'Mobile Accessories'];
-
-  // Fetch products from backend
+  // ✅ Fetch only discounted, active products
   useEffect(() => {
-    fetch('http://localhost:8000/api/products/')
-      .then((res) => res.json())
-      .then((data) => {
-        const productsByCategory: ProductsByCategory = {};
+    const fetchProducts = async () => {
+      try {
+        const res = await fetch(API_PRODUCTS);
+        if (!res.ok) throw new Error('Failed to fetch products');
+        const data = await res.json();
+        const allProducts: ProductT[] = Array.isArray(data) ? data : (data.results ?? []);
+        const discounted = allProducts.filter(
+          (p) => p.is_active && p.discount && p.discount > 0
+        );
 
-        categories.forEach((cat) => {
-          if (cat === 'All') {
-            productsByCategory[cat.toLowerCase()] = data;
-          } else {
-            productsByCategory[cat.toLowerCase()] = data.filter(
-              (p: Product) => p.category?.toLowerCase() === cat.toLowerCase()
-            );
-          }
-        });
+        const indexes: Record<number, number> = {};
+        discounted.forEach((p) => (indexes[p.id] = 0));
+        setCurrentIndexes(indexes);
+        setProducts(discounted);
+      } catch (err) {
+        console.error('Error fetching products:', err);
+      }
+    };
 
-        setProducts(productsByCategory);
-      })
-      .catch((err) => console.error('Error fetching products:', err));
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch(API_CATEGORIES);
+        if (!res.ok) throw new Error('Failed to fetch categories');
+        const data = await res.json();
+        const catsArray = Array.isArray(data) ? data : (data.results ?? []);
+        setCategories(catsArray);
+      } catch (err) {
+        console.error('Error fetching categories:', err);
+      }
+    };
+
+    fetchProducts();
+    fetchCategories();
   }, []);
 
-  const handleChange = (event: React.SyntheticEvent, newValue: number) => setValue(newValue);
-  const currentCategory = categories[value].toLowerCase();
-  const displayedProducts = products[currentCategory] || [];
+  // ✅ Persist cart in localStorage
+  useEffect(() => {
+    const savedCart = JSON.parse(localStorage.getItem('cart') || '{}');
+    setCart(savedCart);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('cart', JSON.stringify(cart));
+  }, [cart]);
+
+  const handleWishlistToggle = (id: number) => {
+    setWishlist((prev) => {
+      const newSet = new Set(prev);
+      newSet.has(id) ? newSet.delete(id) : newSet.add(id);
+      return newSet;
+    });
+  };
+
+  const handleAddToCart = (product: ProductT) => {
+    if (product.stock === 0) return;
+    setCart((prev) => {
+      const newCart = { ...prev };
+      if (newCart[product.id]) {
+        if (newCart[product.id].quantity < product.stock)
+          newCart[product.id].quantity += 1;
+      } else {
+        newCart[product.id] = {
+          id: product.id,
+          title: product.title,
+          price: product.price,
+          discount: product.discount,
+          quantity: 1,
+        };
+      }
+      return newCart;
+    });
+  };
+
+  const handleDecreaseQuantity = (id: number) => {
+    setCart((prev) => {
+      const newCart = { ...prev };
+      if (newCart[id]?.quantity > 1) newCart[id].quantity -= 1;
+      else delete newCart[id];
+      return newCart;
+    });
+  };
+
+  const handleViewCart = () => {
+    router.push('/cart');
+  };
+
+  const handleTabChange = (_: any, newVal: number | 'all') =>
+    setActiveCategory(newVal);
+
+  const displayedProducts =
+    activeCategory === 'all'
+      ? products
+      : products.filter((p) =>
+          p.categories?.some((c) => c.id === activeCategory)
+        );
 
   return (
-    <SectionBox>
-      <Title>Best Deals</Title>
-
-      <Tabs
-        value={value}
-        onChange={handleChange}
-        variant="scrollable"
-        scrollButtons="auto"
+    <Box
+      sx={{
+        p: { xs: 1, md: 2 },
+        background: 'linear-gradient(180deg, #fff 40%, #9a979fff 100%)',
+      }}
+    >
+      {/* Header */}
+      <Box
         sx={{
-          mb: 1,
-          '& .MuiTabs-indicator': { backgroundColor: '#db1b88', height: 3 },
-          '& .MuiTab-root': { textTransform: 'none', fontWeight: 500, color: '#666', '&.Mui-selected': { color: '#db1b88', fontWeight: 600 } },
+          mb: 1.5,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}
       >
-        {categories.map((cat, index) => (
-          <Tab key={index} label={cat} />
+        <Typography variant="h5" sx={{ fontWeight: 700, color: '#000' }}>
+          Hot Deals 
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<ShoppingCart />}
+          onClick={handleViewCart}
+          sx={{
+            backgroundColor: '#db1b88',
+            color: '#fff',
+            textTransform: 'none',
+            fontSize: 12,
+            '&:hover': { backgroundColor: '#b1166f' },
+          }}
+        >
+          View Cart ({Object.keys(cart).length})
+        </Button>
+      </Box>
+
+      {/* Category Tabs */}
+      <Tabs
+        value={activeCategory}
+        onChange={handleTabChange}
+        variant={isMobile ? 'scrollable' : 'standard'}
+        scrollButtons
+        allowScrollButtonsMobile
+        sx={{ mb: 1 }}
+      >
+        <Tab label="All" value="all" />
+        {categories.map((c) => (
+          <Tab key={c.id} label={c.name} value={c.id} />
         ))}
       </Tabs>
 
-      <Grid container spacing={1} justifyContent="center" alignItems="stretch">
-        {displayedProducts.length > 0 ? (
-          displayedProducts.map((product, index) => (
-            <Grid item xs={6} sm={3} md={3} key={index}>
-              <ProductCard>
-                <CardContent
+      {/* Product Cards */}
+      <Box
+        sx={{
+          display: 'flex',
+          overflowX: 'auto',
+          gap: 1.5,
+          pb: 1.5,
+          '&::-webkit-scrollbar': { display: 'none' },
+        }}
+      >
+        {displayedProducts.map((product) => {
+          const images = [product.cover_image, ...(product.images || [])]
+            .filter(Boolean)
+            .slice(0, 3);
+          const currentIndex = currentIndexes[product.id] || 0;
+          const finalPrice = product.discount
+            ? (product.price - product.price * (product.discount / 100)).toFixed(2)
+            : product.price.toFixed(2);
+
+          return (
+            <Card
+              key={product.id}
+              sx={{
+                minWidth: 180,
+                maxWidth: 180,
+                flex: '0 0 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                height: 300,
+                position: 'relative',
+                boxShadow: '0 1px 6px rgba(0,0,0,0.08)',
+              }}
+            >
+              {/* Discount Tag */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 6,
+                  left: 6,
+                  backgroundColor: '#dc1a8a',
+                  color: '#fff',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  px: 0.5,
+                  py: 0.3,
+                  borderRadius: 1,
+                }}
+              >
+                {product.discount}% OFF
+              </Box>
+
+              {/* Wishlist */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 6,
+                  right: 6,
+                  zIndex: 1,
+                  backgroundColor: 'rgba(255,255,255,0.9)',
+                  width: 24,
+                  height: 24,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+                onClick={() => handleWishlistToggle(product.id)}
+              >
+                <Favorite
                   sx={{
-                    flexGrow: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    p: 1,
+                    color: wishlist.has(product.id) ? '#db1b88' : '#666',
+                    fontSize: 14,
+                  }}
+                />
+              </Box>
+
+              {/* Image */}
+              <Box
+                sx={{
+                  position: 'relative',
+                  cursor: 'pointer',
+                  height: 120,
+                }}
+                onClick={() => router.push(`/product/${product.id}`)}
+              >
+                <CardMedia
+                  component="img"
+                  image={
+                    images[currentIndex]?.startsWith('http')
+                      ? images[currentIndex]
+                      : `${MEDIA_BASE}${images[currentIndex]}`
+                  }
+                  sx={{
+                    objectFit: 'cover',
+                    width: '100%',
+                    height: '100%',
+                  }}
+                />
+              </Box>
+
+              {/* Info */}
+              <CardContent sx={{ flexGrow: 1, p: 1 }}>
+                <Typography
+                  variant="subtitle2"
+                  sx={{ fontWeight: 600, color: '#000' }}
+                  noWrap
+                >
+                  {product.title}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{ color: '#666' }}
+                  noWrap
+                >
+                  {product.description}
+                </Typography>
+
+                <Typography
+                  variant="caption"
+                  sx={{
+                    textDecoration: 'line-through',
+                    color: '#888',
                   }}
                 >
-                  <ImageBox>
-                    <img src={product.image || '/images/placeholder.png'} alt={product.name} />
-                  </ImageBox>
-                  <Typography variant="body2" sx={{ color: '#666', mb: 0.5, fontSize: 12 }} noWrap>
-                    {product.name}
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 'bold', color: '#000', mb: 0.5, fontSize: 14 }}>
-                    ${product.price}{' '}
-                    {product.oldPrice && (
-                      <span style={{ color: '#999', textDecoration: 'line-through', fontWeight: 'normal', fontSize: 12 }}>
-                        ${product.oldPrice}
-                      </span>
-                    )}
-                  </Typography>
+                  KES {product.price}
+                </Typography>
+                <Typography
+                  variant="subtitle2"
+                  sx={{ fontWeight: 700, color: '#000', mt: 0.5 }}
+                >
+                  KES {finalPrice}
+                </Typography>
+
+                {!cart[product.id] ? (
                   <Button
                     variant="contained"
+                    startIcon={<ShoppingCart />}
                     sx={{
                       backgroundColor: '#db1b88',
                       color: '#fff',
-                      '&:hover': { backgroundColor: '#b1166f' },
-                      padding: '4px 12px',
-                      fontSize: 11,
                       textTransform: 'none',
+                      fontSize: 12,
+                      mt: 0.5,
+                      '&:hover': { backgroundColor: '#b1166f' },
+                    }}
+                    onClick={() => handleAddToCart(product)}
+                  >
+                    Add to Cart
+                  </Button>
+                ) : (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      mt: 0.5,
                     }}
                   >
-                    Shop Now
-                  </Button>
-                </CardContent>
-              </ProductCard>
-            </Grid>
-          ))
-        ) : (
-          <Typography sx={{ color: '#666', textAlign: 'center', width: '100%' }}>No products available.</Typography>
-        )}
-      </Grid>
-    </SectionBox>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleDecreaseQuantity(product.id)}
+                    >
+                      <Remove sx={{ color: '#db1b88', fontSize: 16 }} />
+                    </IconButton>
+                    <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+                      {cart[product.id].quantity}
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleAddToCart(product)}
+                    >
+                      <Add sx={{ color: '#db1b88', fontSize: 16 }} />
+                    </IconButton>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </Box>
+    </Box>
   );
-};
-
-export default DealsSection;
+}

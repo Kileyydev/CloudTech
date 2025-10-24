@@ -87,9 +87,6 @@ export default function AdminRepairsPage() {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Typography variant="h4" sx={{ fontWeight: 700, mb: 4, color: "#db1b88" }}>
-        Repair Requests Dashboard
-      </Typography>
 
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>

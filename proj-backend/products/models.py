@@ -42,16 +42,13 @@ class Tag(models.Model):
 class Product(models.Model):
     """
     General product (e.g., 'iPhone 14').
-    Now supports MULTIPLE categories + price/discount/stock.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=300, unique=True, blank=True)
     description = models.TextField(blank=True)
 
-    # ✅ UPDATED: Multiple categories instead of one
     categories = models.ManyToManyField(Category, related_name='products', blank=True)
-
     brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, related_name='products')
     tags = models.ManyToManyField(Tag, blank=True, related_name='products')
     cover_image = models.ImageField(upload_to='products/covers/', null=True, blank=True)
@@ -59,6 +56,13 @@ class Product(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     stock = models.PositiveIntegerField(default=0)
     discount = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    final_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+
+    # ✅ New fields for frontend options
+    colors = models.JSONField(blank=True, null=True, help_text='List of available colors')
+    storage_options = models.JSONField(blank=True, null=True, help_text='List of storage options')
+    condition_options = models.JSONField(blank=True, null=True, help_text='["New", "Refurbished"]')
+    features = models.JSONField(blank=True, null=True, help_text='List of product features')
 
     is_active = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
@@ -80,13 +84,19 @@ class Product(models.Model):
                 slug = f"{base}-{i}"
                 i += 1
             self.slug = slug
+
+        # Calculate final price
+        if self.discount and self.discount > 0:
+            self.final_price = self.price - (self.price * self.discount / 100)
+        else:
+            self.final_price = self.price
+
         super().save(*args, **kwargs)
 
 
 class ProductVariant(models.Model):
     """
-    Specific configuration of a product (e.g. different RAM, colors).
-    Keeping its own price & stock.
+    Specific configuration of a product (e.g., color, storage, RAM).
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')

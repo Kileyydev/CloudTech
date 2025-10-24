@@ -12,7 +12,7 @@ const GadgetRepairSection = () => {
   return (
     <Box
       sx={{
-        background: 'linear-gradient(180deg, #9a979fff 40%, #fff 100%)',
+        background: 'linear-gradient(180deg, #fff 40%, #9a979fff 100%)',
         color: '#000',
         padding: { xs: '24px 16px', md: '40px 24px' },
         minHeight: '60vh',

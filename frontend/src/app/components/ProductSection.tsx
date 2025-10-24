@@ -1,3 +1,4 @@
+// src/app/components/ProductSection.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -11,6 +12,8 @@ import {
   Button,
   useTheme,
   useMediaQuery,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import { Favorite, ShoppingCart, Add, Remove } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
@@ -26,15 +29,28 @@ type ProductT = {
   stock: number;
 };
 
+type CartItem = {
+  id: number;
+  title: string;
+  price: number;
+  quantity: number;
+  stock: number;
+};
+
 export default function ProductSection() {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [products, setProducts] = useState<ProductT[]>([]);
   const [wishlist, setWishlist] = useState<Set<number>>(new Set());
-  const [cart, setCart] = useState<Record<number, any>>({});
+  const [cart, setCart] = useState<Record<number, CartItem>>({});
   const [currentIndexes, setCurrentIndexes] = useState<Record<number, number>>({});
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   // Fetch featured products
   useEffect(() => {
@@ -45,74 +61,142 @@ export default function ProductSection() {
         const data = await res.json();
         const list = data.results || data;
 
-        // Initialize slider index for each product
         const indexes: Record<number, number> = {};
-        list.forEach((p: ProductT) => {
-          indexes[p.id] = 0;
-        });
+        list.forEach((p: ProductT) => (indexes[p.id] = 0));
         setCurrentIndexes(indexes);
-
         setProducts(list);
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching products:', err);
+        setSnackbar({ open: true, message: 'Failed to load products', severity: 'error' });
       }
     };
     fetchProducts();
   }, []);
 
-  // Load cart from localStorage
+  // Load cart from localStorage on mount
   useEffect(() => {
-    const storedCart = JSON.parse(localStorage.getItem('cart') || '{}');
-    setCart(storedCart);
+    const loadCart = () => {
+      try {
+        const storedCart = localStorage.getItem('cart');
+        if (storedCart) {
+          const parsedCart = JSON.parse(storedCart);
+          const validCart: Record<number, CartItem> = {};
+          Object.entries(parsedCart).forEach(([id, item]: [string, any]) => {
+            if (item.quantity > 0 && item.id) {
+              validCart[Number(id)] = {
+                ...item,
+                quantity: Math.max(1, Math.min(item.quantity, item.stock || 999)),
+              };
+            }
+          });
+          setCart(validCart);
+        }
+      } catch (error) {
+        console.error('Error loading cart from localStorage:', error);
+        localStorage.removeItem('cart');
+      }
+    };
+    loadCart();
   }, []);
 
-  // Save cart to localStorage
+  // Save cart to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cart));
+    try {
+      localStorage.setItem('cart', JSON.stringify(cart));
+    } catch (error) {
+      console.error('Error saving cart to localStorage:', error);
+    }
   }, [cart]);
+
+  const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
 
   const handleWishlistToggle = (id: number) => {
     setWishlist((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(id)) newSet.delete(id);
-      else newSet.add(id);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      localStorage.setItem('wishlist', JSON.stringify(Array.from(newSet)));
       return newSet;
     });
   };
 
   const handleAddToCart = (product: ProductT) => {
-    if (product.stock === 0) return;
+    if (product.stock === 0) {
+      showSnackbar('This product is out of stock', 'error');
+      return;
+    }
+
     setCart((prev) => {
-      const newCart = { ...prev };
-      if (newCart[product.id]) {
-        if (newCart[product.id].quantity < product.stock) newCart[product.id].quantity += 1;
-      } else {
-        newCart[product.id] = {
+      const existingItem = prev[product.id];
+      let newQuantity = 1;
+      if (existingItem) {
+        newQuantity = existingItem.quantity + 1;
+        if (newQuantity > product.stock) {
+          showSnackbar(`Only ${product.stock} items available in stock`, 'error');
+          return prev;
+        }
+      }
+
+      const newCart = {
+        ...prev,
+        [product.id]: {
           id: product.id,
           title: product.title,
           price: product.price,
-          quantity: 1,
-        };
-      }
+          quantity: newQuantity,
+          stock: product.stock,
+        },
+      };
+
+      showSnackbar(existingItem ? `Added another ${product.title} to cart` : `${product.title} added to cart!`);
       return newCart;
     });
   };
 
   const handleDecreaseQuantity = (id: number) => {
     setCart((prev) => {
-      const newCart = { ...prev };
-      if (newCart[id]?.quantity > 1) newCart[id].quantity -= 1;
-      else delete newCart[id];
-      return newCart;
+      const existingItem = prev[id];
+      if (!existingItem) return prev;
+
+      const newQuantity = existingItem.quantity - 1;
+
+      if (newQuantity <= 0) {
+        const newCart = { ...prev };
+        delete newCart[id];
+        showSnackbar('Item removed from cart');
+        return newCart;
+      }
+
+      return {
+        ...prev,
+        [id]: { ...existingItem, quantity: newQuantity },
+      };
     });
   };
 
   const handleViewCart = () => {
+    if (Object.keys(cart).length === 0) {
+      showSnackbar('Your cart is empty', 'error');
+      return;
+    }
     router.push('/cart');
   };
 
+  const getCartItemCount = () => {
+    return Object.values(cart).reduce((total, item) => total + (item.quantity || 0), 0);
+  };
+
   return (
-    <Box sx={{ p: { xs: 1, md: 2 }, background: 'linear-gradient(180deg, #9a979fff 40%, #fff 100%)', }}>
+    <Box sx={{ p: { xs: 1, md: 2 }, background: 'linear-gradient(180deg, #9a979fff 40%, #fff 100%)' }}>
       <Box sx={{ mb: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h5" sx={{ fontWeight: 700, color: '#000' }}>
           Featured Products
@@ -121,26 +205,26 @@ export default function ProductSection() {
           variant="contained"
           startIcon={<ShoppingCart />}
           onClick={handleViewCart}
-          sx={{ backgroundColor: '#db1b88', color: '#fff', textTransform: 'none', fontSize: 12, '&:hover': { backgroundColor: '#b1166f' } }}
+          sx={{
+            backgroundColor: '#db1b88',
+            color: '#fff',
+            textTransform: 'none',
+            fontSize: 12,
+            '&:hover': { backgroundColor: '#b1166f' },
+          }}
+          disabled={getCartItemCount() === 0}
         >
-          View Cart ({Object.keys(cart).length})
+          View Cart ({getCartItemCount()})
         </Button>
       </Box>
 
-      <Box
-        sx={{
-          display: 'flex',
-          overflowX: 'auto',
-          gap: 1.5,
-          pb: 1.5,
-          '&::-webkit-scrollbar': { display: 'none' },
-        }}
-      >
+      <Box sx={{ display: 'flex', overflowX: 'auto', gap: 1.5, pb: 1.5, '&::-webkit-scrollbar': { display: 'none' } }}>
         {products
           .filter((p) => p.stock > 0)
           .map((product) => {
             const images = [product.cover_image, ...(product.images || [])].filter(Boolean).slice(0, 3);
             const currentIndex = currentIndexes[product.id] || 0;
+            const cartItem = cart[product.id];
 
             return (
               <Card
@@ -153,9 +237,9 @@ export default function ProductSection() {
                   flexDirection: 'column',
                   height: 280,
                   boxShadow: '0 1px 6px rgba(0,0,0,0.08)',
+                  position: 'relative',
                 }}
               >
-                {/* Wishlist */}
                 <Box
                   sx={{
                     position: 'absolute',
@@ -169,13 +253,21 @@ export default function ProductSection() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
+                    borderRadius: '50%',
                   }}
-                  onClick={() => handleWishlistToggle(product.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleWishlistToggle(product.id);
+                  }}
                 >
-                  <Favorite sx={{ color: wishlist.has(product.id) ? '#db1b88' : '#666', fontSize: 14 }} />
+                  <Favorite
+                    sx={{
+                      color: wishlist.has(product.id) ? '#db1b88' : '#666',
+                      fontSize: 14,
+                    }}
+                  />
                 </Box>
 
-                {/* Image */}
                 <Box
                   sx={{ position: 'relative', cursor: 'pointer', height: 120 }}
                   onClick={() => router.push(`/product/${product.id}`)}
@@ -190,9 +282,24 @@ export default function ProductSection() {
                     alt={product.title}
                     sx={{ objectFit: 'cover', width: '100%', height: '100%' }}
                   />
+                  {product.stock < 5 && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        bottom: 4,
+                        left: 4,
+                        backgroundColor: 'rgba(0,0,0,0.7)',
+                        color: 'white',
+                        padding: '2px 6px',
+                        borderRadius: 1,
+                        fontSize: '0.7rem',
+                      }}
+                    >
+                      Only {product.stock} left!
+                    </Box>
+                  )}
                 </Box>
 
-                {/* Product Info */}
                 <CardContent sx={{ flexGrow: 1, p: 1 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#000' }} noWrap>
                     {product.title}
@@ -201,34 +308,82 @@ export default function ProductSection() {
                     {product.description}
                   </Typography>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#000', mt: 0.5 }}>
-                    ${product.price}
+                    KES {product.price.toLocaleString()}
                   </Typography>
 
-                  {!cart[product.id] ? (
+                  {cartItem ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDecreaseQuantity(product.id);
+                        }}
+                        sx={{
+                          color: '#db1b88',
+                          '&:hover': { backgroundColor: 'rgba(219, 27, 136, 0.1)' },
+                        }}
+                      >
+                        <Remove sx={{ fontSize: 16 }} />
+                      </IconButton>
+                      <Typography sx={{ fontWeight: 600, fontSize: 14, minWidth: 20, textAlign: 'center' }}>
+                        {cartItem.quantity}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCart(product);
+                        }}
+                        disabled={cartItem.quantity >= product.stock}
+                        sx={{
+                          color: '#db1b88',
+                          '&:hover': { backgroundColor: 'rgba(219, 27, 136, 0.1)' },
+                          '&[disabled]': { color: '#ccc' },
+                        }}
+                      >
+                        <Add sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Box>
+                  ) : (
                     <Button
                       variant="contained"
                       startIcon={<ShoppingCart />}
-                      sx={{ backgroundColor: '#db1b88', color: '#fff', textTransform: 'none', fontSize: 12, mt: 0.5, '&:hover': { backgroundColor: '#b1166f' } }}
-                      onClick={() => handleAddToCart(product)}
+                      fullWidth
+                      sx={{
+                        backgroundColor: '#db1b88',
+                        color: '#fff',
+                        textTransform: 'none',
+                        fontSize: 12,
+                        mt: 0.5,
+                        '&:hover': { backgroundColor: '#b1166f' },
+                        py: 0.5,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddToCart(product);
+                      }}
+                      disabled={product.stock === 0}
                     >
                       Add to Cart
                     </Button>
-                  ) : (
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
-                      <IconButton size="small" onClick={() => handleDecreaseQuantity(product.id)}>
-                        <Remove sx={{ color: '#db1b88', fontSize: 16 }} />
-                      </IconButton>
-                      <Typography sx={{ fontWeight: 600, fontSize: 14 }}>{cart[product.id].quantity}</Typography>
-                      <IconButton size="small" onClick={() => handleAddToCart(product)}>
-                        <Add sx={{ color: '#db1b88', fontSize: 16 }} />
-                      </IconButton>
-                    </Box>
                   )}
                 </CardContent>
               </Card>
             );
           })}
       </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

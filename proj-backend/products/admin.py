@@ -47,6 +47,34 @@ class ProductAdmin(admin.ModelAdmin):
     search_fields = ("title", "brand__name", "categories__name")
     list_filter = ("brand", "categories", "is_active", "is_featured")
 
+    # Show the new fields in the admin form
+    fieldsets = (
+        (None, {
+            "fields": (
+                "title",
+                "slug",
+                "description",
+                "brand",
+                "categories",
+                "tags",
+                "price",
+                "stock",
+                "discount",
+                "is_active",
+                "is_featured",
+                "cover_image",
+            ),
+        }),
+        ("Options", {
+            "fields": (
+                "colors",
+                "storage_options",
+                "condition_options",
+                "features",
+            ),
+        }),
+    )
+
     def get_categories(self, obj):
         return ", ".join([c.name for c in obj.categories.all()])
     get_categories.short_description = "Categories"
