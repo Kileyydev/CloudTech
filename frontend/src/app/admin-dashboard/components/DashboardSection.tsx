@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import {
   Box,
   Typography,
-  Grid,
   Card,
   CardContent,
   CircularProgress,
@@ -91,7 +90,14 @@ const AdminDashboardPage = () => {
       </Typography>
 
       {/* Top Stats Section */}
-      <Grid container spacing={3}>
+      <Box
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 3,
+          justifyContent: { xs: "center", sm: "space-between" },
+        }}
+      >
         {[
           {
             title: "Total Products",
@@ -114,7 +120,13 @@ const AdminDashboardPage = () => {
             icon: <DollarSign color="#DC1A8A" size={28} />,
           },
         ].map((stat, index) => (
-          <Grid item xs={12} sm={6} md={3} key={index}>
+          <Box
+            key={index}
+            sx={{
+              flex: { xs: "1 1 100%", sm: "1 1 45%", md: "1 1 23%" }, // Responsive widths
+              minWidth: { xs: "100%", sm: "200px" }, // Minimum width for smaller screens
+            }}
+          >
             <Card
               sx={{
                 borderRadius: 3,
@@ -142,9 +154,9 @@ const AdminDashboardPage = () => {
                 </Typography>
               </CardContent>
             </Card>
-          </Grid>
+          </Box>
         ))}
-      </Grid>
+      </Box>
 
       {/* Sales Overview Chart */}
       <Box

@@ -28,7 +28,10 @@ export default function TestimonialsAdminPage() {
   const [snack, setSnack] = useState<{open:boolean; msg:string; severity:"success"|"error"}>({open:false,msg:"",severity:"success"});
 
   const token = typeof window !== "undefined" ? localStorage.getItem("access") : null;
-  const headers = token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   useEffect(() => {
     fetchList();
