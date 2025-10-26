@@ -1,8 +1,12 @@
-"use client";
-import React, { useState, useEffect } from 'react';
+'use client';
+
+import React from 'react';
 import { Box, Typography, styled, IconButton } from '@mui/material';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation } from 'swiper/modules';
 import { ArrowBackIos, ArrowForwardIos } from '@mui/icons-material';
-import { useTheme } from '@mui/material/styles';
+import 'swiper/css';
+import 'swiper/css/navigation';
 
 const CategoriesContainer = styled(Box)(({ theme }) => ({
   padding: theme.spacing(1.5, 0),
@@ -37,59 +41,27 @@ const Title = styled(Typography)(({ theme }) => ({
   },
 }));
 
-const CarouselWrapper = styled(Box)(({ theme }) => ({
-  overflow: 'hidden',
-  position: 'relative',
-  [theme.breakpoints.up('lg')]: {
-    display: 'none', // Hide carousel on lg+
-  },
-}));
-
-const Carousel = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  transition: 'transform 1s ease-in-out',
-  '&.resetting': {
-    transition: 'none', // Disable transition during reset
-  },
-  [theme.breakpoints.down('sm')]: {
-    flexWrap: 'nowrap',
-    transition: 'transform 1.5s ease-in-out', // Slower on xs
-  },
-}));
-
-const GridWrapper = styled(Box)(({ theme }) => ({
-  display: 'none',
-  [theme.breakpoints.up('lg')]: {
-    display: 'flex', // Changed to flex for grid replacement
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: theme.spacing(1), // Matches original Grid spacing={1}
-  },
-}));
-
 const CategoryCard = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
   textAlign: 'center',
-  width: '140px',
+  width: 'clamp(80px, 28vw, 100px)',
   flexShrink: 0,
-  padding: theme.spacing(0, 0.75),
-  [theme.breakpoints.down('sm')]: {
-    width: '100%',
-    maxWidth: '120px',
+  padding: theme.spacing(0, 0.5),
+  boxShadow: '0 3px 6px rgba(0, 0, 0, 0.1)',
+  [theme.breakpoints.up('sm')]: {
+    width: 'clamp(100px, 22vw, 120px)',
   },
   [theme.breakpoints.up('lg')]: {
-    width: 'clamp(110px, 11vw, 130px)',
+    width: 'clamp(100px, 12vw, 120px)',
     padding: theme.spacing(0.5),
-    flex: '1 1 calc(20% - 8px)', // Mimics lg={2.4} (12 / 2.4 = 5 columns)
   },
 }));
 
 const CategoryImage = styled(Box)(({ theme }) => ({
-  width: '100px',
-  height: '100px',
+  width: 'clamp(60px, 22vw, 80px)',
+  height: 'clamp(60px, 22vw, 80px)',
   borderRadius: '50%',
   backgroundColor: '#333',
   display: 'flex',
@@ -97,13 +69,15 @@ const CategoryImage = styled(Box)(({ theme }) => ({
   justifyContent: 'center',
   overflow: 'hidden',
   marginBottom: theme.spacing(0.75),
-  [theme.breakpoints.down('sm')]: {
-    width: '100px',
-    height: '100px',
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
+  [theme.breakpoints.up('sm')]: {
+    width: 'clamp(70px, 18vw, 90px)',
+    height: 'clamp(70px, 18vw, 90px)',
   },
   [theme.breakpoints.up('lg')]: {
-    width: 'clamp(90px, 9vw, 100px)',
-    height: 'clamp(90px, 9vw, 100px)',
+    width: 'clamp(80px, 10vw, 100px)',
+    height: 'clamp(80px, 10vw, 100px)',
   },
 }));
 
@@ -119,9 +93,8 @@ const ProductCount = styled(Typography)(({ theme }) => ({
   color: '#B0B0B0',
 }));
 
-const NavButtonLeft = styled(IconButton)(({ theme }) => ({
+const NavButton = styled(IconButton)(({ theme }) => ({
   position: 'absolute',
-  left: 0,
   top: '50%',
   transform: 'translateY(-50%)',
   color: '#FFFFFF',
@@ -133,30 +106,32 @@ const NavButtonLeft = styled(IconButton)(({ theme }) => ({
   fontSize: 'clamp(1rem, 2.3vw, 1.2rem)',
   [theme.breakpoints.down('sm')]: {
     fontSize: 'clamp(0.9rem, 1.8vw, 1rem)',
+  },
+  [theme.breakpoints.up('lg')]: {
+    display: 'none',
   },
 }));
 
-const NavButtonRight = styled(IconButton)(({ theme }) => ({
-  position: 'absolute',
+const NavButtonLeft = styled(NavButton)({
+  left: 0,
+});
+
+const NavButtonRight = styled(NavButton)({
   right: 0,
-  top: '50%',
-  transform: 'translateY(-50%)',
-  color: '#FFFFFF',
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  '&:hover': {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-  },
-  zIndex: 10,
-  fontSize: 'clamp(1rem, 2.3vw, 1.2rem)',
-  [theme.breakpoints.down('sm')]: {
-    fontSize: 'clamp(0.9rem, 1.8vw, 1rem)',
+});
+
+const CategoriesWrapper = styled(Box)(({ theme }) => ({
+  display: 'none',
+  [theme.breakpoints.up('lg')]: {
+    display: 'flex',
+    flexWrap: 'nowrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: theme.spacing(0.25), // 2px gap
   },
 }));
 
 const TopCategoriesSection = () => {
-  const theme = useTheme();
-  const [currentIndex, setCurrentIndex] = useState(0);
-
   const categories = [
     { name: 'Headphones', count: '25+ Products', image: '/images/headphones.jpg' },
     { name: 'Mobile Phones', count: '25+ Products', image: '/images/mobile-phones.jpg' },
@@ -168,98 +143,53 @@ const TopCategoriesSection = () => {
     { name: 'iPads', count: '25+ Products', image: '/images/ipads.jpg' },
   ];
 
-  const itemsPerPage = theme.breakpoints.down('sm') ? 1 : 4;
-  const totalPages = Math.ceil(categories.length / itemsPerPage);
-  const extendedCategories = [...categories, ...categories.slice(0, itemsPerPage)]; // Duplicate for seamless looping
-
-  useEffect(() => {
-    if (currentIndex >= categories.length) {
-      const resetTimeout = setTimeout(() => {
-        setCurrentIndex(0);
-      }, 50); // Short delay to allow transition to complete
-      return () => clearTimeout(resetTimeout);
-    } else if (currentIndex < 0) {
-      const resetTimeout = setTimeout(() => {
-        setCurrentIndex(categories.length - 1);
-      }, 50);
-      return () => clearTimeout(resetTimeout);
-    }
-  }, [currentIndex]);
-
-  const handlePrev = () => {
-    setCurrentIndex((prev) => prev - 1);
-  };
-
-  const handleNext = () => {
-    setCurrentIndex((prev) => prev + 1);
-  };
-
   return (
     <CategoriesContainer>
       <Title>Top Categories</Title>
-      <CarouselWrapper>
-        <NavButtonLeft onClick={handlePrev} disabled={currentIndex === 0}>
-          <ArrowBackIos />
-        </NavButtonLeft>
-        <NavButtonRight onClick={handleNext} disabled={currentIndex >= categories.length - itemsPerPage}>
-          <ArrowForwardIos />
-        </NavButtonRight>
-        <Carousel
-          className={currentIndex >= categories.length || currentIndex < 0 ? 'resetting' : ''}
-          sx={{
-            transform: `translateX(-${currentIndex * (100 / itemsPerPage)}%)`,
-            width: `${(extendedCategories.length / itemsPerPage) * 100}%`,
+      <Box sx={{ display: { xs: 'block', lg: 'none' } }}>
+        <Swiper
+          modules={[Navigation]}
+          navigation={{
+            prevEl: '.swiper-button-prev',
+            nextEl: '.swiper-button-next',
           }}
-        >
-          {extendedCategories.map((category, index) => (
-            <CategoryCard key={index}>
-              <CategoryImage
-                sx={{
-                  backgroundImage: `url(${category.image})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }}
-              />
-              <CategoryName>{category.name}</CategoryName>
-              <ProductCount>{category.count}</ProductCount>
-            </CategoryCard>
-          ))}
-        </Carousel>
-      </CarouselWrapper>
-      <GridWrapper>
-        <Box
-          sx={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: theme.spacing(1), // Matches original Grid spacing={1}
-            '& > *': {
-              flex: {
-                xs: '1 1 100%', // Full width on xs
-                sm: '1 1 calc(33.33% - 8px)', // 3 columns on sm
-                md: '1 1 calc(25% - 8px)', // 4 columns on md
-                lg: '1 1 calc(20% - 8px)', // 5 columns on lg
-              },
-              minWidth: 0,
-            },
+          spaceBetween={2}
+          slidesPerView={2.2}
+          breakpoints={{
+            600: { slidesPerView: 3.2, spaceBetween: 2 },
+            960: { slidesPerView: 3.2, spaceBetween: 2 },
+          }}
+          style={{
+            width: '100%',
+            padding: '0 24px', // Extra padding for nav buttons
           }}
         >
           {categories.map((category, index) => (
-            <CategoryCard key={index}>
-              <CategoryImage
-                sx={{
-                  backgroundImage: `url(${category.image})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }}
-              />
-              <CategoryName>{category.name}</CategoryName>
-              <ProductCount>{category.count}</ProductCount>
-            </CategoryCard>
+            <SwiperSlide key={index} style={{ display: 'flex', justifyContent: 'center' }}>
+              <CategoryCard>
+                <CategoryImage sx={{ backgroundImage: `url(${category.image})` }} />
+                <CategoryName>{category.name}</CategoryName>
+                <ProductCount>{category.count}</ProductCount>
+              </CategoryCard>
+            </SwiperSlide>
           ))}
-        </Box>
-      </GridWrapper>
+          <NavButtonLeft className="swiper-button-prev">
+            <ArrowBackIos />
+          </NavButtonLeft>
+          <NavButtonRight className="swiper-button-next">
+            <ArrowForwardIos />
+          </NavButtonRight>
+        </Swiper>
+      </Box>
+      <CategoriesWrapper>
+        {categories.map((category, index) => (
+          <CategoryCard key={index}>
+            <CategoryImage sx={{ backgroundImage: `url(${category.image})` }} />
+            <CategoryName>{category.name}</CategoryName>
+            <ProductCount>{category.count}</ProductCount>
+          </CategoryCard>
+        ))}
+      </CategoriesWrapper>
     </CategoriesContainer>
   );
 };

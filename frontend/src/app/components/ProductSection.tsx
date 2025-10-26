@@ -1,4 +1,3 @@
-// src/app/components/ProductSection.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -15,8 +14,12 @@ import {
   Snackbar,
   Alert,
 } from '@mui/material';
-import { Favorite, ShoppingCart, Add, Remove } from '@mui/icons-material';
+import { Favorite, ShoppingCart, Add, Remove, ArrowBackIos, ArrowForwardIos } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/navigation';
 
 type ProductT = {
   id: number;
@@ -37,10 +40,10 @@ type CartItem = {
   stock: number;
 };
 
-export default function ProductSection() {
+const ProductSection = () => {
   const theme = useTheme();
   const router = useRouter();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isLargeScreen = useMediaQuery(theme.breakpoints.up('lg'));
 
   const [products, setProducts] = useState<ProductT[]>([]);
   const [wishlist, setWishlist] = useState<Set<number>>(new Set());
@@ -195,6 +198,161 @@ export default function ProductSection() {
     return Object.values(cart).reduce((total, item) => total + (item.quantity || 0), 0);
   };
 
+  const renderCard = (product: ProductT) => {
+    const images = [product.cover_image, ...(product.images || [])].filter(Boolean).slice(0, 3);
+    const currentIndex = currentIndexes[product.id] || 0;
+    const cartItem = cart[product.id];
+
+    // Ensure image is valid before using startsWith
+    const imageSrc = images[currentIndex] && typeof images[currentIndex] === 'string'
+      ? images[currentIndex].startsWith('http')
+        ? images[currentIndex]
+        : `http://localhost:8000${images[currentIndex]}`
+      : '/images/fallback.jpg'; // Fallback image
+
+    return (
+      <Card
+        key={product.id}
+        sx={{
+          minWidth: { xs: 'clamp(150px, 45vw, 170px)', sm: 'clamp(160px, 22vw, 180px)', lg: 'clamp(160px, 18vw, 180px)' },
+          maxWidth: { xs: 170, sm: 180, lg: 180 },
+          flex: '0 0 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          height: 280,
+          boxShadow: '0 1px 6px rgba(0,0,0,0.08)',
+          position: 'relative',
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 6,
+            right: 6,
+            zIndex: 1,
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            width: 24,
+            height: 24,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            borderRadius: '50%',
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleWishlistToggle(product.id);
+          }}
+        >
+          <Favorite
+            sx={{
+              color: wishlist.has(product.id) ? '#db1b88' : '#666',
+              fontSize: 14,
+            }}
+          />
+        </Box>
+
+        <Box
+          sx={{ position: 'relative', cursor: 'pointer', height: 120 }}
+          onClick={() => router.push(`/product/${product.id}`)}
+        >
+          <CardMedia
+            component="img"
+            image={imageSrc}
+            alt={product.title}
+            sx={{ objectFit: 'cover', width: '100%', height: '100%' }}
+          />
+          {product.stock < 5 && (
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: 4,
+                left: 4,
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                color: 'white',
+                padding: '2px 6px',
+                borderRadius: 1,
+                fontSize: '0.7rem',
+              }}
+            >
+              Only {product.stock} left!
+            </Box>
+          )}
+        </Box>
+
+        <CardContent sx={{ flexGrow: 1, p: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#000' }} noWrap>
+            {product.title}
+          </Typography>
+          <Typography variant="caption" sx={{ color: '#666' }} noWrap>
+            {product.description}
+          </Typography>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#000', mt: 0.5 }}>
+            KES {product.price.toLocaleString()}
+          </Typography>
+
+          {cartItem ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDecreaseQuantity(product.id);
+                }}
+                sx={{
+                  color: '#db1b88',
+                  '&:hover': { backgroundColor: 'rgba(219, 27, 136, 0.1)' },
+                }}
+              >
+                <Remove sx={{ fontSize: 16 }} />
+              </IconButton>
+              <Typography sx={{ fontWeight: 600, fontSize: 14, minWidth: 20, textAlign: 'center' }}>
+                {cartItem.quantity}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToCart(product);
+                }}
+                disabled={cartItem.quantity >= product.stock}
+                sx={{
+                  color: '#db1b88',
+                  '&:hover': { backgroundColor: 'rgba(219, 27, 136, 0.1)' },
+                  '&[disabled]': { color: '#ccc' },
+                }}
+              >
+                <Add sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Box>
+          ) : (
+            <Button
+              variant="contained"
+              startIcon={<ShoppingCart />}
+              fullWidth
+              sx={{
+                backgroundColor: '#db1b88',
+                color: '#fff',
+                textTransform: 'none',
+                fontSize: 12,
+                mt: 0.5,
+                py: 0.5,
+                '&:hover': { backgroundColor: '#b1166f' },
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddToCart(product);
+              }}
+              disabled={product.stock === 0}
+            >
+              Add to Cart
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <Box sx={{ p: { xs: 1, md: 2 }, background: 'linear-gradient(180deg, #9a979fff 40%, #fff 100%)' }}>
       <Box sx={{ mb: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -218,161 +376,73 @@ export default function ProductSection() {
         </Button>
       </Box>
 
-      <Box sx={{ display: 'flex', overflowX: 'auto', gap: 1.5, pb: 1.5, '&::-webkit-scrollbar': { display: 'none' } }}>
-        {products
-          .filter((p) => p.stock > 0)
-          .map((product) => {
-            const images = [product.cover_image, ...(product.images || [])].filter(Boolean).slice(0, 3);
-            const currentIndex = currentIndexes[product.id] || 0;
-            const cartItem = cart[product.id];
-
-            return (
-              <Card
-                key={product.id}
-                sx={{
-                  minWidth: 180,
-                  maxWidth: 180,
-                  flex: '0 0 auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  height: 280,
-                  boxShadow: '0 1px 6px rgba(0,0,0,0.08)',
-                  position: 'relative',
-                }}
-              >
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 6,
-                    right: 6,
-                    zIndex: 1,
-                    backgroundColor: 'rgba(255,255,255,0.9)',
-                    width: 24,
-                    height: 24,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    borderRadius: '50%',
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleWishlistToggle(product.id);
-                  }}
-                >
-                  <Favorite
-                    sx={{
-                      color: wishlist.has(product.id) ? '#db1b88' : '#666',
-                      fontSize: 14,
-                    }}
-                  />
-                </Box>
-
-                <Box
-                  sx={{ position: 'relative', cursor: 'pointer', height: 120 }}
-                  onClick={() => router.push(`/product/${product.id}`)}
-                >
-                  <CardMedia
-                    component="img"
-                    image={
-                      images[currentIndex]?.startsWith('http')
-                        ? images[currentIndex]
-                        : `http://localhost:8000${images[currentIndex]}`
-                    }
-                    alt={product.title}
-                    sx={{ objectFit: 'cover', width: '100%', height: '100%' }}
-                  />
-                  {product.stock < 5 && (
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        bottom: 4,
-                        left: 4,
-                        backgroundColor: 'rgba(0,0,0,0.7)',
-                        color: 'white',
-                        padding: '2px 6px',
-                        borderRadius: 1,
-                        fontSize: '0.7rem',
-                      }}
-                    >
-                      Only {product.stock} left!
-                    </Box>
-                  )}
-                </Box>
-
-                <CardContent sx={{ flexGrow: 1, p: 1 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#000' }} noWrap>
-                    {product.title}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#666' }} noWrap>
-                    {product.description}
-                  </Typography>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#000', mt: 0.5 }}>
-                    KES {product.price.toLocaleString()}
-                  </Typography>
-
-                  {cartItem ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDecreaseQuantity(product.id);
-                        }}
-                        sx={{
-                          color: '#db1b88',
-                          '&:hover': { backgroundColor: 'rgba(219, 27, 136, 0.1)' },
-                        }}
-                      >
-                        <Remove sx={{ fontSize: 16 }} />
-                      </IconButton>
-                      <Typography sx={{ fontWeight: 600, fontSize: 14, minWidth: 20, textAlign: 'center' }}>
-                        {cartItem.quantity}
-                      </Typography>
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddToCart(product);
-                        }}
-                        disabled={cartItem.quantity >= product.stock}
-                        sx={{
-                          color: '#db1b88',
-                          '&:hover': { backgroundColor: 'rgba(219, 27, 136, 0.1)' },
-                          '&[disabled]': { color: '#ccc' },
-                        }}
-                      >
-                        <Add sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Box>
-                  ) : (
-                    <Button
-                      variant="contained"
-                      startIcon={<ShoppingCart />}
-                      fullWidth
-                      sx={{
-                        backgroundColor: '#db1b88',
-                        color: '#fff',
-                        textTransform: 'none',
-                        fontSize: 12,
-                        mt: 0.5,
-                        '&:hover': { backgroundColor: '#b1166f' },
-                        py: 0.5,
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAddToCart(product);
-                      }}
-                      disabled={product.stock === 0}
-                    >
-                      Add to Cart
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-      </Box>
+      {isLargeScreen ? (
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'nowrap',
+            justifyContent: 'center',
+            gap: 0.25, // 2px
+          }}
+        >
+          {products.filter((p) => p.stock > 0).slice(0, 5).map(renderCard)}
+        </Box>
+      ) : (
+        <Box sx={{ position: 'relative', padding: '0 24px' }}>
+          <Swiper
+            modules={[Navigation]}
+            navigation={{
+              prevEl: '.swiper-button-prev',
+              nextEl: '.swiper-button-next',
+            }}
+            spaceBetween={2}
+            slidesPerView={2}
+            breakpoints={{
+              600: { slidesPerView: 4, spaceBetween: 2 },
+              960: { slidesPerView: 4, spaceBetween: 2 },
+            }}
+            style={{ width: '100%' }}
+          >
+            {products.filter((p) => p.stock > 0).map((product) => (
+              <SwiperSlide key={product.id} style={{ display: 'flex', justifyContent: 'center' }}>
+                {renderCard(product)}
+              </SwiperSlide>
+            ))}
+          </Swiper>
+          <IconButton
+            className="swiper-button-prev"
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: 0,
+              transform: 'translateY(-50%)',
+              color: '#FFFFFF',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+              zIndex: 10,
+              fontSize: 'clamp(1rem, 2.3vw, 1.2rem)',
+            }}
+          >
+            <ArrowBackIos />
+          </IconButton>
+          <IconButton
+            className="swiper-button-next"
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              right: 0,
+              transform: 'translateY(-50%)',
+              color: '#FFFFFF',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
+              zIndex: 10,
+              fontSize: 'clamp(1rem, 2.3vw, 1.2rem)',
+            }}
+          >
+            <ArrowForwardIos />
+          </IconButton>
+        </Box>
+      )}
 
       <Snackbar
         open={snackbar.open}
@@ -386,4 +456,6 @@ export default function ProductSection() {
       </Snackbar>
     </Box>
   );
-}
+};
+
+export default ProductSection;
