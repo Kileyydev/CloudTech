@@ -4,9 +4,15 @@ import { useState, useEffect, useRef } from 'react';
 import { Box, Typography, TextField, Button, Slide } from '@mui/material';
 import { Send } from '@mui/icons-material';
 
-const SideMessagePanel = ({ footerRef }) => {
+import { RefObject } from 'react';
+
+interface SideMessagePanelProps {
+  footerRef: RefObject<HTMLElement>;
+}
+
+const SideMessagePanel = ({ footerRef }: SideMessagePanelProps) => {
   const [isVisible, setIsVisible] = useState(false);
-  const panelRef = useRef(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -27,12 +33,17 @@ const SideMessagePanel = ({ footerRef }) => {
     };
   }, [footerRef]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const message = panelRef.current.querySelector('input').value;
-    console.log('Message sent:', message);
-    // Add your SendGrid API call here later
-    panelRef.current.querySelector('input').value = '';
+    if (panelRef.current) {
+      const input = panelRef.current.querySelector('input');
+      const message = input ? (input as HTMLInputElement).value : '';
+      console.log('Message sent:', message);
+      // Add your SendGrid API call here later
+      if (input) {
+        (input as HTMLInputElement).value = '';
+      }
+    }
   };
 
   return (

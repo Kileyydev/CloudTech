@@ -1,4 +1,3 @@
-// app/cart/page.js
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -23,7 +22,6 @@ import {
   Radio,
   Collapse,
   Alert,
-  Grid,
   CircularProgress,
   Snackbar,
 } from '@mui/material';
@@ -31,6 +29,7 @@ import { Add, Remove, Delete } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import TopNavBar from '../components/TopNavBar';
 import MainNavBar from '../components/MainNavBar';
+
 type CartItem = {
   id: number;
   title: string;
@@ -250,268 +249,275 @@ export default function CartPage() {
     <Box>
       <TopNavBar />
       <MainNavBar />
-    <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f5f5f5', minHeight: '100vh' }}>
-      <Grid container spacing={4} sx={{ maxWidth: 1200, mx: 'auto' }}>
-        {/* Cart Items */}
-        <Grid item xs={12} md={8}>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, color: '#1a237e' }}>
-            Your Cart
-          </Typography>
-          {Object.values(cart).length === 0 ? (
-            <StyledPaper>
-              <Typography sx={{ p: 3, color: '#777', textAlign: 'center' }}>
-                Your cart is empty 🛒
-              </Typography>
-            </StyledPaper>
-          ) : (
-            <StyledPaper>
-              <TableContainer>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 600 }}>Quantity</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>Price</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>Total</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 600 }}>Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {Object.values(cart).map((item) => (
-                      <TableRow key={item.id} sx={{ '&:hover': { bgcolor: '#f0f4ff' } }}>
-                        <TableCell>{item.title}</TableCell>
-                        <TableCell align="center">
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleQuantityChange(item.id, -1)}
-                              sx={{ bgcolor: '#e0e0e0', '&:hover': { bgcolor: '#d0d0d0' } }}
-                            >
-                              <Remove fontSize="small" />
-                            </IconButton>
-                            <Typography>{item.quantity}</Typography>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleQuantityChange(item.id, 1)}
-                              disabled={item.quantity >= item.stock}
-                              sx={{
-                                bgcolor: '#e0e0e0',
-                                '&:hover': { bgcolor: '#d0d0d0' },
-                                '&[disabled]': { bgcolor: '#e0e0e0', opacity: 0.5 },
-                              }}
-                            >
-                              <Add fontSize="small" />
-                            </IconButton>
-                          </Box>
-                        </TableCell>
-                        <TableCell align="right">KES {item.price.toLocaleString()}</TableCell>
-                        <TableCell align="right">KES {(item.price * item.quantity).toLocaleString()}</TableCell>
-                        <TableCell align="center">
-                          <IconButton
-                            color="error"
-                            onClick={() => handleDelete(item.id)}
-                            sx={{ '&:hover': { bgcolor: '#ffebee' } }}
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </TableCell>
+      <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f5f5f5', minHeight: '100vh' }}>
+        <Box
+          sx={{
+            maxWidth: 1200,
+            mx: 'auto',
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: 4,
+          }}
+        >
+          {/* Cart Items */}
+          <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 66%' } }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, color: '#1a237e' }}>
+              Your Cart
+            </Typography>
+            {Object.values(cart).length === 0 ? (
+              <StyledPaper>
+                <Typography sx={{ p: 3, color: '#777', textAlign: 'center' }}>
+                  Your cart is empty 🛒
+                </Typography>
+              </StyledPaper>
+            ) : (
+              <StyledPaper>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 600 }}>Quantity</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>Price</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 600 }}>Total</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 600 }}>Actions</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              <Divider sx={{ my: 2 }} />
-              <Box sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="subtitle1">Subtotal:</Typography>
-                  <Typography variant="subtitle1">KES {subtotal.toLocaleString()}</Typography>
+                    </TableHead>
+                    <TableBody>
+                      {Object.values(cart).map((item) => (
+                        <TableRow key={item.id} sx={{ '&:hover': { bgcolor: '#f0f4ff' } }}>
+                          <TableCell>{item.title}</TableCell>
+                          <TableCell align="center">
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleQuantityChange(item.id, -1)}
+                                sx={{ bgcolor: '#e0e0e0', '&:hover': { bgcolor: '#d0d0d0' } }}
+                              >
+                                <Remove fontSize="small" />
+                              </IconButton>
+                              <Typography>{item.quantity}</Typography>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleQuantityChange(item.id, 1)}
+                                disabled={item.quantity >= item.stock}
+                                sx={{
+                                  bgcolor: '#e0e0e0',
+                                  '&:hover': { bgcolor: '#d0d0d0' },
+                                  '&[disabled]': { bgcolor: '#e0e0e0', opacity: 0.5 },
+                                }}
+                              >
+                                <Add fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </TableCell>
+                          <TableCell align="right">KES {item.price.toLocaleString()}</TableCell>
+                          <TableCell align="right">KES {(item.price * item.quantity).toLocaleString()}</TableCell>
+                          <TableCell align="center">
+                            <IconButton
+                              color="error"
+                              onClick={() => handleDelete(item.id)}
+                              sx={{ '&:hover': { bgcolor: '#ffebee' } }}
+                            >
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+                <Divider sx={{ my: 2 }} />
+                <Box sx={{ p: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="subtitle1">Subtotal:</Typography>
+                    <Typography variant="subtitle1">KES {subtotal.toLocaleString()}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="subtitle1">Shipping:</Typography>
+                    <Typography variant="subtitle1">KES {shipping.toLocaleString()}</Typography>
+                  </Box>
+                  <Divider sx={{ my: 1 }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                    <Typography variant="h6">Total:</Typography>
+                    <Typography variant="h6">KES {total.toLocaleString()}</Typography>
+                  </Box>
                 </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="subtitle1">Shipping:</Typography>
-                  <Typography variant="subtitle1">KES {shipping.toLocaleString()}</Typography>
-                </Box>
-                <Divider sx={{ my: 1 }} />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                  <Typography variant="h6">Total:</Typography>
-                  <Typography variant="h6">KES {total.toLocaleString()}</Typography>
-                </Box>
-              </Box>
-            </StyledPaper>
-          )}
-        </Grid>
-
-        {/* Checkout Form */}
-        <Grid item xs={12} md={4}>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, color: '#1a237e' }}>
-            Checkout
-          </Typography>
-          <StyledPaper>
-            {error && (
-              <Collapse in={!!error}>
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {error}
-                </Alert>
-              </Collapse>
+              </StyledPaper>
             )}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <TextField
-                label="Full Name *"
-                value={checkoutDetails.name}
-                onChange={(e) => handleChange('name', e.target.value)}
-                fullWidth
-                variant="outlined"
-                size="small"
-              />
-              <TextField
-                label="Phone Number *"
-                value={checkoutDetails.phone}
-                onChange={(e) => handleChange('phone', e.target.value)}
-                fullWidth
-                variant="outlined"
-                size="small"
-                type="tel"
-              />
-              <TextField
-                label="Email"
-                value={checkoutDetails.email}
-                onChange={(e) => handleChange('email', e.target.value)}
-                fullWidth
-                variant="outlined"
-                size="small"
-                type="email"
-              />
-              <TextField
-                label="Address *"
-                value={checkoutDetails.address}
-                onChange={(e) => handleChange('address', e.target.value)}
-                fullWidth
-                variant="outlined"
-                size="small"
-              />
-              <TextField
-                label="City *"
-                value={checkoutDetails.city}
-                onChange={(e) => handleChange('city', e.target.value)}
-                fullWidth
-                variant="outlined"
-                size="small"
-              />
-              <TextField
-                label="Postal Code"
-                value={checkoutDetails.postalCode}
-                onChange={(e) => handleChange('postalCode', e.target.value)}
-                fullWidth
-                variant="outlined"
-                size="small"
-              />
-              <FormControl component="fieldset" sx={{ mt: 2 }}>
-                <FormLabel component="legend" sx={{ fontWeight: 600, color: '#1a237e' }}>
-                  Payment Method *
-                </FormLabel>
-                <RadioGroup
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as 'stk' | 'card' | 'bank' | 'delivery')}
-                >
-                  <FormControlLabel value="stk" control={<Radio />} label="Pay Now: M-Pesa (STK Push)" />
-                  <FormControlLabel value="card" control={<Radio />} label="Pay Now: Card Payment" />
-                  <FormControlLabel value="bank" control={<Radio />} label="Pay Now: Direct Bank Deposit" />
-                  <FormControlLabel value="delivery" control={<Radio />} label="Pay on Delivery" />
-                </RadioGroup>
-              </FormControl>
-              <Collapse in={paymentMethod === 'card'}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
-                  <TextField
-                    label="Card Number *"
-                    value={cardDetails.cardNumber}
-                    onChange={(e) => handleCardChange('cardNumber', e.target.value)}
-                    fullWidth
-                    variant="outlined"
-                    size="small"
-                  />
-                  <Box sx={{ display: 'flex', gap: 2 }}>
+          </Box>
+
+          {/* Checkout Form */}
+          <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 33%' } }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, color: '#1a237e' }}>
+              Checkout
+            </Typography>
+            <StyledPaper>
+              {error && (
+                <Collapse in={!!error}>
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {error}
+                  </Alert>
+                </Collapse>
+              )}
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <TextField
+                  label="Full Name *"
+                  value={checkoutDetails.name}
+                  onChange={(e) => handleChange('name', e.target.value)}
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                />
+                <TextField
+                  label="Phone Number *"
+                  value={checkoutDetails.phone}
+                  onChange={(e) => handleChange('phone', e.target.value)}
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                  type="tel"
+                />
+                <TextField
+                  label="Email"
+                  value={checkoutDetails.email}
+                  onChange={(e) => handleChange('email', e.target.value)}
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                  type="email"
+                />
+                <TextField
+                  label="Address *"
+                  value={checkoutDetails.address}
+                  onChange={(e) => handleChange('address', e.target.value)}
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                />
+                <TextField
+                  label="City *"
+                  value={checkoutDetails.city}
+                  onChange={(e) => handleChange('city', e.target.value)}
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                />
+                <TextField
+                  label="Postal Code"
+                  value={checkoutDetails.postalCode}
+                  onChange={(e) => handleChange('postalCode', e.target.value)}
+                  fullWidth
+                  variant="outlined"
+                  size="small"
+                />
+                <FormControl component="fieldset" sx={{ mt: 2 }}>
+                  <FormLabel component="legend" sx={{ fontWeight: 600, color: '#1a237e' }}>
+                    Payment Method *
+                  </FormLabel>
+                  <RadioGroup
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as 'stk' | 'card' | 'bank' | 'delivery')}
+                  >
+                    <FormControlLabel value="stk" control={<Radio />} label="Pay Now: M-Pesa (STK Push)" />
+                    <FormControlLabel value="card" control={<Radio />} label="Pay Now: Card Payment" />
+                    <FormControlLabel value="bank" control={<Radio />} label="Pay Now: Direct Bank Deposit" />
+                    <FormControlLabel value="delivery" control={<Radio />} label="Pay on Delivery" />
+                  </RadioGroup>
+                </FormControl>
+                <Collapse in={paymentMethod === 'card'}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
                     <TextField
-                      label="Expiry (MM/YY) *"
-                      value={cardDetails.expiry}
-                      onChange={(e) => handleCardChange('expiry', e.target.value)}
+                      label="Card Number *"
+                      value={cardDetails.cardNumber}
+                      onChange={(e) => handleCardChange('cardNumber', e.target.value)}
+                      fullWidth
+                      variant="outlined"
+                      size="small"
+                    />
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <TextField
+                        label="Expiry (MM/YY) *"
+                        value={cardDetails.expiry}
+                        onChange={(e) => handleCardChange('expiry', e.target.value)}
+                        fullWidth
+                        variant="outlined"
+                        size="small"
+                      />
+                      <TextField
+                        label="CVV *"
+                        value={cardDetails.cvv}
+                        onChange={(e) => handleCardChange('cvv', e.target.value)}
+                        fullWidth
+                        variant="outlined"
+                        size="small"
+                      />
+                    </Box>
+                  </Box>
+                </Collapse>
+                <Collapse in={paymentMethod === 'bank'}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+                    <TextField
+                      label="Account Number *"
+                      value={bankDetails.accountNumber}
+                      onChange={(e) => handleBankChange('accountNumber', e.target.value)}
                       fullWidth
                       variant="outlined"
                       size="small"
                     />
                     <TextField
-                      label="CVV *"
-                      value={cardDetails.cvv}
-                      onChange={(e) => handleCardChange('cvv', e.target.value)}
+                      label="Bank Name *"
+                      value={bankDetails.bankName}
+                      onChange={(e) => handleBankChange('bankName', e.target.value)}
                       fullWidth
                       variant="outlined"
                       size="small"
                     />
                   </Box>
-                </Box>
-              </Collapse>
-              <Collapse in={paymentMethod === 'bank'}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
-                  <TextField
-                    label="Account Number *"
-                    value={bankDetails.accountNumber}
-                    onChange={(e) => handleBankChange('accountNumber', e.target.value)}
-                    fullWidth
-                    variant="outlined"
-                    size="small"
-                  />
-                  <TextField
-                    label="Bank Name *"
-                    value={bankDetails.bankName}
-                    onChange={(e) => handleBankChange('bankName', e.target.value)}
-                    fullWidth
-                    variant="outlined"
-                    size="small"
-                  />
-                </Box>
-              </Collapse>
-              <StyledButton
-                variant="contained"
-                color="primary"
-                fullWidth
-                onClick={handleCheckout}
-                disabled={isProcessing || Object.values(cart).length === 0 || !checkoutDetails.name || !checkoutDetails.phone || !checkoutDetails.address || !checkoutDetails.city || !paymentMethod}
-                startIcon={isProcessing ? <CircularProgress size={20} /> : null}
-              >
-                {isProcessing ? 'Processing...' : paymentMethod === 'delivery' ? 'Place Order' : 'Pay Now'}
-              </StyledButton>
-            </Box>
-          </StyledPaper>
-        </Grid>
-      </Grid>
+                </Collapse>
+                <StyledButton
+                  variant="contained"
+                  color="primary"
+                  fullWidth
+                  onClick={handleCheckout}
+                  disabled={isProcessing || Object.values(cart).length === 0 || !checkoutDetails.name || !checkoutDetails.phone || !checkoutDetails.address || !checkoutDetails.city || !paymentMethod}
+                  startIcon={isProcessing ? <CircularProgress size={20} /> : null}
+                >
+                  {isProcessing ? 'Processing...' : paymentMethod === 'delivery' ? 'Place Order' : 'Pay Now'}
+                </StyledButton>
+              </Box>
+            </StyledPaper>
+          </Box>
+        </Box>
 
-      {/* Footer */}
-      <Box sx={{ mt: 4, textAlign: 'center', bgcolor: '#f5f5f5', p: 2 }}>
-        <Typography variant="h6">Phoneplace Kenya</Typography>
-        <Typography variant="body2">Shop Location: Bazaar Plaza, Mezzanine 1 unit 5, Moi Avenue Nairobi</Typography>
-        <Typography variant="body2">Email: info@phoneplacekenya.com</Typography>
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="body2">Sales: 0726 526375 | Repairs: 0745 063030</Typography>
+        {/* Footer */}
+        <Box sx={{ mt: 4, textAlign: 'center', bgcolor: '#f5f5f5', p: 2 }}>
+          <Typography variant="h6">Phoneplace Kenya</Typography>
+          <Typography variant="body2">Shop Location: Bazaar Plaza, Mezzanine 1 unit 5, Moi Avenue Nairobi</Typography>
+          <Typography variant="body2">Email: info@phoneplacekenya.com</Typography>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2">Sales: 0726 526375 | Repairs: 0745 063030</Typography>
+          </Box>
+          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2 }}>
+            <a href="/about">About Us</a>
+            <a href="/contact">Contact Us</a>
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/terms">Terms and Conditions</a>
+          </Box>
         </Box>
-        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2 }}>
-          <a href="/about">About Us</a>
-          <a href="/contact">Contact Us</a>
-          <a href="/privacy">Privacy Policy</a>
-          <a href="/terms">Terms and Conditions</a>
-        </Box>
+
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={3000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </Box>
-
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-
     </Box>
-      </Box>
   );
 }

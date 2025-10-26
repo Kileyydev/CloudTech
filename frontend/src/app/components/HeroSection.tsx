@@ -1,6 +1,6 @@
 "use client";
 import React from 'react';
-import { Box, styled, Grid } from '@mui/material';
+import { Box, styled } from '@mui/material';
 import Carousel from 'react-material-ui-carousel';
 import Image from 'next/image';
 
@@ -124,23 +124,37 @@ const HeroSection: React.FC = () => {
           }}
         >
           {cardItems.map((cardSet, index) => (
-            <Grid container spacing={1.5} key={index} justifyContent="center"> {/* Reduced from 2 */}
+            <Box
+              key={index}
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'center',
+                gap: 1.5, // Matches original Grid spacing={1.5}
+                '& > *': {
+                  flex: {
+                    xs: '1 1 100%', // Full width on extra-small screens
+                    sm: '1 1 calc(50% - 12px)', // Two columns on small screens
+                    md: '1 1 calc(25% - 18px)', // Four columns on medium screens and up
+                  },
+                  minWidth: 0,
+                },
+              }}
+            >
               {cardSet.map((card, cardIndex) => (
-                <Grid item xs={12} sm={6} md={3} key={cardIndex}>
-                  <Card>
-                    <Image
-                      src={card.src}
-                      alt={card.alt}
-                      fill
-                      style={{ objectFit: 'cover' }}
-                      onError={(e) => {
-                        e.currentTarget.src = '/images/fallback.jpg';
-                      }}
-                    />
-                  </Card>
-                </Grid>
+                <Card key={cardIndex}>
+                  <Image
+                    src={card.src}
+                    alt={card.alt}
+                    fill
+                    style={{ objectFit: 'cover' }}
+                    onError={(e) => {
+                      e.currentTarget.src = '/images/fallback.jpg';
+                    }}
+                  />
+                </Card>
               ))}
-            </Grid>
+            </Box>
           ))}
         </Carousel>
       </CardContainer>

@@ -127,7 +127,7 @@ export default function TestimonialsSection() {
           ? data.results
           : [];
 
-        const approved = list.filter((item) => item.is_approved === true);
+        const approved = list.filter((item: TestimonialT) => item.is_approved === true);
         setTestimonials(approved);
       } catch (err: any) {
         setError(err.message || "Failed to load testimonials");

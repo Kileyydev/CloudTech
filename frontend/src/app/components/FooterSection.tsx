@@ -1,5 +1,5 @@
 "use client";
-import { Box, Typography, Grid, IconButton } from '@mui/material';
+import { Box, Typography, IconButton } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import InstagramIcon from '@mui/icons-material/Instagram';
@@ -70,8 +70,24 @@ const FooterTitle = styled(Typography)(({ theme }) => ({
 const Footer = () => {
   return (
     <FooterBox>
-      <Grid container spacing={3}>
-        <Grid item xs={12} sm={6} md={3}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 3,
+          '& > *': {
+            flex: {
+              xs: '1 1 100%', // Full width on extra-small screens
+              sm: '1 1 calc(50% - 12px)', // Two columns on small screens
+              md: '1 1 calc(25% - 18px)', // Four columns on medium screens and up
+            },
+            minWidth: 0,
+          },
+        }}
+      >
+        <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <Box sx={{ mr: 1.5 }}>
               <img
@@ -131,8 +147,8 @@ const Footer = () => {
               <TwitterIcon />
             </IconButton>
           </SocialIconsBox>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        </Box>
+        <Box>
           <FooterTitle>Our Company</FooterTitle>
           <Link href="/about" style={{ textDecoration: 'none' }}>
             <FooterLink>About Us</FooterLink>
@@ -146,8 +162,8 @@ const Footer = () => {
           <Link href="/terms" style={{ textDecoration: 'none' }}>
             <FooterLink>Terms and Conditions</FooterLink>
           </Link>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        </Box>
+        <Box>
           <FooterTitle>Shop By Brands</FooterTitle>
           <Link href="/samsung" style={{ textDecoration: 'none' }}>
             <FooterLink>Samsung</FooterLink>
@@ -161,13 +177,13 @@ const Footer = () => {
           <Link href="/google" style={{ textDecoration: 'none' }}>
             <FooterLink>Google</FooterLink>
           </Link>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        </Box>
+        <Box>
           <FooterTitle>Contact Us</FooterTitle>
           <FooterLink>Sales: 0726 526375</FooterLink>
           <FooterLink>Repairs: 0745 063030</FooterLink>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
     </FooterBox>
   );
 };

@@ -5,15 +5,17 @@ import Footer from './FooterSection';
 import SideMessagePanel from './SideMessagePanel';
 
 export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
-  const footerRef = useRef(null);
+  // Use a generic HTMLElement type instead of HTMLDivElement
+  const footerRef = useRef<HTMLElement | null>(null);
 
   return (
     <>
       {children}
-      <div ref={footerRef}>
+      {/* Footer wrapped in a <footer> tag for semantic correctness */}
+      <footer ref={footerRef as React.RefObject<HTMLElement>}>
         <Footer />
-      </div>
-      <SideMessagePanel footerRef={footerRef} />
+      </footer>
+      <SideMessagePanel footerRef={footerRef as React.RefObject<HTMLElement>} />
     </>
   );
 }

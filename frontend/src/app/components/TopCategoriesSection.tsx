@@ -1,16 +1,16 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, styled, IconButton, Grid } from '@mui/material';
+import { Box, Typography, styled, IconButton } from '@mui/material';
 import { ArrowBackIos, ArrowForwardIos } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 
 const CategoriesContainer = styled(Box)(({ theme }) => ({
-  padding: theme.spacing(1.5, 0), // Further reduced from 2, 0
+  padding: theme.spacing(1.5, 0),
   backgroundColor: '#000',
   position: 'relative',
   overflow: 'hidden',
   [theme.breakpoints.down('sm')]: {
-    padding: theme.spacing(0.75, 0), // Further reduced from 1, 0
+    padding: theme.spacing(0.75, 0),
   },
   [theme.breakpoints.up('md')]: {
     padding: theme.spacing(2, 0),
@@ -24,16 +24,16 @@ const CategoriesContainer = styled(Box)(({ theme }) => ({
 }));
 
 const Title = styled(Typography)(({ theme }) => ({
-  fontSize: 'clamp(1.6rem, 3.8vw, 1.8rem)', // Slightly smaller from 1.8rem, 2rem
+  fontSize: 'clamp(1.6rem, 3.8vw, 1.8rem)',
   fontWeight: 700,
   color: '#FFFFFF',
   textAlign: 'center',
-  marginBottom: theme.spacing(1.5), // Reduced from 2
+  marginBottom: theme.spacing(1.5),
   textTransform: 'uppercase',
-  letterSpacing: '1.2px', // Reduced from 1.5px
+  letterSpacing: '1.2px',
   [theme.breakpoints.down('sm')]: {
-    fontSize: 'clamp(1.2rem, 3.3vw, 1.3rem)', // Slightly smaller from 1.3rem, 1.4rem
-    marginBottom: theme.spacing(0.75), // Reduced from 1
+    fontSize: 'clamp(1.2rem, 3.3vw, 1.3rem)',
+    marginBottom: theme.spacing(0.75),
   },
 }));
 
@@ -60,7 +60,11 @@ const Carousel = styled(Box)(({ theme }) => ({
 const GridWrapper = styled(Box)(({ theme }) => ({
   display: 'none',
   [theme.breakpoints.up('lg')]: {
-    display: 'block', // Show grid on lg+
+    display: 'flex', // Changed to flex for grid replacement
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: theme.spacing(1), // Matches original Grid spacing={1}
   },
 }));
 
@@ -69,21 +73,22 @@ const CategoryCard = styled(Box)(({ theme }) => ({
   flexDirection: 'column',
   alignItems: 'center',
   textAlign: 'center',
-  width: '140px', // Slightly smaller from 150px
+  width: '140px',
   flexShrink: 0,
-  padding: theme.spacing(0, 0.75), // Reduced from 0, 1
+  padding: theme.spacing(0, 0.75),
   [theme.breakpoints.down('sm')]: {
     width: '100%',
-    maxWidth: '120px', // Increased from 112px for visibility
+    maxWidth: '120px',
   },
   [theme.breakpoints.up('lg')]: {
-    width: 'clamp(110px, 11vw, 130px)', // Adjusted from 120px, 140px
+    width: 'clamp(110px, 11vw, 130px)',
     padding: theme.spacing(0.5),
+    flex: '1 1 calc(20% - 8px)', // Mimics lg={2.4} (12 / 2.4 = 5 columns)
   },
 }));
 
 const CategoryImage = styled(Box)(({ theme }) => ({
-  width: '100px', // Slightly smaller from 112px
+  width: '100px',
   height: '100px',
   borderRadius: '50%',
   backgroundColor: '#333',
@@ -91,26 +96,26 @@ const CategoryImage = styled(Box)(({ theme }) => ({
   alignItems: 'center',
   justifyContent: 'center',
   overflow: 'hidden',
-  marginBottom: theme.spacing(0.75), // Reduced from 1
+  marginBottom: theme.spacing(0.75),
   [theme.breakpoints.down('sm')]: {
-    width: '100px', // Increased from 90px
+    width: '100px',
     height: '100px',
   },
   [theme.breakpoints.up('lg')]: {
-    width: 'clamp(90px, 9vw, 100px)', // Adjusted from 100px, 110px
+    width: 'clamp(90px, 9vw, 100px)',
     height: 'clamp(90px, 9vw, 100px)',
   },
 }));
 
 const CategoryName = styled(Typography)(({ theme }) => ({
-  fontSize: 'clamp(0.7rem, 1.7vw, 0.8rem)', // Slightly smaller from 0.75rem, 0.85rem
+  fontSize: 'clamp(0.7rem, 1.7vw, 0.8rem)',
   fontWeight: 500,
   color: '#E0E0E0',
-  marginBottom: theme.spacing(0.4), // Reduced from 0.5
+  marginBottom: theme.spacing(0.4),
 }));
 
 const ProductCount = styled(Typography)(({ theme }) => ({
-  fontSize: 'clamp(0.6rem, 1.5vw, 0.7rem)', // Slightly smaller from 0.65rem, 0.75rem
+  fontSize: 'clamp(0.6rem, 1.5vw, 0.7rem)',
   color: '#B0B0B0',
 }));
 
@@ -125,9 +130,9 @@ const NavButtonLeft = styled(IconButton)(({ theme }) => ({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   zIndex: 10,
-  fontSize: 'clamp(1rem, 2.3vw, 1.2rem)', // Smaller from 1.2rem, 1.4rem
+  fontSize: 'clamp(1rem, 2.3vw, 1.2rem)',
   [theme.breakpoints.down('sm')]: {
-    fontSize: 'clamp(0.9rem, 1.8vw, 1rem)', // Smaller from 1rem, 1.2rem
+    fontSize: 'clamp(0.9rem, 1.8vw, 1rem)',
   },
 }));
 
@@ -142,9 +147,9 @@ const NavButtonRight = styled(IconButton)(({ theme }) => ({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   zIndex: 10,
-  fontSize: 'clamp(1rem, 2.3vw, 1.2rem)', // Smaller from 1.2rem, 1.4rem
+  fontSize: 'clamp(1rem, 2.3vw, 1.2rem)',
   [theme.breakpoints.down('sm')]: {
-    fontSize: 'clamp(0.9rem, 1.8vw, 1rem)', // Smaller from 1rem, 1.2rem
+    fontSize: 'clamp(0.9rem, 1.8vw, 1rem)',
   },
 }));
 
@@ -222,23 +227,38 @@ const TopCategoriesSection = () => {
         </Carousel>
       </CarouselWrapper>
       <GridWrapper>
-        <Grid container spacing={1} justifyContent="center" alignItems="center">
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: theme.spacing(1), // Matches original Grid spacing={1}
+            '& > *': {
+              flex: {
+                xs: '1 1 100%', // Full width on xs
+                sm: '1 1 calc(33.33% - 8px)', // 3 columns on sm
+                md: '1 1 calc(25% - 8px)', // 4 columns on md
+                lg: '1 1 calc(20% - 8px)', // 5 columns on lg
+              },
+              minWidth: 0,
+            },
+          }}
+        >
           {categories.map((category, index) => (
-            <Grid item xs={12} sm={4} md={3} lg={2.4} key={index}>
-              <CategoryCard>
-                <CategoryImage
-                  sx={{
-                    backgroundImage: `url(${category.image})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }}
-                />
-                <CategoryName>{category.name}</CategoryName>
-                <ProductCount>{category.count}</ProductCount>
-              </CategoryCard>
-            </Grid>
+            <CategoryCard key={index}>
+              <CategoryImage
+                sx={{
+                  backgroundImage: `url(${category.image})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              />
+              <CategoryName>{category.name}</CategoryName>
+              <ProductCount>{category.count}</ProductCount>
+            </CategoryCard>
           ))}
-        </Grid>
+        </Box>
       </GridWrapper>
     </CategoriesContainer>
   );

@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -12,37 +12,47 @@ import {
   Divider,
   Snackbar,
   Alert,
-} from "@mui/material";
-import { Send } from "@mui/icons-material";
-import TopNavBar from "../components/TopNavBar";
-import MainNavBar, { navCategories } from "../components/MainNavBar"; // ✅ import navCategories
-import Footer from "../components/FooterSection";
+} from '@mui/material';
+import { Send } from '@mui/icons-material';
+import TopNavBar from '../components/TopNavBar';
+import MainNavBar, { navCategories } from '../components/MainNavBar';
+import Footer from '../components/FooterSection';
+import { CardMediaProps } from '@mui/material/CardMedia';
 
-const API_ENDPOINT = "http://localhost:8000/api/testimonials/";
+// Define interface for CardMedia in case it's added later
+interface CustomCardMediaProps extends CardMediaProps {
+  component?: 'img';
+  image?: string;
+  alt?: string;
+}
+
+const API_ENDPOINT = 'http://localhost:8000/api/testimonials/';
 
 export default function TestimonialsPage() {
   const [formData, setFormData] = useState({
-    category: "",
-    product: "",
-    experience: "",
-    rating: "",
-    name: "",
-    email: "",
-    phone: "",
+    category: '',
+    product: '',
+    experience: '',
+    rating: '',
+    name: '',
+    email: '',
+    phone: '',
   });
   const [image, setImage] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [snack, setSnack] = useState<{
     open: boolean;
-    severity: "success" | "error";
+    severity: 'success' | 'error';
     msg: string;
   }>({
     open: false,
-    severity: "success",
-    msg: "",
+    severity: 'success',
+    msg: '',
   });
 
-  const handleChange = (e: any) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+  ) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -53,12 +63,11 @@ export default function TestimonialsPage() {
   };
 
   const validate = () => {
-    if (!formData.category) return "Please select a category.";
-    if (!formData.product.trim()) return "Please enter product/service name.";
-    if (!formData.experience.trim())
-      return "Please share your experience.";
-    if (!formData.rating) return "Please select a rating.";
-    if (!formData.name.trim()) return "Please enter your name.";
+    if (!formData.category) return 'Please select a category.';
+    if (!formData.product.trim()) return 'Please enter product/service name.';
+    if (!formData.experience.trim()) return 'Please share your experience.';
+    if (!formData.rating) return 'Please select a rating.';
+    if (!formData.name.trim()) return 'Please enter your name.';
     return null;
   };
 
@@ -66,7 +75,7 @@ export default function TestimonialsPage() {
     e.preventDefault();
     const err = validate();
     if (err) {
-      setSnack({ open: true, severity: "error", msg: err });
+      setSnack({ open: true, severity: 'error', msg: err });
       return;
     }
 
@@ -76,38 +85,38 @@ export default function TestimonialsPage() {
       Object.entries(formData).forEach(([key, value]) => {
         formPayload.append(key, value);
       });
-      if (image) formPayload.append("image", image);
+      if (image) formPayload.append('image', image);
 
       const res = await fetch(API_ENDPOINT, {
-        method: "POST",
+        method: 'POST',
         body: formPayload,
       });
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(text || "Failed to submit testimonial");
+        throw new Error(text || 'Failed to submit testimonial');
       }
 
       setSnack({
         open: true,
-        severity: "success",
-        msg: "Thank you! Your testimonial has been submitted for review.",
+        severity: 'success',
+        msg: 'Thank you! Your testimonial has been submitted for review.',
       });
       setFormData({
-        category: "",
-        product: "",
-        experience: "",
-        rating: "",
-        name: "",
-        email: "",
-        phone: "",
+        category: '',
+        product: '',
+        experience: '',
+        rating: '',
+        name: '',
+        email: '',
+        phone: '',
       });
       setImage(null);
     } catch (error: any) {
       setSnack({
         open: true,
-        severity: "error",
-        msg: error.message || "Submission failed",
+        severity: 'error',
+        msg: error.message || 'Submission failed',
       });
     } finally {
       setLoading(false);
@@ -115,35 +124,35 @@ export default function TestimonialsPage() {
   };
 
   const ratings = [
-    { value: 5, label: "⭐⭐⭐⭐⭐ Excellent" },
-    { value: 4, label: "⭐⭐⭐⭐ Good" },
-    { value: 3, label: "⭐⭐⭐ Average" },
-    { value: 2, label: "⭐⭐ Poor" },
-    { value: 1, label: "⭐ Terrible" },
+    { value: 5, label: '⭐⭐⭐⭐⭐ Excellent' },
+    { value: 4, label: '⭐⭐⭐⭐ Good' },
+    { value: 3, label: '⭐⭐⭐ Average' },
+    { value: 2, label: '⭐⭐ Poor' },
+    { value: 1, label: '⭐ Terrible' },
   ];
 
   return (
     <>
       <TopNavBar />
-      <MainNavBar activeSection="testimonials" setActiveSection={() => {}} />
+      <MainNavBar />
 
       <Box
         sx={{
-          backgroundColor: "#fff",
-          minHeight: "100vh",
+          backgroundColor: '#fff',
+          minHeight: '100vh',
           py: { xs: 4, md: 8 },
           px: { xs: 2, md: 6 },
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
         }}
       >
         <Typography
           variant="body1"
           sx={{
-            color: "#555",
+            color: '#555',
             mb: 5,
-            textAlign: "center",
+            textAlign: 'center',
             maxWidth: 700,
             lineHeight: 1.6,
           }}
@@ -155,10 +164,10 @@ export default function TestimonialsPage() {
 
         <Card
           sx={{
-            width: "100%",
+            width: '100%',
             maxWidth: 800,
-            backgroundColor: "#fff",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+            backgroundColor: '#fff',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
             borderRadius: 0,
           }}
         >
@@ -166,9 +175,8 @@ export default function TestimonialsPage() {
             <Box
               component="form"
               onSubmit={handleSubmit}
-              sx={{ display: "flex", flexDirection: "column", gap: 3 }}
+              sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}
             >
-              {/* ✅ Uses categories from your actual navbar */}
               <TextField
                 select
                 label="Product Category"
@@ -250,16 +258,16 @@ export default function TestimonialsPage() {
                 variant="outlined"
                 component="label"
                 sx={{
-                  borderColor: "#db1b88",
-                  color: "#db1b88",
-                  textTransform: "none",
-                  "&:hover": {
-                    borderColor: "#b1166f",
-                    color: "#b1166f",
+                  borderColor: '#db1b88',
+                  color: '#db1b88',
+                  textTransform: 'none',
+                  '&:hover': {
+                    borderColor: '#b1166f',
+                    color: '#b1166f',
                   },
                 }}
               >
-                {image ? `Selected: ${image.name}` : "Upload an Image (optional)"}
+                {image ? `Selected: ${image.name}` : 'Upload an Image (optional)'}
                 <input
                   type="file"
                   accept="image/*"
@@ -275,13 +283,13 @@ export default function TestimonialsPage() {
                 variant="contained"
                 endIcon={<Send />}
                 sx={{
-                  backgroundColor: "#db1b88",
-                  color: "#fff",
-                  "&:hover": { backgroundColor: "#b1166f" },
+                  backgroundColor: '#db1b88',
+                  color: '#fff',
+                  '&:hover': { backgroundColor: '#b1166f' },
                 }}
                 disabled={loading}
               >
-                {loading ? "Sending..." : "Submit Testimonial"}
+                {loading ? 'Sending...' : 'Submit Testimonial'}
               </Button>
             </Box>
           </CardContent>

@@ -1,9 +1,7 @@
 "use client";
-import { Box, Grid, Typography, Card, CardContent } from '@mui/material';
+import { Box, Typography, Card, CardContent } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
-import HeadsetMicIcon from '@mui/icons-material/HeadsetMic';
 import BuildIcon from '@mui/icons-material/Build';
 import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 
@@ -46,72 +44,79 @@ const StyledCard = styled(Card)(({ theme }) => ({
 const FeatureSection = () => {
   return (
     <SectionBox>
-      <Grid container spacing={2} justifyContent="center" alignItems="stretch">
-        <Grid item xs={12} sm={2.4}>
-          <StyledCard>
-            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-              <Box sx={{ mb: 1.5 }}>
-                <LocalShippingIcon sx={{ fontSize: 'clamp(30px, 4vw, 32px)', color: '#333333' }} />
-              </Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: 'bold', color: '#333333', mb: 0.75, fontSize: 'clamp(0.9rem, 2vw, 1rem)' }}
-              >
-                Fast Delivery
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ color: '#666666', flexGrow: 1, display: 'flex', alignItems: 'center', fontSize: 'clamp(0.65rem, 1.8vw, 0.75rem)' }}
-              >
-                Get your gadgets delivered in 1-3 days across the country.
-              </Typography>
-            </CardContent>
-          </StyledCard>
-        </Grid>
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          alignItems: 'stretch',
+          gap: 2,
+          '& > *': {
+            flex: { xs: '1 1 100%', sm: '1 1 calc(20% - 16px)' }, // Full width on xs, ~20% width on sm and up
+            minWidth: 0,
+          },
+        }}
+      >
+        <StyledCard>
+          <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+            <Box sx={{ mb: 1.5 }}>
+              <LocalShippingIcon sx={{ fontSize: 'clamp(30px, 4vw, 32px)', color: '#333333' }} />
+            </Box>
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 'bold', color: '#333333', mb: 0.75, fontSize: 'clamp(0.9rem, 2vw, 1rem)' }}
+            >
+              Fast Delivery
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ color: '#666666', flexGrow: 1, display: 'flex', alignItems: 'center', fontSize: 'clamp(0.65rem, 1.8vw, 0.75rem)' }}
+            >
+              Get your gadgets delivered in 1-3 days across the country.
+            </Typography>
+          </CardContent>
+        </StyledCard>
 
-        <Grid item xs={12} sm={2.4}>
-          <StyledCard>
-            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-              <Box sx={{ mb: 1.5 }}>
-                <BuildIcon sx={{ fontSize: 'clamp(30px, 4vw, 32px)', color: '#333333' }} />
-              </Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: 'bold', color: '#333333', mb: 0.75, fontSize: 'clamp(0.9rem, 2vw, 1rem)' }}
-              >
-                Device Repairs
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ color: '#666666', flexGrow: 1, display: 'flex', alignItems: 'center', fontSize: 'clamp(0.65rem, 1.8vw, 0.75rem)' }}
-              >
-                Expert repairs for phones, tablets, and more.
-              </Typography>
-            </CardContent>
-          </StyledCard>
-        </Grid>
-        <Grid item xs={12} sm={2.4}>
-          <StyledCard>
-            <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-              <Box sx={{ mb: 1.5 }}>
-                <SwapHorizIcon sx={{ fontSize: 'clamp(30px, 4vw, 32px)', color: '#333333' }} />
-              </Box>
-              <Typography
-                variant="h6"
-                sx={{ fontWeight: 'bold', color: '#333333', mb: 0.75, fontSize: 'clamp(0.9rem, 2vw, 1rem)' }}
-              >
-                Trade-In Program
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ color: '#666666', flexGrow: 1, display: 'flex', alignItems: 'center', fontSize: 'clamp(0.65rem, 1.8vw, 0.75rem)' }}
-              >
-                Trade in your old devices for store credit.
-              </Typography>
-            </CardContent>
-          </StyledCard>
-        </Grid>
-      </Grid>
+        <StyledCard>
+          <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+            <Box sx={{ mb: 1.5 }}>
+              <BuildIcon sx={{ fontSize: 'clamp(30px, 4vw, 32px)', color: '#333333' }} />
+            </Box>
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 'bold', color: '#333333', mb: 0.75, fontSize: 'clamp(0.9rem, 2vw, 1rem)' }}
+            >
+              Device Repairs
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ color: '#666666', flexGrow: 1, display: 'flex', alignItems: 'center', fontSize: 'clamp(0.65rem, 1.8vw, 0.75rem)' }}
+            >
+              Expert repairs for phones, tablets, and more.
+            </Typography>
+          </CardContent>
+        </StyledCard>
+
+        <StyledCard>
+          <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+            <Box sx={{ mb: 1.5 }}>
+              <SwapHorizIcon sx={{ fontSize: 'clamp(30px, 4vw, 32px)', color: '#333333' }} />
+            </Box>
+            <Typography
+              variant="h6"
+              sx={{ fontWeight: 'bold', color: '#333333', mb: 0.75, fontSize: 'clamp(0.9rem, 2vw, 1rem)' }}
+            >
+              Trade-In Program
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ color: '#666666', flexGrow: 1, display: 'flex', alignItems: 'center', fontSize: 'clamp(0.65rem, 1.8vw, 0.75rem)' }}
+            >
+              Trade in your old devices for store credit.
+            </Typography>
+          </CardContent>
+        </StyledCard>
+      </Box>
     </SectionBox>
   );
 };

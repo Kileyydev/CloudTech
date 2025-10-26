@@ -1,10 +1,9 @@
-"use client";
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
-  Grid,
   Card,
   CardMedia,
   CardContent,
@@ -15,8 +14,15 @@ import {
   CircularProgress,
 } from '@mui/material';
 import Link from 'next/link';
+import { CardMediaProps } from '@mui/material/CardMedia';
 
-// Styled product card
+// Define interface to extend CardMediaProps with component support
+interface CustomCardMediaProps extends CardMediaProps {
+  component?: 'img';
+  image?: string;
+  alt?: string;
+}
+
 const ProductCardStyled = styled(Card)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
@@ -31,7 +37,7 @@ const ProductCardStyled = styled(Card)(({ theme }) => ({
   },
 }));
 
-const ProductImage = styled(CardMedia)(({ theme }) => ({
+const ProductImage = styled(CardMedia)<CustomCardMediaProps>(({ theme }) => ({
   height: 200,
   width: '100%',
   objectFit: 'contain',
@@ -88,49 +94,61 @@ const MobileAccessoriesSection = () => {
       <Typography variant="h4" gutterBottom align="center" sx={{ fontWeight: 700, color: theme.palette.text.primary }}>
         Mobile Accessories
       </Typography>
-      <Grid container spacing={3}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: theme.spacing(3), // Matches original Grid spacing={3}
+          '& > *': {
+            flex: {
+              xs: '1 1 100%', // Full width on xs (xs={12})
+              sm: '1 1 calc(50% - 24px)', // 2 columns on sm (sm={6})
+              md: '1 1 calc(33.33% - 24px)', // 3 columns on md (md={4})
+            },
+            minWidth: 0,
+          },
+        }}
+      >
         {products.length === 0 ? (
           <Typography variant="body1" sx={{ textAlign: 'center', width: '100%' }}>
             No Mobile Accessories products found
           </Typography>
         ) : (
           products.map((product) => (
-            <Grid item xs={12} sm={6} md={4} key={product.id}>
-              <ProductCardStyled>
-                <ProductImage
-                  component="img"
-                  image={product.cover_image ? `http://localhost:8000${product.cover_image}` : '/placeholder.png'}
-                  alt={product.title}
-                  sx={{ p: 2 }}
-                />
-                <CardContent>
-                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 500 }}>
-                    {product.title}
-                  </Typography>
-                  <Typography variant="h5" color="primary" gutterBottom sx={{ fontWeight: 600 }}>
-                    KES {product.price?.toLocaleString()}
-                    {product.discount && (
-                      <Typography variant="body2" color="error" sx={{ ml: 1, display: 'inline' }}>
-                        ({product.discount}% off)
-                      </Typography>
-                    )}
-                  </Typography>
-                </CardContent>
-                <CardActions sx={{ justifyContent: 'center' }}>
-                  <Link href={`/products/${product.id}`} passHref>
-                    <Button variant="outlined" color="primary">
-                      View Product
-                    </Button>
-                  </Link>
-                  <Button variant="contained" color="secondary">
-                    Add to Cart
+            <ProductCardStyled key={product.id}>
+              <ProductImage
+                component="img"
+                image={product.cover_image ? `http://localhost:8000${product.cover_image}` : '/placeholder.png'}
+                alt={product.title}
+                sx={{ p: 2 }}
+              />
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 500 }}>
+                  {product.title}
+                </Typography>
+                <Typography variant="h5" color="primary" gutterBottom sx={{ fontWeight: 600 }}>
+                  KES {product.price?.toLocaleString()}
+                  {product.discount && (
+                    <Typography variant="body2" color="error" sx={{ ml: 1, display: 'inline' }}>
+                      ({product.discount}% off)
+                    </Typography>
+                  )}
+                </Typography>
+              </CardContent>
+              <CardActions sx={{ justifyContent: 'center' }}>
+                <Link href={`/products/${product.id}`} passHref>
+                  <Button variant="outlined" color="primary">
+                    View Product
                   </Button>
-                </CardActions>
-              </ProductCardStyled>
-            </Grid>
+                </Link>
+                <Button variant="contained" color="secondary">
+                  Add to Cart
+                </Button>
+              </CardActions>
+            </ProductCardStyled>
           ))
         )}
-      </Grid>
+      </Box>
     </Box>
   );
 };
