@@ -34,6 +34,7 @@ INSTALLED_APPS = [
 # === Middleware ===
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # 👈 ADD THIS
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # 👈 add this before CommonMiddleware
     'django.middleware.common.CommonMiddleware',
@@ -133,3 +134,5 @@ CORS_ALLOW_CREDENTIALS = True
 
 # === Default Auto Field ===
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
