@@ -51,9 +51,10 @@ const DealsSection = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  const MEDIA_BASE = 'http://localhost:8000';
-  const API_PRODUCTS = 'http://localhost:8000/api/products/';
-  const API_CATEGORIES = 'http://localhost:8000/api/categories/';
+const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE!;
+const API_PRODUCTS = `${process.env.NEXT_PUBLIC_API_BASE}/products/`;
+const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
+
 
   // Fetch discounted, active products and categories
   useEffect(() => {

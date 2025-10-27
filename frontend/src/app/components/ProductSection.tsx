@@ -51,7 +51,8 @@ const ProductSection = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const res = await fetch('http://localhost:8000/api/products/?is_featured=true');
+        const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE}/products/?is_featured=true`;
+        const res = await fetch(API_BASE);
         if (!res.ok) throw new Error('Failed to fetch products');
         const data = await res.json();
         const list = data.results || data;
@@ -163,7 +164,7 @@ const ProductSection = () => {
     const imageSrc = images[currentIndex] && typeof images[currentIndex] === 'string'
       ? images[currentIndex].startsWith('http')
         ? images[currentIndex]
-        : `http://localhost:8000${images[currentIndex]}`
+        : `${process.env.NEXT_PUBLIC_API_BASE}${images[currentIndex]}`
       : '/images/fallback.jpg';
 
     return (
