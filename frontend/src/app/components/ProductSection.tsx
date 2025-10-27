@@ -14,12 +14,9 @@ import {
   Snackbar,
   Alert,
 } from '@mui/material';
-import { Favorite, ShoppingCart, Add, Remove, ArrowBackIos, ArrowForwardIos } from '@mui/icons-material';
+import { Favorite, ShoppingCart, Add, Remove } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
-import { Swiper, SwiperSlide } from 'swiper/react';
-import { Navigation } from 'swiper/modules';
-import 'swiper/css';
-import 'swiper/css/navigation';
+import { useCart } from './cartContext';
 
 type ProductT = {
   id: number;
@@ -32,22 +29,16 @@ type ProductT = {
   stock: number;
 };
 
-type CartItem = {
-  id: number;
-  title: string;
-  price: number;
-  quantity: number;
-  stock: number;
-};
-
 const ProductSection = () => {
   const theme = useTheme();
   const router = useRouter();
   const isLargeScreen = useMediaQuery(theme.breakpoints.up('lg'));
+  const isMediumScreen = useMediaQuery(theme.breakpoints.up('md'));
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
 
+  const { cart, addToCart, updateQuantity, removeFromCart } = useCart();
   const [products, setProducts] = useState<ProductT[]>([]);
   const [wishlist, setWishlist] = useState<Set<number>>(new Set());
-  const [cart, setCart] = useState<Record<number, CartItem>>({});
   const [currentIndexes, setCurrentIndexes] = useState<Record<number, number>>({});
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -76,40 +67,17 @@ const ProductSection = () => {
     fetchProducts();
   }, []);
 
-  // Load cart from localStorage on mount
-  useEffect(() => {
-    const loadCart = () => {
-      try {
-        const storedCart = localStorage.getItem('cart');
-        if (storedCart) {
-          const parsedCart = JSON.parse(storedCart);
-          const validCart: Record<number, CartItem> = {};
-          Object.entries(parsedCart).forEach(([id, item]: [string, any]) => {
-            if (item.quantity > 0 && item.id) {
-              validCart[Number(id)] = {
-                ...item,
-                quantity: Math.max(1, Math.min(item.quantity, item.stock || 999)),
-              };
-            }
-          });
-          setCart(validCart);
-        }
-      } catch (error) {
-        console.error('Error loading cart from localStorage:', error);
-        localStorage.removeItem('cart');
-      }
-    };
-    loadCart();
-  }, []);
-
-  // Save cart to localStorage whenever it changes
+  // Load wishlist from localStorage
   useEffect(() => {
     try {
-      localStorage.setItem('cart', JSON.stringify(cart));
+      const storedWishlist = localStorage.getItem('wishlist');
+      if (storedWishlist) {
+        setWishlist(new Set(JSON.parse(storedWishlist)));
+      }
     } catch (error) {
-      console.error('Error saving cart to localStorage:', error);
+      console.error('Error loading wishlist:', error);
     }
-  }, [cart]);
+  }, []);
 
   const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
     setSnackbar({ open: true, message, severity });
@@ -138,52 +106,31 @@ const ProductSection = () => {
       return;
     }
 
-    setCart((prev) => {
-      const existingItem = prev[product.id];
-      let newQuantity = 1;
-      if (existingItem) {
-        newQuantity = existingItem.quantity + 1;
-        if (newQuantity > product.stock) {
-          showSnackbar(`Only ${product.stock} items available in stock`, 'error');
-          return prev;
-        }
-      }
+    const cartItem = cart[product.id];
+    if (cartItem && cartItem.quantity >= product.stock) {
+      showSnackbar(`Only ${product.stock} items available in stock`, 'error');
+      return;
+    }
 
-      const newCart = {
-        ...prev,
-        [product.id]: {
-          id: product.id,
-          title: product.title,
-          price: product.price,
-          quantity: newQuantity,
-          stock: product.stock,
-        },
-      };
-
-      showSnackbar(existingItem ? `Added another ${product.title} to cart` : `${product.title} added to cart!`);
-      return newCart;
+    addToCart({
+      id: product.id,
+      title: product.title,
+      price: product.price,
+      quantity: 1,
+      stock: product.stock,
     });
+
+    showSnackbar(cartItem ? `Added another ${product.title} to cart` : `${product.title} added to cart!`);
   };
 
   const handleDecreaseQuantity = (id: number) => {
-    setCart((prev) => {
-      const existingItem = prev[id];
-      if (!existingItem) return prev;
+    const cartItem = cart[id];
+    if (!cartItem) return;
 
-      const newQuantity = existingItem.quantity - 1;
-
-      if (newQuantity <= 0) {
-        const newCart = { ...prev };
-        delete newCart[id];
-        showSnackbar('Item removed from cart');
-        return newCart;
-      }
-
-      return {
-        ...prev,
-        [id]: { ...existingItem, quantity: newQuantity },
-      };
-    });
+    updateQuantity(id, -1);
+    if (cartItem.quantity <= 1) {
+      showSnackbar('Item removed from cart');
+    }
   };
 
   const handleViewCart = () => {
@@ -203,41 +150,47 @@ const ProductSection = () => {
     const currentIndex = currentIndexes[product.id] || 0;
     const cartItem = cart[product.id];
 
-    // Ensure image is valid before using startsWith
     const imageSrc = images[currentIndex] && typeof images[currentIndex] === 'string'
       ? images[currentIndex].startsWith('http')
         ? images[currentIndex]
         : `http://localhost:8000${images[currentIndex]}`
-      : '/images/fallback.jpg'; // Fallback image
+      : '/images/fallback.jpg';
 
     return (
       <Card
         key={product.id}
         sx={{
-          minWidth: { xs: 'clamp(150px, 45vw, 170px)', sm: 'clamp(160px, 22vw, 180px)', lg: 'clamp(160px, 18vw, 180px)' },
-          maxWidth: { xs: 170, sm: 180, lg: 180 },
-          flex: '0 0 auto',
+          width: 220,
+          height: 360,
+          flex: '0 0 220px',
           display: 'flex',
           flexDirection: 'column',
-          height: 280,
-          boxShadow: '0 1px 6px rgba(0,0,0,0.08)',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+          borderRadius: 0,
+          overflow: 'hidden',
           position: 'relative',
+          backgroundColor: '#fff',
+          transition: 'transform 0.2s',
+          '&:hover': {
+            transform: 'translateY(-4px)',
+          },
         }}
       >
         <Box
           sx={{
             position: 'absolute',
-            top: 6,
-            right: 6,
+            top: 8,
+            right: 8,
             zIndex: 1,
-            backgroundColor: 'rgba(255,255,255,0.9)',
-            width: 24,
-            height: 24,
+            backgroundColor: 'rgba(255,255,255,0.95)',
+            width: 32,
+            height: 32,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             borderRadius: '50%',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
           }}
           onClick={(e) => {
             e.stopPropagation();
@@ -246,33 +199,42 @@ const ProductSection = () => {
         >
           <Favorite
             sx={{
-              color: wishlist.has(product.id) ? '#db1b88' : '#666',
-              fontSize: 14,
+              color: wishlist.has(product.id) ? '#e91e63' : '#888',
+              fontSize: 18,
             }}
           />
         </Box>
 
         <Box
-          sx={{ position: 'relative', cursor: 'pointer', height: 120 }}
+          sx={{
+            width: 220,
+            height: 180,
+            cursor: 'pointer',
+            overflow: 'hidden',
+          }}
           onClick={() => router.push(`/product/${product.id}`)}
         >
           <CardMedia
             component="img"
             image={imageSrc}
             alt={product.title}
-            sx={{ objectFit: 'cover', width: '100%', height: '100%' }}
+            sx={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
           />
           {product.stock < 5 && (
             <Box
               sx={{
                 position: 'absolute',
-                bottom: 4,
-                left: 4,
-                backgroundColor: 'rgba(0,0,0,0.7)',
-                color: 'white',
-                padding: '2px 6px',
-                borderRadius: 1,
-                fontSize: '0.7rem',
+                bottom: 8,
+                left: 8,
+                backgroundColor: 'rgba(0,0,0,0.75)',
+                color: '#fff',
+                padding: '4px 8px',
+                fontSize: '0.8rem',
+                fontWeight: 500,
               }}
             >
               Only {product.stock} left!
@@ -280,19 +242,59 @@ const ProductSection = () => {
           )}
         </Box>
 
-        <CardContent sx={{ flexGrow: 1, p: 1 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#000' }} noWrap>
-            {product.title}
-          </Typography>
-          <Typography variant="caption" sx={{ color: '#666' }} noWrap>
-            {product.description}
-          </Typography>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#000', mt: 0.5 }}>
-            KES {product.price.toLocaleString()}
-          </Typography>
+        <CardContent
+          sx={{
+            flexGrow: 1,
+            p: 1.5,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            height: 180,
+          }}
+        >
+          <Box>
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontWeight: 600,
+                color: '#222',
+                fontSize: '1rem',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {product.title}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                color: '#666',
+                fontSize: '0.85rem',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                mt: 0.5,
+              }}
+            >
+              {product.description}
+            </Typography>
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontWeight: 700,
+                color: '#222',
+                fontSize: '1rem',
+                mt: 1,
+              }}
+            >
+              KES {product.price.toLocaleString()}
+            </Typography>
+          </Box>
 
           {cartItem ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 1.5, gap: 1.5 }}>
               <IconButton
                 size="small"
                 onClick={(e) => {
@@ -300,13 +302,16 @@ const ProductSection = () => {
                   handleDecreaseQuantity(product.id);
                 }}
                 sx={{
-                  color: '#db1b88',
-                  '&:hover': { backgroundColor: 'rgba(219, 27, 136, 0.1)' },
+                  color: '#e91e63',
+                  border: '1px solid #e91e63',
+                  '&:hover': { backgroundColor: 'rgba(233, 30, 99, 0.1)' },
+                  width: 32,
+                  height: 32,
                 }}
               >
                 <Remove sx={{ fontSize: 16 }} />
               </IconButton>
-              <Typography sx={{ fontWeight: 600, fontSize: 14, minWidth: 20, textAlign: 'center' }}>
+              <Typography sx={{ fontWeight: 600, fontSize: '1rem', minWidth: 24, textAlign: 'center' }}>
                 {cartItem.quantity}
               </Typography>
               <IconButton
@@ -317,9 +322,12 @@ const ProductSection = () => {
                 }}
                 disabled={cartItem.quantity >= product.stock}
                 sx={{
-                  color: '#db1b88',
-                  '&:hover': { backgroundColor: 'rgba(219, 27, 136, 0.1)' },
-                  '&[disabled]': { color: '#ccc' },
+                  color: '#e91e63',
+                  border: '1px solid #e91e63',
+                  '&:hover': { backgroundColor: 'rgba(233, 30, 99, 0.1)' },
+                  '&[disabled]': { color: '#ccc', borderColor: '#ccc' },
+                  width: 32,
+                  height: 32,
                 }}
               >
                 <Add sx={{ fontSize: 16 }} />
@@ -328,16 +336,18 @@ const ProductSection = () => {
           ) : (
             <Button
               variant="contained"
-              startIcon={<ShoppingCart />}
+              startIcon={<ShoppingCart sx={{ fontSize: 16 }} />}
               fullWidth
               sx={{
-                backgroundColor: '#db1b88',
+                backgroundColor: '#e91e63',
                 color: '#fff',
                 textTransform: 'none',
-                fontSize: 12,
-                mt: 0.5,
-                py: 0.5,
-                '&:hover': { backgroundColor: '#b1166f' },
+                fontSize: '0.9rem',
+                mt: 1.5,
+                py: 0.75,
+                borderRadius: 0,
+                '&:hover': { backgroundColor: '#c2185b' },
+                '&:disabled': { backgroundColor: '#ccc' },
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -354,21 +364,25 @@ const ProductSection = () => {
   };
 
   return (
-    <Box sx={{ p: { xs: 1, md: 2 }, background: 'linear-gradient(180deg, #9a979fff 40%, #fff 100%)' }}>
-      <Box sx={{ mb: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: '#000' }}>
+    <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, background: 'linear-gradient(180deg, #f5f5f5 40%, #fff 100%)' }}>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: '#222', fontSize: '1.5rem' }}>
           Featured Products
         </Typography>
         <Button
           variant="contained"
-          startIcon={<ShoppingCart />}
+          startIcon={<ShoppingCart sx={{ fontSize: 16 }} />}
           onClick={handleViewCart}
           sx={{
-            backgroundColor: '#db1b88',
+            backgroundColor: '#e91e63',
             color: '#fff',
             textTransform: 'none',
-            fontSize: 12,
-            '&:hover': { backgroundColor: '#b1166f' },
+            fontSize: '0.9rem',
+            py: 0.75,
+            px: 2,
+            borderRadius: 0,
+            '&:hover': { backgroundColor: '#c2185b' },
+            '&:disabled': { backgroundColor: '#ccc' },
           }}
           disabled={getCartItemCount() === 0}
         >
@@ -376,73 +390,39 @@ const ProductSection = () => {
         </Button>
       </Box>
 
-      {isLargeScreen ? (
-        <Box
-          sx={{
-            display: 'flex',
-            flexWrap: 'nowrap',
-            justifyContent: 'center',
-            gap: 0.25, // 2px
-          }}
-        >
-          {products.filter((p) => p.stock > 0).slice(0, 5).map(renderCard)}
-        </Box>
-      ) : (
-        <Box sx={{ position: 'relative', padding: '0 24px' }}>
-          <Swiper
-            modules={[Navigation]}
-            navigation={{
-              prevEl: '.swiper-button-prev',
-              nextEl: '.swiper-button-next',
-            }}
-            spaceBetween={2}
-            slidesPerView={2}
-            breakpoints={{
-              600: { slidesPerView: 4, spaceBetween: 2 },
-              960: { slidesPerView: 4, spaceBetween: 2 },
-            }}
-            style={{ width: '100%' }}
-          >
-            {products.filter((p) => p.stock > 0).map((product) => (
-              <SwiperSlide key={product.id} style={{ display: 'flex', justifyContent: 'center' }}>
-                {renderCard(product)}
-              </SwiperSlide>
-            ))}
-          </Swiper>
-          <IconButton
-            className="swiper-button-prev"
-            sx={{
-              position: 'absolute',
-              top: '50%',
-              left: 0,
-              transform: 'translateY(-50%)',
-              color: '#FFFFFF',
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
-              zIndex: 10,
-              fontSize: 'clamp(1rem, 2.3vw, 1.2rem)',
-            }}
-          >
-            <ArrowBackIos />
-          </IconButton>
-          <IconButton
-            className="swiper-button-next"
-            sx={{
-              position: 'absolute',
-              top: '50%',
-              right: 0,
-              transform: 'translateY(-50%)',
-              color: '#FFFFFF',
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
-              zIndex: 10,
-              fontSize: 'clamp(1rem, 2.3vw, 1.2rem)',
-            }}
-          >
-            <ArrowForwardIos />
-          </IconButton>
-        </Box>
-      )}
+      <Box
+        sx={{
+          maxWidth: '1200px',
+          mx: 'auto',
+          ...(isSmallScreen
+            ? {
+                display: 'flex',
+                flexWrap: 'nowrap',
+                overflowX: 'auto',
+                gap: 2,
+                pb: 2,
+                scrollSnapType: 'x mandatory',
+                msOverflowStyle: 'none',
+                scrollbarWidth: 'none',
+                '&::-webkit-scrollbar': {
+                  display: 'none',
+                },
+                '& > *': {
+                  scrollSnapAlign: 'start',
+                },
+              }
+            : {
+                display: 'grid',
+                gridTemplateColumns: {
+                  md: 'repeat(4, minmax(220px, 1fr))',
+                  lg: 'repeat(5, minmax(220px, 1fr))',
+                },
+                gap: { md: 3 },
+              }),
+        }}
+      >
+        {products.filter((p) => p.stock > 0).map(renderCard)}
+      </Box>
 
       <Snackbar
         open={snackbar.open}

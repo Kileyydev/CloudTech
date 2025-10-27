@@ -29,6 +29,7 @@ import { Add, Remove, Delete } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import TopNavBar from '../components/TopNavBar';
 import MainNavBar from '../components/MainNavBar';
+import { useCart } from '../components/cartContext';
 
 type CartItem = {
   id: number;
@@ -60,7 +61,7 @@ const StyledButton = styled(Button)(({ theme }) => ({
 }));
 
 export default function CartPage() {
-  const [cart, setCart] = useState<Record<number, CartItem>>({});
+  const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
   const [checkoutDetails, setCheckoutDetails] = useState({
     name: '',
     phone: '',
@@ -80,55 +81,6 @@ export default function CartPage() {
     severity: 'success',
   });
 
-  // Load cart from localStorage on mount
-  useEffect(() => {
-    const loadCart = () => {
-      try {
-        const storedCart = localStorage.getItem('cart');
-        if (storedCart) {
-          const parsedCart = JSON.parse(storedCart);
-          const validCart: Record<number, CartItem> = {};
-          Object.entries(parsedCart).forEach(([id, item]: [string, any]) => {
-            if (item.id && item.quantity > 0 && item.title && item.price) {
-              validCart[Number(id)] = {
-                id: Number(item.id),
-                title: item.title,
-                price: Number(item.price),
-                quantity: Math.max(1, Math.min(item.quantity, item.stock || 999)),
-                stock: Number(item.stock) || 999,
-              };
-            }
-          });
-          setCart(validCart);
-          if (Object.keys(validCart).length === 0) {
-            showSnackbar('Cart is empty', 'error');
-          }
-        } else {
-          showSnackbar('No items in cart', 'error');
-        }
-      } catch (error) {
-        console.error('Error loading cart from localStorage:', error);
-        localStorage.removeItem('cart');
-        setSnackbar({ open: true, message: 'Failed to load cart', severity: 'error' });
-      }
-    };
-    loadCart();
-  }, []);
-
-  // Save cart to localStorage whenever it changes
-  useEffect(() => {
-    try {
-      if (Object.keys(cart).length > 0) {
-        localStorage.setItem('cart', JSON.stringify(cart));
-      } else {
-        localStorage.removeItem('cart');
-      }
-    } catch (error) {
-      console.error('Error saving cart to localStorage:', error);
-      setSnackbar({ open: true, message: 'Failed to save cart', severity: 'error' });
-    }
-  }, [cart]);
-
   const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
     setSnackbar({ open: true, message, severity });
   };
@@ -138,36 +90,26 @@ export default function CartPage() {
   };
 
   const handleQuantityChange = (id: number, delta: number) => {
-    setCart((prev) => {
-      const newCart = { ...prev };
-      const item = newCart[id];
-      if (!item) return newCart;
-      const newQuantity = item.quantity + delta;
-      if (newQuantity <= 0) {
-        delete newCart[id];
-        showSnackbar(`${item.title} removed from cart`);
-        return newCart;
-      }
-      if (item.stock && newQuantity > item.stock) {
-        showSnackbar(`Only ${item.stock} items available in stock`, 'error');
-        return prev;
-      }
-      item.quantity = newQuantity;
+    const item = cart[id];
+    if (!item) return;
+    if (delta > 0 && item.quantity >= item.stock) {
+      showSnackbar(`Only ${item.stock} items available in stock`, 'error');
+      return;
+    }
+    updateQuantity(id, delta);
+    if (delta < 0 && item.quantity <= 1) {
+      showSnackbar(`${item.title} removed from cart`);
+    } else {
       showSnackbar(`Updated quantity for ${item.title}`);
-      return newCart;
-    });
+    }
   };
 
   const handleDelete = (id: number) => {
-    setCart((prev) => {
-      const newCart = { ...prev };
-      const item = newCart[id];
-      if (item) {
-        showSnackbar(`${item.title} removed from cart`);
-        delete newCart[id];
-      }
-      return newCart;
-    });
+    const item = cart[id];
+    if (item) {
+      removeFromCart(id);
+      showSnackbar(`${item.title} removed from cart`);
+    }
   };
 
   const handleChange = (field: string, value: string) => {
@@ -185,7 +127,7 @@ export default function CartPage() {
     setError('');
   };
 
-  const subtotal = Object.values(cart).reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = Object.values(cart).reduce((sum: number, item) => sum + item.price * item.quantity, 0);
   const shipping = subtotal > 0 ? 200 : 0;
   const total = subtotal + shipping;
 
@@ -217,11 +159,11 @@ export default function CartPage() {
     try {
       if (paymentMethod === 'stk') {
         console.log('Initiating STK Push for:', checkoutDetails.phone, 'Amount:', total);
-        await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate M-Pesa API
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         showSnackbar('STK Push sent to your phone. Please complete the payment.');
       } else if (paymentMethod === 'card') {
         console.log('Processing card payment:', cardDetails);
-        await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate card API
+        await new Promise((resolve) => setTimeout(resolve, 2000));
         showSnackbar('Card payment processed successfully!');
       } else if (paymentMethod === 'bank') {
         console.log('Bank deposit details:', bankDetails);
@@ -230,13 +172,11 @@ export default function CartPage() {
         console.log('Pay on Delivery selected:', checkoutDetails);
         showSnackbar('Order placed! You will pay on delivery.');
       }
-      // Reset form and cart after successful checkout
       setCheckoutDetails({ name: '', phone: '', email: '', address: '', city: '', postalCode: '' });
       setCardDetails({ cardNumber: '', expiry: '', cvv: '' });
       setBankDetails({ accountNumber: '', bankName: '' });
       setPaymentMethod('');
-      setCart({});
-      localStorage.removeItem('cart');
+      clearCart();
     } catch (err) {
       setError('An error occurred during checkout. Please try again.');
       setSnackbar({ open: true, message: 'Checkout failed. Please try again.', severity: 'error' });
@@ -259,7 +199,6 @@ export default function CartPage() {
             gap: 4,
           }}
         >
-          {/* Cart Items */}
           <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 66%' } }}>
             <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, color: '#1a237e' }}>
               Your Cart
@@ -346,8 +285,6 @@ export default function CartPage() {
               </StyledPaper>
             )}
           </Box>
-
-          {/* Checkout Form */}
           <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 33%' } }}>
             <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, color: '#1a237e' }}>
               Checkout
@@ -489,24 +426,6 @@ export default function CartPage() {
             </StyledPaper>
           </Box>
         </Box>
-
-        {/* Footer */}
-        <Box sx={{ mt: 4, textAlign: 'center', bgcolor: '#f5f5f5', p: 2 }}>
-          <Typography variant="h6">Phoneplace Kenya</Typography>
-          <Typography variant="body2">Shop Location: Bazaar Plaza, Mezzanine 1 unit 5, Moi Avenue Nairobi</Typography>
-          <Typography variant="body2">Email: info@phoneplacekenya.com</Typography>
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="body2">Sales: 0726 526375 | Repairs: 0745 063030</Typography>
-          </Box>
-          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2 }}>
-            <a href="/about">About Us</a>
-            <a href="/contact">Contact Us</a>
-            <a href="/privacy">Privacy Policy</a>
-            <a href="/terms">Terms and Conditions</a>
-          </Box>
-        </Box>
-
-        {/* Snackbar for notifications */}
         <Snackbar
           open={snackbar.open}
           autoHideDuration={3000}

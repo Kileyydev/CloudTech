@@ -1,26 +1,27 @@
-"use client";
+'use client';
+
 import { Box, Typography, IconButton } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import InstagramIcon from '@mui/icons-material/Instagram';
 import SmartDisplayIcon from '@mui/icons-material/SmartDisplay'; // TikTok substitute
-import TwitterIcon from '@mui/icons-material/Twitter';
+import TwitterIcon from '@mui/icons-material/X'; // Updated to X icon
 import Link from 'next/link';
+import { useMediaQuery, useTheme } from '@mui/material';
 
 const FooterBox = styled(Box)(({ theme }) => ({
-  background: '#F5F5F5', // Neutral light gray background
-  padding: theme.spacing(3),
-  color: '#333333',
+  background: 'linear-gradient(180deg, #f5f5f5 40%, #fff 100%)',
+  padding: theme.spacing(4, 2),
+  color: '#222',
   textAlign: 'left',
-  borderTop: '1px solid #E0E0E0',
   [theme.breakpoints.up('sm')]: {
-    padding: theme.spacing(4),
+    padding: theme.spacing(5, 3),
   },
   [theme.breakpoints.up('md')]: {
-    padding: theme.spacing(5),
+    padding: theme.spacing(6, 4),
   },
   [theme.breakpoints.up('lg')]: {
-    padding: theme.spacing(6),
+    padding: theme.spacing(8, 4),
   },
 }));
 
@@ -29,7 +30,7 @@ const SocialIconsBox = styled(Box)(({ theme }) => ({
   gap: theme.spacing(1.5),
   marginTop: theme.spacing(1.5),
   '& .MuiSvgIcon-root': {
-    fontSize: 'clamp(1.2rem, 3vw, 1.5rem)',
+    fontSize: 'clamp(20px, 2.5vw, 24px)',
     transition: 'color 0.2s ease-in-out',
   },
   [theme.breakpoints.up('sm')]: {
@@ -39,8 +40,8 @@ const SocialIconsBox = styled(Box)(({ theme }) => ({
 }));
 
 const FooterLink = styled(Typography)(({ theme }) => ({
-  color: '#666666',
-  fontSize: 'clamp(0.85rem, 2vw, 0.9rem)',
+  color: '#222',
+  fontSize: 'clamp(14px, 1.8vw, 16px)',
   lineHeight: '1.8',
   cursor: 'pointer',
   transition: 'color 0.2s ease-in-out',
@@ -52,49 +53,65 @@ const FooterLink = styled(Typography)(({ theme }) => ({
     outline: '2px solid #DC1A8A',
     outlineOffset: '2px',
   },
-  [theme.breakpoints.up('md')]: {
-    fontSize: 'clamp(0.9rem, 1.8vw, 1rem)',
-  },
 }));
 
 const FooterTitle = styled(Typography)(({ theme }) => ({
-  fontWeight: 'bold',
-  color: '#2E7D32',
-  fontSize: 'clamp(1rem, 2.5vw, 1.2rem)',
+  fontWeight: 700,
+  color: '#222',
+  fontSize: 'clamp(16px, 2vw, 20px)',
   marginBottom: theme.spacing(1.5),
-  [theme.breakpoints.up('md')]: {
-    fontSize: 'clamp(1.1rem, 2vw, 1.3rem)',
-  },
+}));
+
+const FooterCard = styled(Box)(({ theme }) => ({
+  backgroundColor: '#fff',
+  padding: theme.spacing(2),
+  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+  borderRadius: 0, // No border radius
+  display: 'flex',
+  flexDirection: 'column',
+  height: '100%',
 }));
 
 const Footer = () => {
+  const theme = useTheme();
+  const isLargeScreen = useMediaQuery(theme.breakpoints.up('lg'));
+  const isMediumScreen = useMediaQuery(theme.breakpoints.up('md'));
+  const isSmallScreen = useMediaQuery(theme.breakpoints.up('sm'));
+
+  // Format current date
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
   return (
     <FooterBox>
       <Box
         sx={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          gap: 3,
+          maxWidth: '1200px',
+          mx: 'auto',
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr', // 1 card per row
+            sm: 'repeat(2, minmax(0, 1fr))', // 2 cards per row
+            md: 'repeat(4, minmax(0, 1fr))', // 4 cards per row
+          },
+          gap: { xs: 2, sm: 2.5, md: 3 },
           '& > *': {
-            flex: {
-              xs: '1 1 100%', // Full width on extra-small screens
-              sm: '1 1 calc(50% - 12px)', // Two columns on small screens
-              md: '1 1 calc(25% - 18px)', // Four columns on medium screens and up
-            },
             minWidth: 0,
           },
         }}
       >
-        <Box>
+        {/* Company Info */}
+        <FooterCard>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
             <Box sx={{ mr: 1.5 }}>
               <img
                 src="/images/logo.jpeg"
-                alt="Phoneplace Kenya Logo"
+                alt="CloudTech Logo"
                 style={{
-                  height: 'clamp(30px, 6vw, 40px)',
+                  height: 'clamp(32px, 5vw, 40px)',
                   maxWidth: '100%',
                   objectFit: 'contain',
                 }}
@@ -103,52 +120,54 @@ const Footer = () => {
             <Typography
               variant="h6"
               sx={{
-                fontWeight: 'bold',
-                color: '#2E7D32',
-                fontSize: 'clamp(1.1rem, 3vw, 1.3rem)',
+                fontWeight: 700,
+                color: '#222',
+                fontSize: 'clamp(16px, 2.5vw, 20px)',
               }}
             >
-              Phoneplace Kenya
+              CloudTech
             </Typography>
           </Box>
           <FooterLink>Shop Location: Bazaar Plaza, Mezzanine 1 unit 5, Moi Avenue Nairobi</FooterLink>
-          <FooterLink>Email: info@phoneplacekenya.com</FooterLink>
+          <FooterLink>Email: info@cloudtech.com</FooterLink>
           <SocialIconsBox>
             <IconButton
               component="a"
               href="https://facebook.com"
               aria-label="Facebook"
-              sx={{ '&:hover .MuiSvgIcon-root': { color: '#3b5998' } }}
+              sx={{ '&:hover .MuiSvgIcon-root': { color: '#DC1A8A' } }}
             >
-              <FacebookIcon />
+              <FacebookIcon sx={{ color: '#222' }} />
             </IconButton>
             <IconButton
               component="a"
               href="https://instagram.com"
               aria-label="Instagram"
-              sx={{ '&:hover .MuiSvgIcon-root': { color: '#E1306C' } }}
+              sx={{ '&:hover .MuiSvgIcon-root': { color: '#DC1A8A' } }}
             >
-              <InstagramIcon />
+              <InstagramIcon sx={{ color: '#222' }} />
             </IconButton>
             <IconButton
               component="a"
               href="https://tiktok.com"
               aria-label="TikTok"
-              sx={{ '&:hover .MuiSvgIcon-root': { color: '#000000' } }}
+              sx={{ '&:hover .MuiSvgIcon-root': { color: '#DC1A8A' } }}
             >
-              <SmartDisplayIcon />
+              <SmartDisplayIcon sx={{ color: '#222' }} />
             </IconButton>
             <IconButton
               component="a"
-              href="https://twitter.com"
-              aria-label="Twitter"
-              sx={{ '&:hover .MuiSvgIcon-root': { color: '#1DA1F2' } }}
+              href="https://x.com"
+              aria-label="X"
+              sx={{ '&:hover .MuiSvgIcon-root': { color: '#DC1A8A' } }}
             >
-              <TwitterIcon />
+              <TwitterIcon sx={{ color: '#222' }} />
             </IconButton>
           </SocialIconsBox>
-        </Box>
-        <Box>
+        </FooterCard>
+
+        {/* Our Company */}
+        <FooterCard>
           <FooterTitle>Our Company</FooterTitle>
           <Link href="/about" style={{ textDecoration: 'none' }}>
             <FooterLink>About Us</FooterLink>
@@ -162,8 +181,10 @@ const Footer = () => {
           <Link href="/terms" style={{ textDecoration: 'none' }}>
             <FooterLink>Terms and Conditions</FooterLink>
           </Link>
-        </Box>
-        <Box>
+        </FooterCard>
+
+        {/* Shop By Brands */}
+        <FooterCard>
           <FooterTitle>Shop By Brands</FooterTitle>
           <Link href="/samsung" style={{ textDecoration: 'none' }}>
             <FooterLink>Samsung</FooterLink>
@@ -177,12 +198,30 @@ const Footer = () => {
           <Link href="/google" style={{ textDecoration: 'none' }}>
             <FooterLink>Google</FooterLink>
           </Link>
-        </Box>
-        <Box>
+        </FooterCard>
+
+        {/* Contact Us */}
+        <FooterCard>
           <FooterTitle>Contact Us</FooterTitle>
           <FooterLink>Sales: 0726 526375</FooterLink>
           <FooterLink>Repairs: 0745 063030</FooterLink>
-        </Box>
+        </FooterCard>
+      </Box>
+
+      {/* Horizontal Line */}
+      <Box sx={{ width: '100%', height: '2px', backgroundColor: '#222', my: { xs: 3, md: 4 }, maxWidth: '1200px', mx: 'auto' }} />
+
+      {/* Copyright */}
+      <Box sx={{ textAlign: 'center', maxWidth: '1200px', mx: 'auto' }}>
+        <Typography
+          sx={{
+            color: '#222',
+            fontSize: 'clamp(12px, 1.5vw, 14px)',
+            fontWeight: 500,
+          }}
+        >
+          © {currentDate} @ CloudTech
+        </Typography>
       </Box>
     </FooterBox>
   );

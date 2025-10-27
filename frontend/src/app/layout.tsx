@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   description: "Explore cutting-edge electronics, repairs, and trade-ins with Ferrouqe Systems.",
 };
 
+import { CartProvider } from './components/cartContext';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -26,9 +28,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <ClientLayoutWrapper>
-          {children}
-        </ClientLayoutWrapper>
+        <CartProvider>
+          <ClientLayoutWrapper>
+            {children}
+          </ClientLayoutWrapper>
+        </CartProvider>
       </body>
     </html>
   );

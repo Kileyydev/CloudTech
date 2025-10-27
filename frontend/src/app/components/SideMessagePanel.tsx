@@ -52,10 +52,19 @@ const SideMessagePanel = ({ footerRef }: SideMessagePanelProps) => {
         ref={panelRef}
         sx={{
           position: 'fixed',
-          bottom: 20,
-          right: 20,
-          width: { xs: 400, md: 400 },
-          p: 3,
+          bottom: { xs: 10, sm: 15, md: 20 },
+          right: { xs: 10, sm: 15, md: 20 },
+          width: {
+            xs: 'clamp(250px, 80vw, 300px)', // Smaller on extra-small screens
+            sm: 'clamp(300px, 60vw, 350px)', // Slightly larger on small screens
+            md: 'clamp(350px, 40vw, 400px)', // Standard size on medium screens
+            lg: 'clamp(350px, 30vw, 400px)', // Cap at 400px on large screens
+          },
+          p: {
+            xs: 2, // Reduced padding on small screens
+            sm: 2.5,
+            md: 3,
+          },
           backdropFilter: 'blur(12px)',
           background: 'rgba(255, 255, 255, 0.25)',
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
@@ -63,6 +72,7 @@ const SideMessagePanel = ({ footerRef }: SideMessagePanelProps) => {
           zIndex: 1000,
           transition: 'all 0.3s ease',
           color: '#fff',
+          borderRadius: 1, // Slight border radius for better aesthetics
         }}
       >
         <Typography
@@ -71,6 +81,11 @@ const SideMessagePanel = ({ footerRef }: SideMessagePanelProps) => {
             color: '#000',
             mb: 1,
             fontWeight: 600,
+            fontSize: {
+              xs: '1rem', // Smaller font on small screens
+              sm: '1.1rem',
+              md: '1.25rem',
+            },
           }}
         >
           💬 How May We Help You?
@@ -81,6 +96,11 @@ const SideMessagePanel = ({ footerRef }: SideMessagePanelProps) => {
           sx={{
             color: 'rgba(0, 0, 0, 0.9)',
             mb: 2,
+            fontSize: {
+              xs: '0.75rem', // Smaller font on small screens
+              sm: '0.85rem',
+              md: '0.875rem',
+            },
           }}
         >
           Send us a message!
@@ -91,9 +111,14 @@ const SideMessagePanel = ({ footerRef }: SideMessagePanelProps) => {
             fullWidth
             variant="outlined"
             placeholder="Type your message..."
+            size="small" // Use "small" for consistent sizing; TextField size prop does not support responsive values
             InputProps={{
               sx: {
                 color: '#000',
+                fontSize: {
+                  xs: '0.875rem',
+                  md: '1rem',
+                },
                 '&::placeholder': { color: 'rgba(255,255,255,0.7)' },
               },
             }}
@@ -110,12 +135,17 @@ const SideMessagePanel = ({ footerRef }: SideMessagePanelProps) => {
           <Button
             type="submit"
             variant="contained"
-            endIcon={<Send />}
+            endIcon={<Send sx={{ fontSize: { xs: 16, md: 20 } }} />}
             sx={{
               background: 'linear-gradient(135deg, #db1b88, #b1166f)',
               color: '#fff',
               textTransform: 'none',
-              fontWeight: '600',
+              fontWeight: 600,
+              fontSize: {
+                xs: '0.875rem', // Smaller button text on small screens
+                md: '1rem',
+              },
+              py: { xs: 0.5, md: 0.75 }, // Smaller padding on small screens
               boxShadow: '0 0 10px rgba(219,27,136,0.4)',
               '&:hover': {
                 background: 'linear-gradient(135deg, #b1166f, #881055)',
