@@ -31,6 +31,12 @@ INSTALLED_APPS = [
     'testimonials',
 ]
 
+CORS_ALLOWED_ORIGINS = [
+    "https://cloud-tech-eta.vercel.app",  # frontend URL
+    "http://localhost:3000",              # local dev
+]
+
+
 # === Middleware ===
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
