@@ -48,7 +48,7 @@ const SmartphonesSection = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  const API_BASE = `http://localhost:8000/api/products/?category=${categorySlug}`;
+  const API_BASE = `https://cloudtech-c4ft.onrender.com/api/products/?category=${categorySlug}`;
 
   // Fetch smartphones products
   useEffect(() => {
@@ -170,7 +170,7 @@ const SmartphonesSection = () => {
     const imageSrc = images[currentIndex] && typeof images[currentIndex] === 'string'
       ? images[currentIndex].startsWith('http')
         ? images[currentIndex]
-        : `http://localhost:8000${images[currentIndex]}`
+        : `${process.env.NEXT_PUBLIC_API_BASE}${images[currentIndex]}`
       : '/images/fallback.jpg';
 
     return (
