@@ -9,12 +9,15 @@ export default function AdminLogin() {
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [otpStep, setOtpStep] = useState(false);
-  const [otpId, setOtpId] = useState(null); // ✅ STORES THE OTP ID
+  const [otpId, setOtpId] = useState(null); // ✅ Stores the OTP ID
   const router = useRouter();
+
+  // ✅ Base API URL (automatically adjusts for local and deployed)
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
 
   const handleLogin = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/auth/login/", {
+      const res = await fetch(`${API_BASE}/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -23,7 +26,6 @@ export default function AdminLogin() {
       const data = await res.json();
       console.log("Login Response:", data);
 
-      // ✅ CHECK FOR otp_id, NOT otp_required
       if (data.otp_id) {
         setOtpId(data.otp_id);
         setOtpStep(true);
@@ -38,7 +40,7 @@ export default function AdminLogin() {
 
   const handleOtpVerify = async () => {
     try {
-      const res = await fetch("http://localhost:8000/api/auth/verify-otp/", {
+      const res = await fetch(`${API_BASE}/auth/verify-otp/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ otp_id: otpId, code: otp }), // ✅ Correct payload
@@ -61,9 +63,7 @@ export default function AdminLogin() {
   };
 
   return (
-
     <Box
-
       sx={{
         minHeight: "100vh",
         display: "flex",
