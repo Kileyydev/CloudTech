@@ -318,8 +318,6 @@ export default function ContactUsPage() {
         </Box>
       </Box>
 
-      <Footer />
-
       <Snackbar open={snack.open} autoHideDuration={4500} onClose={handleCloseSnack}>
         <Alert onClose={handleCloseSnack} severity={snack.severity} sx={{ width: '100%' }}>
           {snack.msg}
