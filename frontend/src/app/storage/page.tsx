@@ -12,9 +12,7 @@ export default function Home() {
     <div>
       <TopNavBar />
       <MainNavBar />
-      <HeroSection />
       <StorageAccessoriesSection />
-      <Footer />
     </div>
   );
 }

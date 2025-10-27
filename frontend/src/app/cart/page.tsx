@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -27,6 +27,7 @@ import {
 } from '@mui/material';
 import { Add, Remove, Delete } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
+import { useRouter } from 'next/navigation';
 import TopNavBar from '../components/TopNavBar';
 import MainNavBar from '../components/MainNavBar';
 import { useCart } from '../components/cartContext';
@@ -41,27 +42,22 @@ type CartItem = {
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
-  borderRadius: typeof theme.shape.borderRadius === 'number'
-    ? theme.shape.borderRadius * 2
-    : `calc(${theme.shape.borderRadius} * 2)`,
+  borderRadius: 8,
   boxShadow: theme.shadows[3],
   backgroundColor: theme.palette.background.paper,
 }));
 
 const StyledButton = styled(Button)(({ theme }) => ({
-  borderRadius: typeof theme.shape.borderRadius === 'number'
-    ? theme.shape.borderRadius * 2
-    : `calc(${theme.shape.borderRadius} * 2)`,
+  borderRadius: 8,
   padding: theme.spacing(1.5),
   fontWeight: 600,
   textTransform: 'none',
-  '&:hover': {
-    backgroundColor: theme.palette.primary.dark,
-  },
 }));
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
+  const router = useRouter();
+
   const [checkoutDetails, setCheckoutDetails] = useState({
     name: '',
     phone: '',
@@ -69,67 +65,49 @@ export default function CartPage() {
     address: '',
     city: '',
     postalCode: '',
+    mpesaCode: '',
   });
-  const [paymentMethod, setPaymentMethod] = useState<'stk' | 'card' | 'bank' | 'delivery' | ''>('');
+  const [paymentMethod, setPaymentMethod] = useState<'paybill' | 'withdraw' | ''>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
-  const [cardDetails, setCardDetails] = useState({ cardNumber: '', expiry: '', cvv: '' });
-  const [bankDetails, setBankDetails] = useState({ accountNumber: '', bankName: '' });
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+  const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
-    severity: 'success',
+    severity: 'success' as 'success' | 'error',
   });
+
+  const subtotal = Object.values(cart).reduce(
+    (sum: number, item) => sum + item.price * item.quantity,
+    0
+  );
+  const shipping = subtotal > 0 ? 200 : 0;
+  const total = subtotal + shipping;
 
   const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
     setSnackbar({ open: true, message, severity });
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar((prev) => ({ ...prev, open: false }));
-  };
-
-  const handleQuantityChange = (id: number, delta: number) => {
-    const item = cart[id];
-    if (!item) return;
-    if (delta > 0 && item.quantity >= item.stock) {
-      showSnackbar(`Only ${item.stock} items available in stock`, 'error');
-      return;
-    }
-    updateQuantity(id, delta);
-    if (delta < 0 && item.quantity <= 1) {
-      showSnackbar(`${item.title} removed from cart`);
-    } else {
-      showSnackbar(`Updated quantity for ${item.title}`);
-    }
-  };
-
-  const handleDelete = (id: number) => {
-    const item = cart[id];
-    if (item) {
-      removeFromCart(id);
-      showSnackbar(`${item.title} removed from cart`);
-    }
-  };
+  const handleCloseSnackbar = () => setSnackbar((prev) => ({ ...prev, open: false }));
 
   const handleChange = (field: string, value: string) => {
     setCheckoutDetails((prev) => ({ ...prev, [field]: value }));
     setError('');
   };
 
-  const handleCardChange = (field: string, value: string) => {
-    setCardDetails((prev) => ({ ...prev, [field]: value }));
-    setError('');
+  const handleQuantityChange = (id: number, delta: number) => {
+    const item = cart[id];
+    if (!item) return;
+    if (delta > 0 && item.quantity >= item.stock) {
+      showSnackbar(`Only ${item.stock} in stock`, 'error');
+      return;
+    }
+    updateQuantity(id, delta);
   };
 
-  const handleBankChange = (field: string, value: string) => {
-    setBankDetails((prev) => ({ ...prev, [field]: value }));
-    setError('');
+  const handleDelete = (id: number) => {
+    removeFromCart(id);
+    showSnackbar('Item removed');
   };
-
-  const subtotal = Object.values(cart).reduce((sum: number, item) => sum + item.price * item.quantity, 0);
-  const shipping = subtotal > 0 ? 200 : 0;
-  const total = subtotal + shipping;
 
   const validateForm = () => {
     if (!checkoutDetails.name || !checkoutDetails.phone || !checkoutDetails.address || !checkoutDetails.city) {
@@ -140,46 +118,47 @@ export default function CartPage() {
       setError('Please select a payment method.');
       return false;
     }
-    if (paymentMethod === 'card' && (!cardDetails.cardNumber || !cardDetails.expiry || !cardDetails.cvv)) {
-      setError('Please provide all card details.');
-      return false;
-    }
-    if (paymentMethod === 'bank' && (!bankDetails.accountNumber || !bankDetails.bankName)) {
-      setError('Please provide all bank details.');
+    if (paymentMethod === 'withdraw' && !checkoutDetails.mpesaCode) {
+      setError('Please enter your M-Pesa confirmation code.');
       return false;
     }
     return true;
   };
 
   const handleCheckout = async () => {
+    if (Object.values(cart).length === 0) {
+      showSnackbar('Your cart is empty.', 'error');
+      return;
+    }
     if (!validateForm()) return;
     setIsProcessing(true);
-    setError('');
 
     try {
-      if (paymentMethod === 'stk') {
-        console.log('Initiating STK Push for:', checkoutDetails.phone, 'Amount:', total);
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        showSnackbar('STK Push sent to your phone. Please complete the payment.');
-      } else if (paymentMethod === 'card') {
-        console.log('Processing card payment:', cardDetails);
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        showSnackbar('Card payment processed successfully!');
-      } else if (paymentMethod === 'bank') {
-        console.log('Bank deposit details:', bankDetails);
-        showSnackbar('Please make a deposit to the provided bank details.');
-      } else if (paymentMethod === 'delivery') {
-        console.log('Pay on Delivery selected:', checkoutDetails);
-        showSnackbar('Order placed! You will pay on delivery.');
+      if (paymentMethod === 'paybill') {
+        // STK Push (or backend call)
+        const res = await fetch('/api/mpesa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: checkoutDetails.phone,
+            amount: total,
+          }),
+        });
+        const data = await res.json();
+        if (data.ResponseCode === '0') {
+          showSnackbar('STK Push sent to your phone. Complete payment to confirm order.', 'success');
+        } else {
+          showSnackbar('Failed to send STK Push. Try again.', 'error');
+        }
+      } else if (paymentMethod === 'withdraw') {
+        showSnackbar('Withdrawal payment submitted! We’ll confirm shortly.', 'success');
       }
-      setCheckoutDetails({ name: '', phone: '', email: '', address: '', city: '', postalCode: '' });
-      setCardDetails({ cardNumber: '', expiry: '', cvv: '' });
-      setBankDetails({ accountNumber: '', bankName: '' });
-      setPaymentMethod('');
+
       clearCart();
+      router.push('/order-confirmation');
     } catch (err) {
-      setError('An error occurred during checkout. Please try again.');
-      setSnackbar({ open: true, message: 'Checkout failed. Please try again.', severity: 'error' });
+      console.error('Checkout error:', err);
+      showSnackbar('Payment failed. Please try again.', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -190,24 +169,19 @@ export default function CartPage() {
       <TopNavBar />
       <MainNavBar />
       <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f5f5f5', minHeight: '100vh' }}>
-        <Box
-          sx={{
-            maxWidth: 1200,
-            mx: 'auto',
-            display: 'flex',
-            flexDirection: { xs: 'column', md: 'row' },
-            gap: 4,
-          }}
-        >
-          <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 66%' } }}>
+        <Box sx={{ maxWidth: 1200, mx: 'auto', display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4 }}>
+          {/* CART TABLE */}
+          <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 65%' } }}>
             <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, color: '#1a237e' }}>
               Your Cart
             </Typography>
+
             {Object.values(cart).length === 0 ? (
-              <StyledPaper>
-                <Typography sx={{ p: 3, color: '#777', textAlign: 'center' }}>
-                  Your cart is empty 🛒
-                </Typography>
+              <StyledPaper sx={{ textAlign: 'center', p: 3 }}>
+                <Typography sx={{ color: '#777' }}>Your cart is empty 🛒</Typography>
+                <StyledButton sx={{ mt: 2 }} variant="contained" color="primary" onClick={() => router.push('/')}>
+                  Continue Shopping
+                </StyledButton>
               </StyledPaper>
             ) : (
               <StyledPaper>
@@ -215,37 +189,24 @@ export default function CartPage() {
                   <Table>
                     <TableHead>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: 600 }}>Product</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 600 }}>Quantity</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 600 }}>Price</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 600 }}>Total</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 600 }}>Actions</TableCell>
+                        <TableCell>Product</TableCell>
+                        <TableCell align="center">Quantity</TableCell>
+                        <TableCell align="right">Price</TableCell>
+                        <TableCell align="right">Total</TableCell>
+                        <TableCell align="center">Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {Object.values(cart).map((item) => (
-                        <TableRow key={item.id} sx={{ '&:hover': { bgcolor: '#f0f4ff' } }}>
+                        <TableRow key={item.id}>
                           <TableCell>{item.title}</TableCell>
                           <TableCell align="center">
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleQuantityChange(item.id, -1)}
-                                sx={{ bgcolor: '#e0e0e0', '&:hover': { bgcolor: '#d0d0d0' } }}
-                              >
+                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1 }}>
+                              <IconButton size="small" onClick={() => handleQuantityChange(item.id, -1)}>
                                 <Remove fontSize="small" />
                               </IconButton>
                               <Typography>{item.quantity}</Typography>
-                              <IconButton
-                                size="small"
-                                onClick={() => handleQuantityChange(item.id, 1)}
-                                disabled={item.quantity >= item.stock}
-                                sx={{
-                                  bgcolor: '#e0e0e0',
-                                  '&:hover': { bgcolor: '#d0d0d0' },
-                                  '&[disabled]': { bgcolor: '#e0e0e0', opacity: 0.5 },
-                                }}
-                              >
+                              <IconButton size="small" onClick={() => handleQuantityChange(item.id, 1)}>
                                 <Add fontSize="small" />
                               </IconButton>
                             </Box>
@@ -253,11 +214,7 @@ export default function CartPage() {
                           <TableCell align="right">KES {item.price.toLocaleString()}</TableCell>
                           <TableCell align="right">KES {(item.price * item.quantity).toLocaleString()}</TableCell>
                           <TableCell align="center">
-                            <IconButton
-                              color="error"
-                              onClick={() => handleDelete(item.id)}
-                              sx={{ '&:hover': { bgcolor: '#ffebee' } }}
-                            >
+                            <IconButton color="error" onClick={() => handleDelete(item.id)}>
                               <Delete fontSize="small" />
                             </IconButton>
                           </TableCell>
@@ -266,15 +223,16 @@ export default function CartPage() {
                     </TableBody>
                   </Table>
                 </TableContainer>
+
                 <Divider sx={{ my: 2 }} />
                 <Box sx={{ p: 2 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="subtitle1">Subtotal:</Typography>
-                    <Typography variant="subtitle1">KES {subtotal.toLocaleString()}</Typography>
+                    <Typography>Subtotal:</Typography>
+                    <Typography>KES {subtotal.toLocaleString()}</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="subtitle1">Shipping:</Typography>
-                    <Typography variant="subtitle1">KES {shipping.toLocaleString()}</Typography>
+                    <Typography>Shipping:</Typography>
+                    <Typography>KES {shipping.toLocaleString()}</Typography>
                   </Box>
                   <Divider sx={{ my: 1 }} />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
@@ -285,147 +243,77 @@ export default function CartPage() {
               </StyledPaper>
             )}
           </Box>
-          <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 33%' } }}>
+
+          {/* CHECKOUT SECTION */}
+          <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 35%' } }}>
             <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, color: '#1a237e' }}>
               Checkout
             </Typography>
+
             <StyledPaper>
-              {error && (
-                <Collapse in={!!error}>
-                  <Alert severity="error" sx={{ mb: 2 }}>
-                    {error}
-                  </Alert>
-                </Collapse>
-              )}
+              {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <TextField
-                  label="Full Name *"
-                  value={checkoutDetails.name}
-                  onChange={(e) => handleChange('name', e.target.value)}
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                />
-                <TextField
-                  label="Phone Number *"
-                  value={checkoutDetails.phone}
-                  onChange={(e) => handleChange('phone', e.target.value)}
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                  type="tel"
-                />
-                <TextField
-                  label="Email"
-                  value={checkoutDetails.email}
-                  onChange={(e) => handleChange('email', e.target.value)}
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                  type="email"
-                />
-                <TextField
-                  label="Address *"
-                  value={checkoutDetails.address}
-                  onChange={(e) => handleChange('address', e.target.value)}
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                />
-                <TextField
-                  label="City *"
-                  value={checkoutDetails.city}
-                  onChange={(e) => handleChange('city', e.target.value)}
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                />
-                <TextField
-                  label="Postal Code"
-                  value={checkoutDetails.postalCode}
-                  onChange={(e) => handleChange('postalCode', e.target.value)}
-                  fullWidth
-                  variant="outlined"
-                  size="small"
-                />
-                <FormControl component="fieldset" sx={{ mt: 2 }}>
-                  <FormLabel component="legend" sx={{ fontWeight: 600, color: '#1a237e' }}>
-                    Payment Method *
-                  </FormLabel>
-                  <RadioGroup
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as 'stk' | 'card' | 'bank' | 'delivery')}
-                  >
-                    <FormControlLabel value="stk" control={<Radio />} label="Pay Now: M-Pesa (STK Push)" />
-                    <FormControlLabel value="card" control={<Radio />} label="Pay Now: Card Payment" />
-                    <FormControlLabel value="bank" control={<Radio />} label="Pay Now: Direct Bank Deposit" />
-                    <FormControlLabel value="delivery" control={<Radio />} label="Pay on Delivery" />
+                <TextField label="Full Name *" value={checkoutDetails.name} onChange={(e) => handleChange('name', e.target.value)} size="small" />
+                <TextField label="Phone Number *" value={checkoutDetails.phone} onChange={(e) => handleChange('phone', e.target.value)} size="small" type="tel" />
+                <TextField label="Email" value={checkoutDetails.email} onChange={(e) => handleChange('email', e.target.value)} size="small" />
+                <TextField label="Address *" value={checkoutDetails.address} onChange={(e) => handleChange('address', e.target.value)} size="small" />
+                <TextField label="City *" value={checkoutDetails.city} onChange={(e) => handleChange('city', e.target.value)} size="small" />
+                <TextField label="Postal Code" value={checkoutDetails.postalCode} onChange={(e) => handleChange('postalCode', e.target.value)} size="small" />
+
+                <FormControl sx={{ mt: 2 }}>
+                  <FormLabel sx={{ fontWeight: 600, color: '#1a237e' }}>Payment Method *</FormLabel>
+                  <RadioGroup value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'paybill' | 'withdraw')}>
+                    <FormControlLabel value="paybill" control={<Radio />} label="Paybill (247247 - Account 0722244482)" />
+                    <FormControlLabel value="withdraw" control={<Radio />} label="Withdraw Option (Agent 2065355 / Store 2061522)" />
                   </RadioGroup>
                 </FormControl>
-                <Collapse in={paymentMethod === 'card'}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
-                    <TextField
-                      label="Card Number *"
-                      value={cardDetails.cardNumber}
-                      onChange={(e) => handleCardChange('cardNumber', e.target.value)}
-                      fullWidth
-                      variant="outlined"
-                      size="small"
-                    />
-                    <Box sx={{ display: 'flex', gap: 2 }}>
-                      <TextField
-                        label="Expiry (MM/YY) *"
-                        value={cardDetails.expiry}
-                        onChange={(e) => handleCardChange('expiry', e.target.value)}
-                        fullWidth
-                        variant="outlined"
-                        size="small"
-                      />
-                      <TextField
-                        label="CVV *"
-                        value={cardDetails.cvv}
-                        onChange={(e) => handleCardChange('cvv', e.target.value)}
-                        fullWidth
-                        variant="outlined"
-                        size="small"
-                      />
-                    </Box>
+
+                {/* Paybill Instructions */}
+                <Collapse in={paymentMethod === 'paybill'}>
+                  <Box sx={{ mt: 2, p: 2, bgcolor: '#f9f9f9', borderRadius: 2 }}>
+                    <Typography fontWeight={600}>Paybill Instructions:</Typography>
+                    <Typography>1️⃣ Open M-Pesa → Lipa na M-Pesa</Typography>
+                    <Typography>2️⃣ Select Paybill</Typography>
+                    <Typography>3️⃣ Enter Business Number: <b>247247</b></Typography>
+                    <Typography>4️⃣ Account Number: <b>0722244482</b></Typography>
+                    <Typography>5️⃣ Enter Amount: <b>KES {total.toLocaleString()}</b></Typography>
+                    <Typography>6️⃣ Confirm and Send ✅</Typography>
                   </Box>
                 </Collapse>
-                <Collapse in={paymentMethod === 'bank'}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+
+                {/* Withdraw Option */}
+                <Collapse in={paymentMethod === 'withdraw'}>
+                  <Box sx={{ mt: 2, p: 2, bgcolor: '#f9f9f9', borderRadius: 2 }}>
+                    <Typography fontWeight={600}>Withdraw Option:</Typography>
+                    <Typography>Pay to Agent Number: <b>2065355</b></Typography>
+                    <Typography>or Store Number: <b>2061522</b></Typography>
+                    <Typography sx={{ mt: 1 }}>After payment, enter your M-Pesa confirmation code below:</Typography>
                     <TextField
-                      label="Account Number *"
-                      value={bankDetails.accountNumber}
-                      onChange={(e) => handleBankChange('accountNumber', e.target.value)}
+                      label="M-Pesa Confirmation Code *"
+                      value={checkoutDetails.mpesaCode}
+                      onChange={(e) => handleChange('mpesaCode', e.target.value)}
                       fullWidth
-                      variant="outlined"
                       size="small"
-                    />
-                    <TextField
-                      label="Bank Name *"
-                      value={bankDetails.bankName}
-                      onChange={(e) => handleBankChange('bankName', e.target.value)}
-                      fullWidth
-                      variant="outlined"
-                      size="small"
+                      sx={{ mt: 1 }}
                     />
                   </Box>
                 </Collapse>
+
                 <StyledButton
                   variant="contained"
                   color="primary"
                   fullWidth
                   onClick={handleCheckout}
-                  disabled={isProcessing || Object.values(cart).length === 0 || !checkoutDetails.name || !checkoutDetails.phone || !checkoutDetails.address || !checkoutDetails.city || !paymentMethod}
+                  disabled={isProcessing}
                   startIcon={isProcessing ? <CircularProgress size={20} /> : null}
                 >
-                  {isProcessing ? 'Processing...' : paymentMethod === 'delivery' ? 'Place Order' : 'Pay Now'}
+                  {isProcessing ? 'Processing...' : 'Complete Payment'}
                 </StyledButton>
               </Box>
             </StyledPaper>
           </Box>
         </Box>
+
         <Snackbar
           open={snackbar.open}
           autoHideDuration={3000}

@@ -13,8 +13,8 @@ type CartItem = {
 
 type CartContextType = {
   cart: Record<number, CartItem>;
-  addToCart: (item: CartItem) => void;
-  updateQuantity: (id: number, delta: number) => void;
+  addToCart: (item: CartItem) => boolean; // Return boolean for success/failure
+  updateQuantity: (id: number, delta: number) => boolean; // Return boolean for success/failure
   removeFromCart: (id: number) => void;
   clearCart: () => void;
 };
@@ -37,7 +37,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
               item.quantity > 0 &&
               item.title &&
               typeof item.price === 'number' &&
-              !isNaN(item.price)
+              !isNaN(item.price) &&
+              item.stock >= item.quantity
             ) {
               validCart[Number(id)] = {
                 id: Number(item.id),
@@ -58,15 +59,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     };
 
     loadCart();
-    window.addEventListener('storage', loadCart);
-    return () => window.removeEventListener('storage', loadCart);
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'cart') {
+        loadCart();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   useEffect(() => {
     try {
       if (Object.keys(cart).length > 0) {
         localStorage.setItem('cart', JSON.stringify(cart));
-        window.dispatchEvent(new Event('storage'));
       } else {
         localStorage.removeItem('cart');
       }
@@ -75,49 +80,71 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [cart]);
 
-  const addToCart = (item: CartItem) => {
+  const addToCart = (item: CartItem): boolean => {
+    if (item.quantity <= 0 || item.quantity > item.stock) {
+      console.log('Invalid addToCart attempt:', item);
+      return false;
+    }
     setCart((prev) => {
       const newCart = { ...prev };
       if (newCart[item.id]) {
-        newCart[item.id].quantity = Math.min(
-          newCart[item.id].quantity + item.quantity,
-          item.stock
-        );
+        const newQuantity = newCart[item.id].quantity + item.quantity;
+        if (newQuantity > item.stock) {
+          console.log('Stock limit reached:', item);
+          return prev;
+        }
+        newCart[item.id] = {
+          ...newCart[item.id],
+          quantity: newQuantity,
+        };
       } else {
         newCart[item.id] = { ...item };
       }
+      console.log('Cart updated:', newCart);
       return newCart;
     });
+    return true;
   };
 
-  const updateQuantity = (id: number, delta: number) => {
+  const updateQuantity = (id: number, delta: number): boolean => {
+    let success = false;
     setCart((prev) => {
       const newCart = { ...prev };
       const item = newCart[id];
-      if (!item) return newCart;
+      if (!item) {
+        console.log('Item not found for update:', id);
+        return newCart;
+      }
       const newQuantity = item.quantity + delta;
       if (newQuantity <= 0) {
         delete newCart[id];
+        success = true;
         return newCart;
       }
       if (newQuantity > item.stock) {
+        console.log('Stock limit reached for update:', item);
         return prev;
       }
-      item.quantity = newQuantity;
+      newCart[id] = { ...item, quantity: newQuantity };
+      success = true;
+      console.log('Cart updated:', newCart);
       return newCart;
     });
+    return success;
   };
 
   const removeFromCart = (id: number) => {
     setCart((prev) => {
       const newCart = { ...prev };
       delete newCart[id];
+      console.log('Item removed, new cart:', newCart);
       return newCart;
     });
   };
 
   const clearCart = () => {
     setCart({});
+    console.log('Cart cleared');
   };
 
   return (

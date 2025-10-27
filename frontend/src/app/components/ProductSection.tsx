@@ -1,3 +1,4 @@
+// ProductSection.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -101,6 +102,7 @@ const ProductSection = () => {
   };
 
   const handleAddToCart = (product: ProductT) => {
+    console.log('Adding to cart:', product);
     if (product.stock === 0) {
       showSnackbar('This product is out of stock', 'error');
       return;
@@ -112,7 +114,7 @@ const ProductSection = () => {
       return;
     }
 
-    addToCart({
+    const success = addToCart({
       id: product.id,
       title: product.title,
       price: product.price,
@@ -120,16 +122,22 @@ const ProductSection = () => {
       stock: product.stock,
     });
 
-    showSnackbar(cartItem ? `Added another ${product.title} to cart` : `${product.title} added to cart!`);
+    if (success) {
+      showSnackbar(cartItem ? `Added another ${product.title} to cart` : `${product.title} added to cart!`);
+    } else {
+      showSnackbar('Failed to add to cart', 'error');
+    }
   };
 
   const handleDecreaseQuantity = (id: number) => {
     const cartItem = cart[id];
     if (!cartItem) return;
 
-    updateQuantity(id, -1);
-    if (cartItem.quantity <= 1) {
-      showSnackbar('Item removed from cart');
+    const success = updateQuantity(id, -1);
+    if (success && cartItem.quantity <= 1) {
+      showSnackbar(`${cartItem.title} removed from cart`);
+    } else if (success) {
+      showSnackbar(`Updated quantity for ${cartItem.title}`);
     }
   };
 
@@ -142,7 +150,9 @@ const ProductSection = () => {
   };
 
   const getCartItemCount = () => {
-    return Object.values(cart).reduce((total, item) => total + (item.quantity || 0), 0);
+    const count = Object.values(cart).reduce((total, item) => total + (item.quantity || 0), 0);
+    console.log('Cart count:', count, 'Cart:', cart);
+    return count;
   };
 
   const renderCard = (product: ProductT) => {

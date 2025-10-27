@@ -12,10 +12,7 @@ export default function Home() {
     <div>
       <TopNavBar />
       <MainNavBar />
-      <HeroSection />
       <AppleProductsSection />
-
-      <Footer />
     </div>
   );
 }

@@ -13,9 +13,13 @@ import {
   Tab,
   useTheme,
   useMediaQuery,
+  Snackbar,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import { Favorite, ShoppingCart, Add, Remove } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
+import { useCart } from './cartContext'; // Ensure cartContext is set up in your project
 
 type ProductT = {
   id: number;
@@ -30,27 +34,22 @@ type ProductT = {
   is_active?: boolean;
 };
 
-type CartItem = {
-  id: number;
-  title: string;
-  price: number;
-  discount?: number;
-  quantity: number;
-};
-
 const DealsSection = () => {
   const theme = useTheme();
   const router = useRouter();
-  const isLargeScreen = useMediaQuery(theme.breakpoints.up('lg'));
-  const isMediumScreen = useMediaQuery(theme.breakpoints.up('md'));
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
-
+  const { cart, addToCart, updateQuantity } = useCart();
   const [products, setProducts] = useState<ProductT[]>([]);
   const [wishlist, setWishlist] = useState<Set<number>>(new Set());
-  const [cart, setCart] = useState<Record<number, CartItem>>({});
   const [currentIndexes, setCurrentIndexes] = useState<Record<number, number>>({});
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [activeCategory, setActiveCategory] = useState<number | 'all'>('all');
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+  const [loading, setLoading] = useState(true);
 
   const MEDIA_BASE = 'http://localhost:8000';
   const API_PRODUCTS = 'http://localhost:8000/api/products/';
@@ -58,12 +57,13 @@ const DealsSection = () => {
 
   // Fetch discounted, active products and categories
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
-        const res = await fetch(API_PRODUCTS);
-        if (!res.ok) throw new Error('Failed to fetch products');
-        const data = await res.json();
-        const allProducts: ProductT[] = Array.isArray(data) ? data : (data.results ?? []);
+        // Fetch products
+        const productRes = await fetch(API_PRODUCTS);
+        if (!productRes.ok) throw new Error('Failed to fetch products');
+        const productData = await productRes.json();
+        const allProducts: ProductT[] = Array.isArray(productData) ? productData : (productData.results ?? []);
         const discounted = allProducts.filter(
           (p) => p.is_active && p.discount && p.discount > 0
         );
@@ -72,88 +72,119 @@ const DealsSection = () => {
         discounted.forEach((p) => (indexes[p.id] = 0));
         setCurrentIndexes(indexes);
         setProducts(discounted);
-      } catch (err) {
-        console.error('Error fetching products:', err);
-      }
-    };
 
-    const fetchCategories = async () => {
-      try {
-        const res = await fetch(API_CATEGORIES);
-        if (!res.ok) throw new Error('Failed to fetch categories');
-        const data = await res.json();
-        const catsArray = Array.isArray(data) ? data : (data.results ?? []);
+        // Fetch categories
+        const categoryRes = await fetch(API_CATEGORIES);
+        if (!categoryRes.ok) throw new Error('Failed to fetch categories');
+        const categoryData = await categoryRes.json();
+        const catsArray = Array.isArray(categoryData) ? categoryData : (categoryData.results ?? []);
         setCategories(catsArray);
       } catch (err) {
-        console.error('Error fetching categories:', err);
+        console.error('Error fetching data:', err);
+        setSnackbar({ open: true, message: 'Failed to load deals or categories', severity: 'error' });
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchProducts();
-    fetchCategories();
+    fetchData();
   }, []);
 
-  // Persist cart in localStorage
+  // Load wishlist from localStorage
   useEffect(() => {
-    const savedCart = JSON.parse(localStorage.getItem('cart') || '{}');
-    setCart(savedCart);
+    try {
+      const storedWishlist = localStorage.getItem('wishlist');
+      if (storedWishlist) {
+        setWishlist(new Set(JSON.parse(storedWishlist)));
+      }
+    } catch (error) {
+      console.error('Error loading wishlist:', error);
+    }
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(cart));
-  }, [cart]);
+  const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
+    setSnackbar({ open: true, message, severity });
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  };
 
   const handleWishlistToggle = (id: number) => {
     setWishlist((prev) => {
       const newSet = new Set(prev);
-      newSet.has(id) ? newSet.delete(id) : newSet.add(id);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      localStorage.setItem('wishlist', JSON.stringify(Array.from(newSet)));
       return newSet;
     });
   };
 
   const handleAddToCart = (product: ProductT) => {
-    if (product.stock === 0) return;
-    setCart((prev) => {
-      const newCart = { ...prev };
-      if (newCart[product.id]) {
-        if (newCart[product.id].quantity < product.stock)
-          newCart[product.id].quantity += 1;
-      } else {
-        newCart[product.id] = {
-          id: product.id,
-          title: product.title,
-          price: product.price,
-          discount: product.discount,
-          quantity: 1,
-        };
-      }
-      return newCart;
+    if (product.stock === 0) {
+      showSnackbar('This product is out of stock', 'error');
+      return;
+    }
+
+    const cartItem = cart[product.id];
+    if (cartItem && cartItem.quantity >= product.stock) {
+      showSnackbar(`Only ${product.stock} items available in stock`, 'error');
+      return;
+    }
+
+    const success = addToCart({
+      id: product.id,
+      title: product.title,
+      price: product.price,
+      quantity: 1,
+      stock: product.stock,
     });
+
+    if (success) {
+      showSnackbar(cartItem ? `Added another ${product.title} to cart` : `${product.title} added to cart!`);
+    } else {
+      showSnackbar('Failed to add to cart', 'error');
+    }
   };
 
   const handleDecreaseQuantity = (id: number) => {
-    setCart((prev) => {
-      const newCart = { ...prev };
-      if (newCart[id]?.quantity > 1) newCart[id].quantity -= 1;
-      else delete newCart[id];
-      return newCart;
-    });
+    const cartItem = cart[id];
+    if (!cartItem) return;
+
+    const success = updateQuantity(id, -1);
+    if (success && cartItem.quantity <= 1) {
+      showSnackbar(`${cartItem.title} removed from cart`);
+    } else if (success) {
+      showSnackbar(`Updated quantity for ${cartItem.title}`);
+    }
   };
 
   const handleViewCart = () => {
+    if (Object.keys(cart).length === 0) {
+      showSnackbar('Your cart is empty', 'error');
+      return;
+    }
     router.push('/cart');
+  };
+
+  const getCartItemCount = () => {
+    return Object.values(cart).reduce((total, item) => total + (item.quantity || 0), 0);
   };
 
   const handleTabChange = (_: any, newVal: number | 'all') => setActiveCategory(newVal);
 
   const displayedProducts =
     activeCategory === 'all'
-      ? products
-      : products.filter((p) => p.categories?.some((c) => c.id === activeCategory));
+      ? products.filter((p) => p.stock > 0)
+      : products.filter((p) => p.stock > 0 && p.categories?.some((c) => c.id === activeCategory));
 
   const renderCard = (product: ProductT) => {
     const images = [product.cover_image, ...(product.images || [])].filter(Boolean).slice(0, 3);
     const currentIndex = currentIndexes[product.id] || 0;
+    const cartItem = cart[product.id];
     const finalPrice = product.discount
       ? (product.price - product.price * (product.discount / 100)).toFixed(2)
       : product.price.toFixed(2);
@@ -168,13 +199,13 @@ const DealsSection = () => {
       <Card
         key={product.id}
         sx={{
-          width: 220, // Static width
-          height: 360, // Static height
-          flex: '0 0 220px', // Ensure fixed width in scrollable row
+          width: 220,
+          height: 360,
+          flex: '0 0 220px',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-          borderRadius: 0, // No border radius
+          borderRadius: 0,
           overflow: 'hidden',
           position: 'relative',
           backgroundColor: '#fff',
@@ -217,7 +248,10 @@ const DealsSection = () => {
             borderRadius: '50%',
             boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
           }}
-          onClick={() => handleWishlistToggle(product.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleWishlistToggle(product.id);
+          }}
         >
           <Favorite
             sx={{
@@ -229,8 +263,8 @@ const DealsSection = () => {
 
         <Box
           sx={{
-            width: 220, // Static image width
-            height: 180, // Static image height
+            width: 220,
+            height: 180,
             cursor: 'pointer',
             overflow: 'hidden',
           }}
@@ -246,6 +280,22 @@ const DealsSection = () => {
               objectFit: 'cover',
             }}
           />
+          {product.stock < 5 && (
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: 8,
+                left: 8,
+                backgroundColor: 'rgba(0,0,0,0.75)',
+                color: '#fff',
+                padding: '4px 8px',
+                fontSize: '0.8rem',
+                fontWeight: 500,
+              }}
+            >
+              Only {product.stock} left!
+            </Box>
+          )}
         </Box>
 
         <CardContent
@@ -312,7 +362,47 @@ const DealsSection = () => {
             </Box>
           </Box>
 
-          {!cart[product.id] ? (
+          {cartItem ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 1.5, gap: 1.5 }}>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDecreaseQuantity(product.id);
+                }}
+                sx={{
+                  color: '#e91e63',
+                  border: '1px solid #e91e63',
+                  '&:hover': { backgroundColor: 'rgba(233, 30, 99, 0.1)' },
+                  width: 32,
+                  height: 32,
+                }}
+              >
+                <Remove sx={{ fontSize: 16 }} />
+              </IconButton>
+              <Typography sx={{ fontWeight: 600, fontSize: '1rem', minWidth: 24, textAlign: 'center' }}>
+                {cartItem.quantity}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToCart(product);
+                }}
+                disabled={cartItem.quantity >= product.stock}
+                sx={{
+                  color: '#e91e63',
+                  border: '1px solid #e91e63',
+                  '&:hover': { backgroundColor: 'rgba(233, 30, 99, 0.1)' },
+                  '&[disabled]': { color: '#ccc', borderColor: '#ccc' },
+                  width: 32,
+                  height: 32,
+                }}
+              >
+                <Add sx={{ fontSize: 16 }} />
+              </IconButton>
+            </Box>
+          ) : (
             <Button
               variant="contained"
               startIcon={<ShoppingCart sx={{ fontSize: 16 }} />}
@@ -328,58 +418,27 @@ const DealsSection = () => {
                 '&:hover': { backgroundColor: '#c2185b' },
                 '&:disabled': { backgroundColor: '#ccc' },
               }}
-              onClick={() => handleAddToCart(product)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddToCart(product);
+              }}
               disabled={product.stock === 0}
             >
               Add to Cart
             </Button>
-          ) : (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mt: 1.5,
-                gap: 1.5,
-              }}
-            >
-              <IconButton
-                size="small"
-                onClick={() => handleDecreaseQuantity(product.id)}
-                sx={{
-                  color: '#e91e63',
-                  border: '1px solid #e91e63',
-                  '&:hover': { backgroundColor: 'rgba(233, 30, 99, 0.1)' },
-                  width: 32,
-                  height: 32,
-                }}
-              >
-                <Remove sx={{ fontSize: 16 }} />
-              </IconButton>
-              <Typography sx={{ fontWeight: 600, fontSize: '1rem', minWidth: 24, textAlign: 'center' }}>
-                {cart[product.id].quantity}
-              </Typography>
-              <IconButton
-                size="small"
-                onClick={() => handleAddToCart(product)}
-                disabled={cart[product.id].quantity >= product.stock}
-                sx={{
-                  color: '#e91e63',
-                  border: '1px solid #e91e63',
-                  '&:hover': { backgroundColor: 'rgba(233, 30, 99, 0.1)' },
-                  '&[disabled]': { color: '#ccc', borderColor: '#ccc' },
-                  width: 32,
-                  height: 32,
-                }}
-              >
-                <Add sx={{ fontSize: 16 }} />
-              </IconButton>
-            </Box>
           )}
         </CardContent>
       </Card>
     );
   };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, background: 'linear-gradient(180deg, #f5f5f5 40%, #fff 100%)' }}>
@@ -402,8 +461,9 @@ const DealsSection = () => {
             '&:hover': { backgroundColor: '#c2185b' },
             '&:disabled': { backgroundColor: '#ccc' },
           }}
+          disabled={getCartItemCount() === 0}
         >
-          View Cart ({Object.keys(cart).length})
+          View Cart ({getCartItemCount()})
         </Button>
       </Box>
 
@@ -448,10 +508,10 @@ const DealsSection = () => {
                 gap: 2,
                 pb: 2,
                 scrollSnapType: 'x mandatory',
-                msOverflowStyle: 'none', // Hide scrollbar in IE/Edge
-                scrollbarWidth: 'none', // Hide scrollbar in Firefox
+                msOverflowStyle: 'none',
+                scrollbarWidth: 'none',
                 '&::-webkit-scrollbar': {
-                  display: 'none', // Hide scrollbar in WebKit browsers
+                  display: 'none',
                 },
                 '& > *': {
                   scrollSnapAlign: 'start',
@@ -460,15 +520,32 @@ const DealsSection = () => {
             : {
                 display: 'grid',
                 gridTemplateColumns: {
-                  md: 'repeat(4, minmax(220px, 1fr))', // 4 cards
-                  lg: 'repeat(5, minmax(220px, 1fr))', // 5 cards
+                  md: 'repeat(4, minmax(220px, 1fr))',
+                  lg: 'repeat(5, minmax(220px, 1fr))',
                 },
                 gap: { md: 3 },
               }),
         }}
       >
-        {displayedProducts.map(renderCard)}
+        {displayedProducts.length === 0 ? (
+          <Typography variant="body1" sx={{ width: '100%', textAlign: 'center', mt: 4 }}>
+            No deals found.
+          </Typography>
+        ) : (
+          displayedProducts.map(renderCard)
+        )}
       </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
