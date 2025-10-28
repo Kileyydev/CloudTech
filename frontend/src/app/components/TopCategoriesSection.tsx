@@ -133,14 +133,14 @@ const CategoriesWrapper = styled(Box)(({ theme }) => ({
 
 const TopCategoriesSection = () => {
   const categories = [
-    { name: 'Headphones', count: '25+ Products', image: '/images/headphones.jpg' },
-    { name: 'Mobile Phones', count: '25+ Products', image: '/images/mobile-phones.jpg' },
-    { name: 'Mobile Accessories', count: '25+ Products', image: '/images/mobile-accessories.jpg' },
-    { name: 'Laptops', count: '25+ Products', image: '/images/laptops.jpg' },
-    { name: 'Pods', count: '25+ Products', image: '/images/pods.jpg' },
-    { name: 'Gaming Console', count: '25+ Products', image: '/images/gaming-console.jpg' },
-    { name: 'Watch', count: '25+ Products', image: '/images/watch.jpg' },
-    { name: 'iPads', count: '25+ Products', image: '/images/ipads.jpg' },
+    { name: 'Headphones', image: '/images/headphones.jpg' },
+    { name: 'Mobile Phones',  image: '/images/iphone17.webp' },
+    { name: 'Mobile Accessories',  image: '/images/cables.png' },
+    { name: 'Laptops',  image: '/images/mac.jpg' },
+    { name: 'Audio',  image: '/images/oraimo.webp' },
+    { name: 'Gaming Console', image: '/images/ps5.png' },
+    { name: 'Watch',  image: '/images/watch.webp' },
+    { name: 'iPads',  image: '/images/iPad.webp' },
   ];
 
   return (
@@ -169,7 +169,7 @@ const TopCategoriesSection = () => {
               <CategoryCard>
                 <CategoryImage sx={{ backgroundImage: `url(${category.image})` }} />
                 <CategoryName>{category.name}</CategoryName>
-                <ProductCount>{category.count}</ProductCount>
+
               </CategoryCard>
             </SwiperSlide>
           ))}
@@ -186,7 +186,6 @@ const TopCategoriesSection = () => {
           <CategoryCard key={index}>
             <CategoryImage sx={{ backgroundImage: `url(${category.image})` }} />
             <CategoryName>{category.name}</CategoryName>
-            <ProductCount>{category.count}</ProductCount>
           </CategoryCard>
         ))}
       </CategoriesWrapper>

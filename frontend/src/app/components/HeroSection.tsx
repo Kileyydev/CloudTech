@@ -57,10 +57,6 @@ const Card = styled(Box)(({ theme }) => ({
   boxShadow: '0 4.5px 9px rgba(0, 0, 0, 0.15), 0 2.2px 4.5px rgba(0, 0, 0, 0.1)',
   overflow: 'hidden',
   transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
-  '&:hover': {
-    transform: 'translateY(-4px)',
-    boxShadow: '0 6px 12px rgba(0, 0, 0, 0.2)',
-  },
   '@keyframes zoomIn': {
     '0%': { transform: 'scale(0.95)', opacity: 0.8 },
     '100%': { transform: 'scale(1)', opacity: 1 },
@@ -69,14 +65,14 @@ const Card = styled(Box)(({ theme }) => ({
 
 // Card items
 const cardItems = [
-  { src: '/images/samsung.jpg', alt: 'Samsung', href: '/samsung' },
-  { src: '/images/apple.jpg', alt: 'Apple', href: '/apple' },
-  { src: '/images/smartphones.jpg', alt: 'Smartphones', href: '/smartphones' },
-  { src: '/images/mobile-accessories.jpg', alt: 'Mobile Accessories', href: '/mobile-accessories' },
-  { src: '/images/audio.jpg', alt: 'Audio', href: '/audio' },
-  { src: '/images/gaming.jpg', alt: 'Gaming', href: '/gaming' },
-  { src: '/images/storage.jpg', alt: 'Storage', href: '/storage' },
-  { src: '/images/powerbank.jpg', alt: 'PowerBank', href: '/powerbank' },
+  { src: '/images/galaxy.jpg', alt: 'Samsung', href: '/samsung' },
+  { src: '/images/iphone17.webp', alt: 'Apple', href: '/apple' },
+  { src: '/images/redmi.avif', alt: 'Smartphones', href: '/smartphones' },
+  { src: '/images/cables.png', alt: 'Mobile Accessories', href: '/mobile-accessories' },
+  { src: '/images/oraimo.webp', alt: 'Audio', href: '/audio' },
+  { src: '/images/ps5.png', alt: 'Gaming', href: '/gaming' },
+  { src: '/images/controller.webp', alt: 'Storage', href: '/storage' },
+  { src: '/images/osmo.webp', alt: 'PowerBank', href: '/powerbank' },
 ];
 
 // Group cards for large screens: two slides with 4 cards each

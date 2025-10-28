@@ -2,228 +2,203 @@
 
 import { Box, Typography, IconButton } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import FacebookIcon from '@mui/icons-material/Facebook';
-import InstagramIcon from '@mui/icons-material/Instagram';
-import SmartDisplayIcon from '@mui/icons-material/SmartDisplay'; // TikTok substitute
-import TwitterIcon from '@mui/icons-material/X'; // Updated to X icon
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import Link from 'next/link';
 import { useMediaQuery, useTheme } from '@mui/material';
 
-const FooterBox = styled(Box)(({ theme }) => ({
-  background: 'linear-gradient(180deg, #f5f5f5 40%, #fff 100%)',
-  padding: theme.spacing(4, 2),
-  color: '#222',
-  textAlign: 'left',
+const FooterContainer = styled(Box)(({ theme }) => ({
+  backgroundColor: '#000',
+  color: '#e0e0e0',
+  padding: theme.spacing(6, 2),
+  fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
   [theme.breakpoints.up('sm')]: {
-    padding: theme.spacing(5, 3),
+    padding: theme.spacing(8, 4),
   },
   [theme.breakpoints.up('md')]: {
-    padding: theme.spacing(6, 4),
-  },
-  [theme.breakpoints.up('lg')]: {
-    padding: theme.spacing(8, 4),
+    padding: theme.spacing(10, 6),
   },
 }));
 
-const SocialIconsBox = styled(Box)(({ theme }) => ({
+const FooterContent = styled(Box)(({ theme }) => ({
+  maxWidth: '1400px',
+  margin: '0 auto',
   display: 'flex',
+  flexDirection: 'column',
+  gap: theme.spacing(4),
+  [theme.breakpoints.up('md')]: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+}));
+
+const LogoSection = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: theme.spacing(2),
+  marginBottom: theme.spacing(3),
+  [theme.breakpoints.up('md')]: {
+    marginBottom: 0,
+    flex: '0 0 300px',
+  },
+}));
+
+const Logo = styled('img')({
+  height: '60px',
+  width: 'auto',
+});
+
+const BrandName = styled(Typography)({
+  fontSize: '1.5rem',
+  fontWeight: 600,
+  color: '#fff',
+  fontFamily: 'cursive',
+  marginTop: '-8px',
+});
+
+const Column = styled(Box)(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
   gap: theme.spacing(1.5),
-  marginTop: theme.spacing(1.5),
-  '& .MuiSvgIcon-root': {
-    fontSize: 'clamp(20px, 2.5vw, 24px)',
-    transition: 'color 0.2s ease-in-out',
-  },
-  [theme.breakpoints.up('sm')]: {
-    gap: theme.spacing(2),
-    marginTop: theme.spacing(2),
-  },
+}));
+
+const ColumnTitle = styled(Typography)(({ theme }) => ({
+  fontWeight: 600,
+  fontSize: '1.1rem',
+  color: '#fff',
+  marginBottom: theme.spacing(1),
 }));
 
 const FooterLink = styled(Typography)(({ theme }) => ({
-  color: '#222',
-  fontSize: 'clamp(14px, 1.8vw, 16px)',
-  lineHeight: '1.8',
+  color: '#ccc',
+  fontSize: '0.95rem',
   cursor: 'pointer',
-  transition: 'color 0.2s ease-in-out',
+  transition: 'color 0.2s ease',
   '&:hover': {
-    color: '#DC1A8A',
-  },
-  '&:focus': {
-    color: '#DC1A8A',
-    outline: '2px solid #DC1A8A',
-    outlineOffset: '2px',
+    color: '#fff',
   },
 }));
 
-const FooterTitle = styled(Typography)(({ theme }) => ({
-  fontWeight: 700,
-  color: '#222',
-  fontSize: 'clamp(16px, 2vw, 20px)',
-  marginBottom: theme.spacing(1.5),
+const Copyright = styled(Typography)(({ theme }) => ({
+  textAlign: 'center',
+  color: '#888',
+  fontSize: '0.85rem',
+  paddingTop: theme.spacing(3),
+  borderTop: '1px solid #333',
+  marginTop: theme.spacing(4),
 }));
 
-const FooterCard = styled(Box)(({ theme }) => ({
-  backgroundColor: '#fff',
-  padding: theme.spacing(2),
-  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-  borderRadius: 0, // No border radius
-  display: 'flex',
-  flexDirection: 'column',
-  height: '100%',
+const WhatsAppButton = styled(IconButton)(({ theme }) => ({
+  position: 'fixed',
+  bottom: 24,
+  right: 24,
+  backgroundColor: '#25D366',
+  color: '#fff',
+  padding: theme.spacing(1.5),
+  boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+  zIndex: 1000,
+  '&:hover': {
+    backgroundColor: '#1DA851',
+    transform: 'scale(1.1)',
+  },
+  transition: 'all 0.3s ease',
+  [theme.breakpoints.down('sm')]: {
+    bottom: 16,
+    right: 16,
+  },
 }));
+
+const WhatsAppLabel = styled(Typography)({
+  marginLeft: '8px',
+  fontWeight: 600,
+  fontSize: '1rem',
+});
 
 const Footer = () => {
   const theme = useTheme();
-  const isLargeScreen = useMediaQuery(theme.breakpoints.up('lg'));
-  const isMediumScreen = useMediaQuery(theme.breakpoints.up('md'));
-  const isSmallScreen = useMediaQuery(theme.breakpoints.up('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  // Format current date
-  const currentDate = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  const currentYear = new Date().getFullYear();
 
   return (
-    <FooterBox>
-      <Box
-        sx={{
-          maxWidth: '1200px',
-          mx: 'auto',
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr', // 1 card per row
-            sm: 'repeat(2, minmax(0, 1fr))', // 2 cards per row
-            md: 'repeat(4, minmax(0, 1fr))', // 4 cards per row
-          },
-          gap: { xs: 2, sm: 2.5, md: 3 },
-          '& > *': {
-            minWidth: 0,
-          },
-        }}
-      >
-        {/* Company Info */}
-        <FooterCard>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <Box sx={{ mr: 1.5 }}>
-              <img
-                src="/images/logo.jpeg"
+    <>
+      <FooterContainer>
+        <FooterContent>
+          {/* Logo & Brand */}
+          <LogoSection>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Logo
+                src="/images/logo.jpeg" // Replace with actual logo path
                 alt="CloudTech Logo"
-                style={{
-                  height: 'clamp(32px, 5vw, 40px)',
-                  maxWidth: '100%',
-                  objectFit: 'contain',
-                }}
               />
             </Box>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 700,
-                color: '#222',
-                fontSize: 'clamp(16px, 2.5vw, 20px)',
-              }}
-            >
-              CloudTech
-            </Typography>
-          </Box>
-          <FooterLink>Shop Location: Bazaar Plaza, Mezzanine 1 unit 5, Moi Avenue Nairobi</FooterLink>
-          <FooterLink>Email: info@cloudtech.com</FooterLink>
-          <SocialIconsBox>
-            <IconButton
-              component="a"
-              href="https://facebook.com"
-              aria-label="Facebook"
-              sx={{ '&:hover .MuiSvgIcon-root': { color: '#DC1A8A' } }}
-            >
-              <FacebookIcon sx={{ color: '#222' }} />
-            </IconButton>
-            <IconButton
-              component="a"
-              href="https://instagram.com"
-              aria-label="Instagram"
-              sx={{ '&:hover .MuiSvgIcon-root': { color: '#DC1A8A' } }}
-            >
-              <InstagramIcon sx={{ color: '#222' }} />
-            </IconButton>
-            <IconButton
-              component="a"
-              href="https://tiktok.com"
-              aria-label="TikTok"
-              sx={{ '&:hover .MuiSvgIcon-root': { color: '#DC1A8A' } }}
-            >
-              <SmartDisplayIcon sx={{ color: '#222' }} />
-            </IconButton>
-            <IconButton
-              component="a"
-              href="https://x.com"
-              aria-label="X"
-              sx={{ '&:hover .MuiSvgIcon-root': { color: '#DC1A8A' } }}
-            >
-              <TwitterIcon sx={{ color: '#222' }} />
-            </IconButton>
-          </SocialIconsBox>
-        </FooterCard>
+            <BrandName>CloudTech</BrandName>
+          </LogoSection>
 
-        {/* Our Company */}
-        <FooterCard>
-          <FooterTitle>Our Company</FooterTitle>
-          <Link href="/about" style={{ textDecoration: 'none' }}>
-            <FooterLink>About Us</FooterLink>
-          </Link>
-          <Link href="/contact" style={{ textDecoration: 'none' }}>
-            <FooterLink>Contact Us</FooterLink>
-          </Link>
-          <Link href="/privacy" style={{ textDecoration: 'none' }}>
-            <FooterLink>Privacy Policy</FooterLink>
-          </Link>
-          <Link href="/terms" style={{ textDecoration: 'none' }}>
-            <FooterLink>Terms and Conditions</FooterLink>
-          </Link>
-        </FooterCard>
+          {/* Quick Links */}
+          <Column>
+            <ColumnTitle>Quick links</ColumnTitle>
+            <Link href="/" style={{ textDecoration: 'none' }}>
+              <FooterLink>Home</FooterLink>
+            </Link>
+            <Link href="/samsung" style={{ textDecoration: 'none' }}>
+              <FooterLink>Samsung</FooterLink>
+            </Link>
+            <Link href="/apple" style={{ textDecoration: 'none' }}>
+              <FooterLink>Apple</FooterLink>
+            </Link>
+            <Link href="/mobile-accessories" style={{ textDecoration: 'none' }}>
+              <FooterLink>Mobile Accessories</FooterLink>
+            </Link>
+            <Link href="/storage" style={{ textDecoration: 'none' }}>
+              <FooterLink> Storage</FooterLink>
+            </Link>
+            <Link href="/content-creator-kits" style={{ textDecoration: 'none' }}>
+              <FooterLink> Content Creator Kits</FooterLink>
 
-        {/* Shop By Brands */}
-        <FooterCard>
-          <FooterTitle>Shop By Brands</FooterTitle>
-          <Link href="/samsung" style={{ textDecoration: 'none' }}>
-            <FooterLink>Samsung</FooterLink>
-          </Link>
-          <Link href="/apple" style={{ textDecoration: 'none' }}>
-            <FooterLink>Apple</FooterLink>
-          </Link>
-          <Link href="/xiaomi" style={{ textDecoration: 'none' }}>
-            <FooterLink>Xiaomi</FooterLink>
-          </Link>
-          <Link href="/google" style={{ textDecoration: 'none' }}>
-            <FooterLink>Google</FooterLink>
-          </Link>
-        </FooterCard>
+            <Link href="/conntact-us" style={{ textDecoration: 'none' }}>
+              <FooterLink> Contact us</FooterLink>
+            </Link>
+            </Link>
+          </Column>
 
-        {/* Contact Us */}
-        <FooterCard>
-          <FooterTitle>Contact Us</FooterTitle>
-          <FooterLink>Sales: 0726 526375</FooterLink>
-          <FooterLink>Repairs: 0745 063030</FooterLink>
-        </FooterCard>
-      </Box>
+          {/* Contact Us */}
+          <Column>
+            <ColumnTitle>Contact Us</ColumnTitle>
+            <FooterLink>
+              Call, Text or Whatsapp us on,
+              <br />
+              <strong style={{ color: '#fff' }}>+254 716 265 661</strong>
+            </FooterLink>
+            <FooterLink>
+              Email:{' '}
+              <a
+                href="mailto:info@cloudtech.co.ke"
+                style={{ color: '#ccc', textDecoration: 'none' }}
+              >
+                info@cloudtech.co.ke
+              </a>
+            </FooterLink>
+          </Column>
+        </FooterContent>
 
-      {/* Horizontal Line */}
-      <Box sx={{ width: '100%', height: '2px', backgroundColor: '#222', my: { xs: 3, md: 4 }, maxWidth: '1200px', mx: 'auto' }} />
+        {/* Copyright */}
+        <Copyright>
+          &copy; {currentYear}, CloudTech Created by Kim
+        </Copyright>
+      </FooterContainer>
 
-      {/* Copyright */}
-      <Box sx={{ textAlign: 'center', maxWidth: '1200px', mx: 'auto' }}>
-        <Typography
-          sx={{
-            color: '#222',
-            fontSize: 'clamp(12px, 1.5vw, 14px)',
-            fontWeight: 500,
-          }}
-        >
-          © {currentDate} @ CloudTech
-        </Typography>
-      </Box>
-    </FooterBox>
+      {/* Floating WhatsApp Button */}
+      <Link href="https://wa.me/254722244482" target="_blank" rel="noopener noreferrer" passHref legacyBehavior>
+        <a style={{ textDecoration: 'none' }}>
+          <WhatsAppButton aria-label="Chat on WhatsApp">
+            <WhatsAppIcon sx={{ fontSize: 28 }} />
+            {!isMobile && <WhatsAppLabel>Reach us via Whatsapp</WhatsAppLabel>}
+          </WhatsAppButton>
+        </a>
+      </Link>
+    </>
   );
 };
 
