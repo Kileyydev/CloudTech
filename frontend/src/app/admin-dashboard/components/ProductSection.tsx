@@ -6,11 +6,6 @@ import {
   TextField,
   Tabs,
   Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   CircularProgress,
   FormControl,
   InputLabel,
@@ -22,8 +17,38 @@ import {
   FormControlLabel,
   Typography,
   IconButton,
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Card,
+  CardContent,
+  CardMedia,
+  CardActions,
+  Stack,
+  Avatar,
+  Tooltip,
+  Zoom,
+  useTheme,
+  useMediaQuery,
+  Snackbar,
+  Alert,
 } from "@mui/material";
-import { Add, Remove } from "@mui/icons-material";
+import {
+  Add,
+  Remove,
+  Edit,
+  Delete,
+  Favorite,
+  ShoppingCart,
+  Image as ImageIcon,
+  Palette,
+  Category,
+  Store,
+  AttachMoney,
+  Inventory,
+} from "@mui/icons-material";
 
 type ProductT = {
   id: string;
@@ -32,9 +57,11 @@ type ProductT = {
   price?: number;
   stock?: number;
   discount?: number;
+  final_price?: number;
   categories?: { id: number; name: string }[];
   brand?: { id: number; name: string };
-  cover_images?: string[];
+  cover_image?: string;
+  images?: { id: string; image: string }[];
   colors?: string[];
   is_active?: boolean;
   is_featured?: boolean;
@@ -43,15 +70,27 @@ type ProductT = {
 type CategoryT = { id: number; name: string };
 type BrandT = { id: number; name: string };
 
+const API_HOST = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+const API_BASE = `${API_HOST}/api/products`;
+const API_CATEGORIES = `${API_HOST}/api/categories/`;
+const API_BRANDS = `${API_HOST}/api/brands/`;
+const MEDIA_BASE = API_HOST;
+
 const ProductSection: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+
   const [activeTab, setActiveTab] = useState<number>(0);
+  const [activeCategory, setActiveCategory] = useState<number | "all">("all");
+
   const [products, setProducts] = useState<ProductT[]>([]);
   const [categories, setCategories] = useState<CategoryT[]>([]);
   const [brands, setBrands] = useState<BrandT[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Form fields
+  // Form
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState<number | "">("");
@@ -60,142 +99,131 @@ const ProductSection: React.FC = () => {
   const [finalPrice, setFinalPrice] = useState<number | "">("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [brand, setBrand] = useState<string>("");
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
+  const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [isFeatured, setIsFeatured] = useState(false);
-
-  // Colors and quantity selection
-  const [availableColors, setAvailableColors] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
 
-  const API_BASE = "http://localhost:8000/api/products";
-  const API_CATEGORIES = "http://localhost:8000/api/categories/";
-  const API_BRANDS = "http://localhost:8000/api/brands/";
-  const MEDIA_BASE = "http://localhost:8000";
+  // Delete
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const getToken = () =>
-    typeof window !== "undefined" ? localStorage.getItem("access") : null;
+  // Snackbar
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: "success" | "error" }>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
-  // Final price calculation
+  const getToken = () => (typeof window !== "undefined" ? localStorage.getItem("access") : null);
+
+  // Final price
   useEffect(() => {
     if (price !== "" && discount !== "") {
-      const final =
-        discount && discount > 0
-          ? Number(price) - (Number(price) * Number(discount)) / 100
-          : Number(price);
+      const final = discount > 0 ? Number(price) - (Number(price) * Number(discount)) / 100 : Number(price);
       setFinalPrice(parseFloat(final.toFixed(2)));
     } else {
       setFinalPrice("");
     }
   }, [price, discount]);
 
-  // Fetch data
-  const fetchProducts = async () => {
+  // Fetch
+  const fetchData = async () => {
     const token = getToken();
     if (!token) return;
-    setLoadingProducts(true);
+    setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setProducts(Array.isArray(data) ? data : data.results);
+      const [pRes, cRes, bRes] = await Promise.all([
+        fetch(`${API_BASE}/`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(API_CATEGORIES, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(API_BRANDS, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      const [pData, cData, bData] = await Promise.all([pRes.json(), cRes.json(), bRes.json()]);
+      setProducts(Array.isArray(pData) ? pData : pData.results ?? []);
+      setCategories(Array.isArray(cData) ? cData : cData.results ?? []);
+      setBrands(Array.isArray(bData) ? bData : bData.results ?? []);
     } catch (err) {
-      console.error("Error fetching products", err);
+      console.error(err);
+      setSnackbar({ open: true, message: "Failed to load data", severity: "error" });
     } finally {
-      setLoadingProducts(false);
-    }
-  };
-
-  const fetchCategories = async () => {
-    const token = getToken();
-    if (!token) return;
-    try {
-      const res = await fetch(API_CATEGORIES, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setCategories(Array.isArray(data) ? data : data.results);
-    } catch (err) {
-      console.error("Error fetching categories", err);
-    }
-  };
-
-  const fetchBrands = async () => {
-    const token = getToken();
-    if (!token) return;
-    try {
-      const res = await fetch(API_BRANDS, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setBrands(Array.isArray(data) ? data : data.results);
-    } catch (err) {
-      console.error("Error fetching brands", err);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-    fetchBrands();
+    fetchData();
   }, []);
 
-  const handleImagesChange = (files: FileList | null) => {
-    if (!files) return;
-    const fileArray = Array.from(files);
-    setImageFiles(fileArray);
-    const previews = fileArray.map((file) => URL.createObjectURL(file));
-    setImagePreviews(previews);
+  // Image handlers
+  const handleCoverChange = (files: FileList | null) => {
+    if (!files?.[0]) {
+      setCoverFile(null);
+      setCoverPreview(null);
+      return;
+    }
+    const f = files[0];
+    setCoverFile(f);
+    setCoverPreview(URL.createObjectURL(f));
+  };
+
+  const handleGalleryChange = (files: FileList | null) => {
+    if (!files) {
+      setGalleryFiles([]);
+      setGalleryPreviews([]);
+      return;
+    }
+    const arr = Array.from(files);
+    setGalleryFiles(arr);
+    setGalleryPreviews(arr.map((f) => URL.createObjectURL(f)));
   };
 
   const resetForm = () => {
+    setEditingId(null);
     setTitle("");
     setDescription("");
     setPrice("");
+    setStock("");
     setDiscount(0);
     setFinalPrice("");
-    setStock("");
     setSelectedCategories([]);
     setBrand("");
-    setImageFiles([]);
-    setImagePreviews([]);
-    setEditingId(null);
+    setCoverFile(null);
+    setCoverPreview(null);
+    setGalleryFiles([]);
+    setGalleryPreviews([]);
     setIsActive(true);
     setIsFeatured(false);
-    setAvailableColors([]);
     setSelectedColors([]);
     setQuantities({});
   };
 
-  // Add/Edit product
-  const handleAddOrEditProduct = async () => {
+  // Save
+  const handleSave = async () => {
     const token = getToken();
-    if (!token) return;
-    if (!title || !description || price === "" || stock === "" || !brand) {
-      alert("Please fill all required fields");
+    if (!token || !title || price === "" || !brand) {
+      setSnackbar({ open: true, message: "Fill required fields", severity: "error" });
       return;
     }
 
     const formData = new FormData();
     formData.append("title", title);
     formData.append("description", description);
-    formData.append("price", price.toString());
-    formData.append("stock", stock.toString());
-    formData.append("discount", discount?.toString() || "0");
-    formData.append("final_price", finalPrice?.toString() || price.toString());
+    formData.append("price", String(price));
+    formData.append("stock", String(stock));
+    formData.append("discount", String(discount));
+    formData.append("final_price", String(finalPrice));
     formData.append("brand", brand);
+    formData.append("is_active", String(isActive));
+    formData.append("is_featured", String(isFeatured));
     selectedCategories.forEach((c) => formData.append("categories", c));
     selectedColors.forEach((c) => formData.append("colors", c));
-    Object.entries(quantities).forEach(([color, qty]) =>
-      formData.append(`quantity_${color}`, qty.toString())
-    );
-    formData.append("is_active", isActive.toString());
-    formData.append("is_featured", isFeatured.toString());
-    imageFiles.forEach((file) => formData.append("cover_images", file));
+    if (coverFile) formData.append("cover_image", coverFile);
+    galleryFiles.forEach((f) => formData.append("images", f));
 
     setSaving(true);
     try {
@@ -209,218 +237,457 @@ const ProductSection: React.FC = () => {
       });
 
       if (res.ok) {
-        alert(editingId ? "Product updated!" : "Product added!");
+        setSnackbar({ open: true, message: editingId ? "Updated!" : "Added!", severity: "success" });
         resetForm();
-        fetchProducts();
+        fetchData();
         setActiveTab(1);
       } else {
-        console.error(await res.text());
-        alert("Failed to save product");
+        const err = await res.text();
+        console.error(err);
+        setSnackbar({ open: true, message: "Save failed", severity: "error" });
       }
     } catch (err) {
-      console.error("Error saving product", err);
-      alert("Error saving product");
+      setSnackbar({ open: true, message: "Network error", severity: "error" });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleEditClick = (p: ProductT) => {
+  // Edit
+  const handleEdit = (p: ProductT) => {
     setEditingId(p.id);
     setTitle(p.title ?? "");
     setDescription(p.description ?? "");
     setPrice(p.price ?? "");
-    setDiscount(p.discount ?? 0);
     setStock(p.stock ?? "");
+    setDiscount(p.discount ?? 0);
+    setFinalPrice(p.final_price ?? p.price ?? "");
     setBrand(p.brand?.id?.toString() ?? "");
-    setSelectedCategories(p.categories?.map((c) => c.id.toString()) || []);
-    setImagePreviews(p.cover_images ?? []);
-    setAvailableColors(p.colors ?? []);
-    setSelectedColors(p.colors ?? []);
-    const initQty: Record<string, number> = {};
-    (p.colors ?? []).forEach((c) => (initQty[c] = 1));
-    setQuantities(initQty);
+    setSelectedCategories(p.categories?.map((c) => String(c.id)) || []);
     setIsActive(p.is_active ?? true);
     setIsFeatured(p.is_featured ?? false);
+    setSelectedColors(p.colors ?? []);
+
+    if (p.cover_image) {
+      const url = p.cover_image.startsWith("http") ? p.cover_image : `${MEDIA_BASE}${p.cover_image}`;
+      setCoverPreview(url);
+    }
+
+    if (p.images?.length) {
+      const urls = p.images.map((img) => (img.image.startsWith("http") ? img.image : `${MEDIA_BASE}${img.image}`));
+      setGalleryPreviews(urls);
+    }
+
     setActiveTab(0);
   };
 
-  const handleDelete = async (id: string) => {
+  // Delete
+  const confirmDelete = (id: string) => {
+    setDeleteTarget(id);
+    setConfirmOpen(true);
+  };
+
+  const handleDelete = async () => {
+    const id = deleteTarget;
     const token = getToken();
-    if (!token) return;
-    if (!confirm("Are you sure you want to delete this product?")) return;
+    setConfirmOpen(false);
+    if (!id || !token) return;
 
     try {
       const res = await fetch(`${API_BASE}/${id}/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) fetchProducts();
-      else alert("Failed to delete product");
+      if (res.ok) {
+        setSnackbar({ open: true, message: "Deleted", severity: "success" });
+        fetchData();
+      }
     } catch (err) {
-      console.error("Error deleting product", err);
+      setSnackbar({ open: true, message: "Delete failed", severity: "error" });
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
-  return (
-    <Box sx={{ minHeight: "100vh", backgroundColor: "#FFFFFF", padding: 3 }}>
-      <Tabs
-        value={activeTab}
-        onChange={(_, val) => setActiveTab(val)}
+  const filteredProducts =
+    activeCategory === "all"
+      ? products
+      : products.filter((p) => p.categories?.some((c) => c.id === activeCategory));
+
+  const renderProductCard = (p: ProductT) => {
+    const images = [
+      p.cover_image,
+      ...(p.images?.map((i) => i.image) || []),
+    ].filter(Boolean) as string[];
+
+    const imageSrc =
+      images.length > 0
+        ? images[0].startsWith("http")
+          ? images[0]
+          : `${MEDIA_BASE}${images[0]}`
+        : "/images/fallback.jpg";
+
+    const finalPrice = p.final_price ?? (p.discount && p.discount > 0
+      ? p.price! - (p.price! * p.discount) / 100
+      : p.price);
+
+    return (
+      <Card
+        key={p.id}
         sx={{
-          mb: 4,
-          "& .MuiTabs-indicator": { backgroundColor: "#DC1A8A" },
-          "& .MuiTab-root": {
-            textTransform: "none",
-            fontWeight: "bold",
-            color: "#666",
-            "&.Mui-selected": { color: "#DC1A8A" },
-          },
+          width: 220,
+          height: 360,
+          flex: "0 0 220px",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 4px 8px rgba(0,0,0,0.1)",
+          borderRadius: 0,
+          overflow: "hidden",
+          position: "relative",
+          backgroundColor: "#fff",
+          transition: "transform 0.2s",
+          "&:hover": { transform: "translateY(-4px)" },
         }}
       >
-        <Tab label="Add/Edit Product" />
+        {p.discount && p.discount > 0 && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 8,
+              left: 8,
+              backgroundColor: "#e91e63",
+              color: "#fff",
+              fontSize: "0.8rem",
+              fontWeight: 700,
+              px: 1,
+              py: 0.5,
+              borderRadius: 0,
+            }}
+          >
+            {p.discount}% OFF
+          </Box>
+        )}
+
+        <Box
+          sx={{
+            width: 220,
+            height: 180,
+            cursor: "pointer",
+            overflow: "hidden",
+          }}
+          onClick={() => handleEdit(p)}
+        >
+          <CardMedia
+            component="img"
+            image={imageSrc}
+            alt={p.title}
+            sx={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+          {p.stock !== undefined && p.stock < 5 && p.stock > 0 && (
+            <Box
+              sx={{
+                position: "absolute",
+                bottom: 8,
+                left: 8,
+                backgroundColor: "rgba(0,0,0,0.75)",
+                color: "#fff",
+                padding: "4px 8px",
+                fontSize: "0.8rem",
+                fontWeight: 500,
+              }}
+            >
+              Only {p.stock} left!
+            </Box>
+          )}
+        </Box>
+
+        <CardContent
+          sx={{
+            flexGrow: 1,
+            p: 1.5,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            height: 180,
+          }}
+        >
+          <Box>
+            <Typography
+              variant="subtitle1"
+              sx={{
+                fontWeight: 600,
+                color: "#222",
+                fontSize: "1rem",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {p.title}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "#666",
+                fontSize: "0.85rem",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                mt: 0.5,
+              }}
+            >
+              {p.description}
+            </Typography>
+            <Box sx={{ mt: 1 }}>
+              {p.discount && p.discount > 0 && (
+                <Typography
+                  variant="caption"
+                  sx={{
+                    textDecoration: "line-through",
+                    color: "#888",
+                    fontSize: "0.85rem",
+                    mr: 1,
+                  }}
+                >
+                  KES {p.price?.toLocaleString()}
+                </Typography>
+              )}
+              <Typography
+                variant="subtitle1"
+                sx={{
+                  fontWeight: 700,
+                  color: "#222",
+                  fontSize: "1rem",
+                  display: "inline",
+                }}
+              >
+                KES {finalPrice?.toLocaleString()}
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ display: "flex", gap: 1, mt: 1.5 }}>
+            <Button
+              startIcon={<Edit />}
+              size="small"
+              variant="contained"
+              onClick={() => handleEdit(p)}
+              sx={{ flex: 1, fontSize: "0.8rem" }}
+            >
+              Edit
+            </Button>
+            <Button
+              startIcon={<Delete />}
+              size="small"
+              color="error"
+              variant="outlined"
+              onClick={() => confirmDelete(p.id)}
+              sx={{ flex: 1, fontSize: "0.8rem" }}
+            >
+              Delete
+            </Button>
+          </Box>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  return (
+    <Box sx={{ minHeight: "100vh", bgcolor: "#f5f5f5", p: { xs: 2, md: 4 } }}>
+      <Tabs
+        value={activeTab}
+        onChange={(_, v) => setActiveTab(v)}
+        centered
+        sx={{
+          mb: 4,
+          "& .MuiTabs-indicator": { bgcolor: "#e91e63", height: 4, borderRadius: 2 },
+        }}
+      >
+        <Tab label={editingId ? "Edit Product" : "Add Product"} />
         <Tab label="View Products" />
       </Tabs>
 
+      {/* ADD / EDIT FORM */}
       {activeTab === 0 && (
-        <Box sx={{ backgroundColor: "#F9FAFB", p: 4, borderRadius: 2 }}>
-          <TextField label="Product Title *" value={title} onChange={(e) => setTitle(e.target.value)} fullWidth sx={{ mb: 3 }} />
-          <TextField label="Description *" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline rows={3} sx={{ mb: 3 }} />
+        <Paper elevation={3} sx={{ p: 4, borderRadius: 3 }}>
+          <Stack spacing={3}>
+            <TextField label="Title *" value={title} onChange={(e) => setTitle(e.target.value)} fullWidth />
+            <TextField label="Description *" value={description} onChange={(e) => setDescription(e.target.value)} multiline rows={3} fullWidth />
 
-          <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
-            <TextField label="Price (KES) *" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} fullWidth />
-            <TextField label="Discount (%)" type="number" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} fullWidth />
-            <TextField label="Final Price" type="number" value={finalPrice} disabled fullWidth />
-          </Box>
+            <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+              <TextField label="Price (KES) *" type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
+              <TextField label="Discount (%)" type="number" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} />
+              <TextField label="Final Price" value={finalPrice} disabled />
+            </Stack>
 
-          <TextField label="Stock *" type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} fullWidth sx={{ mb: 3 }} />
+            <TextField label="Stock *" type="number" value={stock} onChange={(e) => setStock(Number(e.target.value))} />
 
-          {/* Colors */}
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <InputLabel>Available Colors</InputLabel>
-            <Select
-              multiple
-              value={selectedColors}
-              onChange={(e) => setSelectedColors(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
-              input={<OutlinedInput label="Available Colors" />}
-              renderValue={(selected) => (
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                  {(selected as string[]).map((color) => <Chip key={color} label={color} />)}
+            <FormControl fullWidth>
+              <InputLabel>Categories *</InputLabel>
+              <Select
+                multiple
+                value={selectedCategories}
+                onChange={(e) => setSelectedCategories(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
+                renderValue={(selected) => (
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                    {(selected as string[]).map((v) => {
+                      const cat = categories.find((c) => String(c.id) === v);
+                      return <Chip key={v} label={cat?.name ?? v} size="small" />;
+                    })}
+                  </Box>
+                )}
+              >
+                {categories.map((c) => (
+                  <MenuItem key={c.id} value={String(c.id)}>
+                    <Checkbox checked={selectedCategories.includes(String(c.id))} />
+                    {c.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>Brand *</InputLabel>
+              <Select value={brand} onChange={(e) => setBrand(e.target.value)}>
+                <MenuItem value="">None</MenuItem>
+                {brands.map((b) => (
+                  <MenuItem key={b.id} value={String(b.id)}>
+                    {b.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <Stack direction="row" spacing={3}>
+              <FormControlLabel control={<Checkbox checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Active" />
+              <FormControlLabel control={<Checkbox checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} />} label="Featured" />
+            </Stack>
+
+            <Box>
+              <Typography variant="subtitle1" gutterBottom>Cover Image *</Typography>
+              <input type="file" accept="image/*" onChange={(e) => handleCoverChange(e.target.files)} />
+              {coverPreview && (
+                <Box sx={{ mt: 2, borderRadius: 2, overflow: "hidden", boxShadow: 2, width: 200 }}>
+                  <img src={coverPreview} alt="cover" style={{ width: "100%", height: 150, objectFit: "cover" }} />
                 </Box>
               )}
-            >
-              {["Red","Blue","Green","Yellow","Black","White"].map((c) => (
-                <MenuItem key={c} value={c}>
-                  <Checkbox checked={selectedColors.includes(c)} />
-                  {c}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+            </Box>
 
-          {/* Quantity per color */}
-          {selectedColors.length > 0 && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" sx={{ mb: 1 }}>Quantity per color</Typography>
-              <Box sx={{ display: "flex", gap: 2 }}>
-                {selectedColors.map((c) => (
-                  <Box key={c} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Typography>{c}:</Typography>
-                    <IconButton size="small" onClick={() => setQuantities((q) => ({ ...q, [c]: Math.max((q[c] || 1) - 1, 1) }))}><Remove fontSize="small" /></IconButton>
-                    <TextField type="number" value={quantities[c] || 1} onChange={(e) => setQuantities((q) => ({ ...q, [c]: Number(e.target.value) }))} sx={{ width: 60 }} />
-                    <IconButton size="small" onClick={() => setQuantities((q) => ({ ...q, [c]: (q[c] || 1) + 1 }))}><Add fontSize="small" /></IconButton>
-                  </Box>
-                ))}
-              </Box>
+            <Box>
+              <Typography variant="subtitle1" gutterBottom>Gallery Images</Typography>
+              <input type="file" accept="image/*" multiple onChange={(e) => handleGalleryChange(e.target.files)} />
+              {galleryPreviews.length > 0 && (
+                <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: "wrap" }}>
+                  {galleryPreviews.map((src, i) => (
+                    <Box key={i} sx={{ width: 80, height: 80, borderRadius: 2, overflow: "hidden", border: "1px solid #eee" }}>
+                      <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+
+            <Button variant="contained" onClick={handleSave} disabled={saving} size="large">
+              {saving ? "Saving..." : editingId ? "Update" : "Add Product"}
+            </Button>
+          </Stack>
+        </Paper>
+      )}
+
+      {/* VIEW PRODUCTS - CARDS LIKE DEALSSECTION */}
+      {activeTab === 1 && (
+        <Box>
+          <Tabs
+            value={activeCategory}
+            onChange={(_, v) => setActiveCategory(v)}
+            variant={isMobile ? "scrollable" : "standard"}
+            scrollButtons
+            allowScrollButtonsMobile
+            sx={{
+              mb: 3,
+              "& .MuiTab-root": {
+                textTransform: "none",
+                fontSize: "0.9rem",
+                fontWeight: 500,
+                color: "#666",
+                "&.Mui-selected": { color: "#e91e63", fontWeight: 700 },
+              },
+              "& .MuiTabs-indicator": { backgroundColor: "#e91e63" },
+            }}
+          >
+            <Tab label="All" value="all" />
+            {categories.map((c) => (
+              <Tab key={c.id} label={c.name} value={c.id} />
+            ))}
+          </Tabs>
+
+          {loading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", p: 6 }}>
+              <CircularProgress />
+            </Box>
+          ) : filteredProducts.length === 0 ? (
+            <Typography sx={{ textAlign: "center", mt: 4, color: "#888" }}>
+              No products found.
+            </Typography>
+          ) : (
+            <Box
+              sx={{
+                maxWidth: "1200px",
+                mx: "auto",
+                ...(isMobile
+                  ? {
+                      display: "flex",
+                      flexWrap: "nowrap",
+                      overflowX: "auto",
+                      gap: 2,
+                      pb: 2,
+                      scrollSnapType: "x mandatory",
+                      msOverflowStyle: "none",
+                      scrollbarWidth: "none",
+                      "&::-webkit-scrollbar": { display: "none" },
+                      "& > *": { scrollSnapAlign: "start" },
+                    }
+                  : {
+                      display: "grid",
+                      gridTemplateColumns: {
+                        md: "repeat(4, minmax(220px, 1fr))",
+                        lg: "repeat(5, minmax(220px, 1fr))",
+                      },
+                      gap: 3,
+                    }),
+              }}
+            >
+              {filteredProducts.map(renderProductCard)}
             </Box>
           )}
-
-          {/* Categories, Brand, Active/Featured, Images */}
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <InputLabel>Categories *</InputLabel>
-            <Select
-              multiple
-              value={selectedCategories}
-              onChange={(e) => setSelectedCategories(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
-              input={<OutlinedInput label="Categories *" />}
-              renderValue={(selected) => (
-                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                  {(selected as string[]).map((value) => {
-                    const cat = categories.find((c) => c.id.toString() === value);
-                    return <Chip key={value} label={cat?.name || value} />;
-                  })}
-                </Box>
-              )}
-            >
-              {categories.map((c) => <MenuItem key={c.id} value={c.id.toString()}>{c.name}</MenuItem>)}
-            </Select>
-          </FormControl>
-
-          <FormControl fullWidth sx={{ mb: 3 }}>
-            <InputLabel>Brand *</InputLabel>
-            <Select value={brand} onChange={(e) => setBrand(e.target.value)}>
-              {brands.map((b) => <MenuItem key={b.id} value={b.id.toString()}>{b.name}</MenuItem>)}
-            </Select>
-          </FormControl>
-
-          <Box sx={{ display: "flex", gap: 3, mb: 3 }}>
-            <FormControlLabel control={<Checkbox checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Is Active" />
-            <FormControlLabel control={<Checkbox checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} />} label="Is Featured" />
-          </Box>
-
-          <input type="file" accept="image/*" multiple onChange={(e) => handleImagesChange(e.target.files)} style={{ marginBottom: 16 }} />
-          {imagePreviews.length > 0 && <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 3 }}>{imagePreviews.map((src, i) => <img key={i} src={src} alt={`Preview ${i}`} style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 8 }} />)}</Box>}
-
-          <Button variant="contained" onClick={handleAddOrEditProduct} sx={{ width: "100%" }} disabled={saving}>{saving ? "Saving..." : editingId ? "Update Product" : "Add Product"}</Button>
         </Box>
       )}
 
-      {/* View Products */}
-      {activeTab === 1 && (
-        <Box sx={{ backgroundColor: "#F9FAFB", p: 3, borderRadius: 2 }}>
-          {loadingProducts ? <CircularProgress /> : (
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Title</TableCell>
-                  <TableCell>Description</TableCell>
-                  <TableCell>Original Price</TableCell>
-                  <TableCell>Discount</TableCell>
-                  <TableCell>Final Price</TableCell>
-                  <TableCell>Stock</TableCell>
-                  <TableCell>Colors</TableCell>
-                  <TableCell>Categories</TableCell>
-                  <TableCell>Brand</TableCell>
-                  <TableCell>Images</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {products.length === 0 ? (
-                  <TableRow><TableCell colSpan={11} align="center">No products found</TableCell></TableRow>
-                ) : products.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>{p.title}</TableCell>
-                    <TableCell>{p.description}</TableCell>
-                    <TableCell>{p.discount && p.discount > 0 ? <Typography sx={{ color: "#888", textDecoration: "line-through" }}>KES {p.price}</Typography> : <Typography>KES {p.price}</Typography>}</TableCell>
-                    <TableCell>{p.discount ?? 0}%</TableCell>
-                    <TableCell><Typography sx={{ fontWeight: "bold" }}>KES {p.discount && p.discount > 0 ? (p.price! - (p.price! * p.discount!) / 100).toFixed(2) : p.price}</Typography></TableCell>
-                    <TableCell>{p.stock}</TableCell>
-                    <TableCell>{p.colors?.join(", ")}</TableCell>
-                    <TableCell>{p.categories?.map(c => c.name).join(", ")}</TableCell>
-                    <TableCell>{p.brand?.name}</TableCell>
-                    <TableCell>{p.cover_images?.length ? p.cover_images.map((img, i) => <img key={i} src={img.startsWith("http") ? img : `${MEDIA_BASE}${img}`} alt={p.title} width={50} height={50} style={{ objectFit: "cover", borderRadius: 4, marginRight: 4 }} />) : "—"}</TableCell>
-                    <TableCell>
-                      <Button onClick={() => handleEditClick(p)}>Edit</Button>
-                      <Button color="error" onClick={() => handleDelete(p.id)}>Delete</Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </Box>
-      )}
+      {/* Dialogs */}
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <DialogTitle>Delete Product?</DialogTitle>
+        <DialogContent>
+          <Typography>This cannot be undone.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+          <Button color="error" onClick={handleDelete} variant="contained">
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert onClose={() => setSnackbar((s) => ({ ...s, open: false }))} severity={snackbar.severity}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
