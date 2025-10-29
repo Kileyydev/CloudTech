@@ -241,7 +241,7 @@ const TopNavBar = () => {
         <StyledInputBase
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
-          placeholder="Search for products..."
+          placeholder="Search products..."
           inputProps={{ 'aria-label': 'search' }}
         />
       </Search>
@@ -249,7 +249,7 @@ const TopNavBar = () => {
         {[
           { text: 'Contact Us', icon: <PhoneIcon />, href: '/contact-us' },
           { text: 'Repair', icon: <BuildIcon />, href: '/repair' },
-          { text: 'Feedback', icon: <FeedbackIcon />, href: '/testimonials' },
+          { text: 'Trade-in', icon: <FeedbackIcon />, href: '/trade-in' },
           { text: 'Cart', icon: <ShoppingCartIcon />, href: '/cart', badge: cart.length },
           { text: 'Profile', icon: <PersonIcon />, href: '/profile', badge: 0 },
         ].map((item) => (
@@ -333,7 +333,7 @@ const TopNavBar = () => {
               <StyledInputBase
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
-                placeholder="Search for products..."
+                placeholder="Search products..."
                 inputProps={{ 'aria-label': 'search' }}
               />
             </Search>
@@ -354,9 +354,9 @@ const TopNavBar = () => {
               <BuildIcon sx={{ color: '#DC1A8A', fontSize: { sm: 'clamp(1.1rem, 2.5vw, 1.2rem)' } }} />
               <ActionText>Repair</ActionText>
             </ActionButton>
-            <ActionButton component={Link} href="/testimonials" aria-label="feedback">
+            <ActionButton component={Link} href="/trade-in" aria-label="Trade-in">
               <FeedbackIcon sx={{ color: '#DC1A8A', fontSize: { sm: 'clamp(1.1rem, 2.5vw, 1.2rem)' } }} />
-              <ActionText>Feedback</ActionText>
+              <ActionText>Trade-in</ActionText>
             </ActionButton>
             <ActionButton component={Link} href="/cart" aria-label="cart">
               <Badge

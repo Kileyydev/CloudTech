@@ -2,7 +2,7 @@
 
 import { useRef } from 'react';
 import Footer from './FooterSection';
-import SideMessagePanel from './SideMessagePanel';
+
 
 export default function ClientLayoutWrapper({ children }: { children: React.ReactNode }) {
   // Use a generic HTMLElement type instead of HTMLDivElement
@@ -15,7 +15,6 @@ export default function ClientLayoutWrapper({ children }: { children: React.Reac
       <footer ref={footerRef as React.RefObject<HTMLElement>}>
         <Footer />
       </footer>
-      <SideMessagePanel footerRef={footerRef as React.RefObject<HTMLElement>} />
     </>
   );
 }

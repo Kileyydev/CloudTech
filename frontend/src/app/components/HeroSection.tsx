@@ -1,3 +1,4 @@
+// src/components/HeroSection.tsx
 'use client';
 
 import React from 'react';
@@ -57,6 +58,11 @@ const Card = styled(Box)(({ theme }) => ({
   boxShadow: '0 4.5px 9px rgba(0, 0, 0, 0.15), 0 2.2px 4.5px rgba(0, 0, 0, 0.1)',
   overflow: 'hidden',
   transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+  '&:hover': {
+    transform: 'scale(1.05)',
+    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.2)',
+  },
+  animation: 'zoomIn 0.6s ease-out forwards',
   '@keyframes zoomIn': {
     '0%': { transform: 'scale(0.95)', opacity: 0.8 },
     '100%': { transform: 'scale(1)', opacity: 1 },
@@ -85,7 +91,7 @@ const cardGroups = {
 
 const HeroSection: React.FC = () => {
   return (
-    <HeroContainer>
+    <HeroContainer id="hero">
       <ImageContainer>
         <Image
           src="/images/gaming-headphone.jpg"
@@ -100,6 +106,7 @@ const HeroSection: React.FC = () => {
           }}
         />
       </ImageContainer>
+
       <CardContainer>
         <Swiper
           modules={[Navigation]}

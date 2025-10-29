@@ -1,9 +1,11 @@
+// src/app/cart/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Box,
   Typography,
+  Chip,
   Table,
   TableBody,
   TableCell,
@@ -24,13 +26,31 @@ import {
   Alert,
   CircularProgress,
   Snackbar,
+  Card,
+  CardMedia,
+  CardContent,
+  Container,
+  InputAdornment,
+  useTheme,
+  useMediaQuery,
+  Stack,
 } from '@mui/material';
-import { Add, Remove, Delete } from '@mui/icons-material';
+import {
+  Add,
+  Remove,
+  Delete,
+  LocalShipping,
+  CreditCard,
+  AttachMoney,
+  Download,
+} from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { useRouter } from 'next/navigation';
 import TopNavBar from '../components/TopNavBar';
 import MainNavBar from '../components/MainNavBar';
 import { useCart } from '../components/cartContext';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 type CartItem = {
   id: number;
@@ -38,25 +58,42 @@ type CartItem = {
   price: number;
   quantity: number;
   stock: number;
+  image?: string;
 };
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
-  borderRadius: 8,
-  boxShadow: theme.shadows[3],
-  backgroundColor: theme.palette.background.paper,
+  borderRadius: 16,
+  boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+  background: 'linear-gradient(145deg, #ffffff, #f8f9fa)',
 }));
 
-const StyledButton = styled(Button)(({ theme }) => ({
-  borderRadius: 8,
-  padding: theme.spacing(1.5),
+const GradientButton = styled(Button)(({ theme }) => ({
+  borderRadius: 12,
+  padding: theme.spacing(1.5, 4),
   fontWeight: 600,
   textTransform: 'none',
+  background: 'linear-gradient(45deg, #db1b88, #b1166f)',
+  color: 'white',
+  '&:hover': {
+    background: 'linear-gradient(45deg, #b1166f, #db1b88)',
+  },
 }));
+
+// Sample trending products
+const trendingProducts = [
+  { id: 1, title: 'iPhone 15 Pro', price: 140000, image: '/images/iphone15.jpg' },
+  { id: 2, title: 'AirPods Pro 2', price: 35000, image: '/images/airpods.jpg' },
+  { id: 3, title: 'MacBook Air M2', price: 180000, image: '/images/macbook.jpg' },
+  { id: 4, title: 'Samsung S24', price: 120000, image: '/images/s24.jpg' },
+];
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
   const router = useRouter();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const pdfRef = useRef<HTMLDivElement>(null);
 
   const [checkoutDetails, setCheckoutDetails] = useState({
     name: '',
@@ -66,8 +103,9 @@ export default function CartPage() {
     city: '',
     postalCode: '',
     mpesaCode: '',
+    cashAmount: '',
   });
-  const [paymentMethod, setPaymentMethod] = useState<'paybill' | 'withdraw' | ''>('');
+  const [paymentMethod, setPaymentMethod] = useState<'paybill' | 'withdraw' | 'cod' | ''>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
   const [snackbar, setSnackbar] = useState({
@@ -76,12 +114,11 @@ export default function CartPage() {
     severity: 'success' as 'success' | 'error',
   });
 
-  const subtotal = Object.values(cart).reduce(
-    (sum: number, item) => sum + item.price * item.quantity,
-    0
-  );
+  const subtotal = Object.values(cart).reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shipping = subtotal > 0 ? 200 : 0;
   const total = subtotal + shipping;
+  const cashPaid = parseFloat(checkoutDetails.cashAmount) || 0;
+  const change = paymentMethod === 'cod' && cashPaid > total ? cashPaid - total : 0;
 
   const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
     setSnackbar({ open: true, message, severity });
@@ -122,7 +159,35 @@ export default function CartPage() {
       setError('Please enter your M-Pesa confirmation code.');
       return false;
     }
+    if (paymentMethod === 'cod' && cashPaid < total) {
+      setError(`Please enter at least KES ${total.toLocaleString()} in cash.`);
+      return false;
+    }
     return true;
+  };
+
+  const generatePDF = async () => {
+    if (!pdfRef.current) return;
+    const canvas = await html2canvas(pdfRef.current);
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF();
+    const imgWidth = 190;
+    const pageHeight = 295;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    let heightLeft = imgHeight;
+    let position = 10;
+
+    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft >= 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
+    pdf.save(`CloudTech_Order_${Date.now()}.pdf`);
   };
 
   const handleCheckout = async () => {
@@ -131,34 +196,17 @@ export default function CartPage() {
       return;
     }
     if (!validateForm()) return;
+
     setIsProcessing(true);
 
     try {
-      if (paymentMethod === 'paybill') {
-        // STK Push (or backend call)
-        const res = await fetch('/api/mpesa', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: checkoutDetails.phone,
-            amount: total,
-          }),
-        });
-        const data = await res.json();
-        if (data.ResponseCode === '0') {
-          showSnackbar('STK Push sent to your phone. Complete payment to confirm order.', 'success');
-        } else {
-          showSnackbar('Failed to send STK Push. Try again.', 'error');
-        }
-      } else if (paymentMethod === 'withdraw') {
-        showSnackbar('Withdrawal payment submitted! We’ll confirm shortly.', 'success');
-      }
-
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      showSnackbar('Order placed successfully!', 'success');
       clearCart();
+      setTimeout(generatePDF, 500);
       router.push('/order-confirmation');
     } catch (err) {
-      console.error('Checkout error:', err);
-      showSnackbar('Payment failed. Please try again.', 'error');
+      showSnackbar('Order failed. Please try again.', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -168,163 +216,275 @@ export default function CartPage() {
     <Box>
       <TopNavBar />
       <MainNavBar />
-      <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f5f5f5', minHeight: '100vh' }}>
-        <Box sx={{ maxWidth: 1200, mx: 'auto', display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4 }}>
-          {/* CART TABLE */}
-          <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 65%' } }}>
-            <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, color: '#1a237e' }}>
-              Your Cart
-            </Typography>
 
-            {Object.values(cart).length === 0 ? (
-              <StyledPaper sx={{ textAlign: 'center', p: 3 }}>
-                <Typography sx={{ color: '#777' }}>Your cart is empty 🛒</Typography>
-                <StyledButton sx={{ mt: 2 }} variant="contained" color="primary" onClick={() => router.push('/')}>
-                  Continue Shopping
-                </StyledButton>
-              </StyledPaper>
-            ) : (
-              <StyledPaper>
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Product</TableCell>
-                        <TableCell align="center">Quantity</TableCell>
-                        <TableCell align="right">Price</TableCell>
-                        <TableCell align="right">Total</TableCell>
-                        <TableCell align="center">Actions</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {Object.values(cart).map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>{item.title}</TableCell>
-                          <TableCell align="center">
-                            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1 }}>
-                              <IconButton size="small" onClick={() => handleQuantityChange(item.id, -1)}>
-                                <Remove fontSize="small" />
-                              </IconButton>
-                              <Typography>{item.quantity}</Typography>
-                              <IconButton size="small" onClick={() => handleQuantityChange(item.id, 1)}>
-                                <Add fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </TableCell>
-                          <TableCell align="right">KES {item.price.toLocaleString()}</TableCell>
-                          <TableCell align="right">KES {(item.price * item.quantity).toLocaleString()}</TableCell>
-                          <TableCell align="center">
-                            <IconButton color="error" onClick={() => handleDelete(item.id)}>
-                              <Delete fontSize="small" />
-                            </IconButton>
-                          </TableCell>
+      <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', py: { xs: 3, md: 6 } }}>
+        <Container maxWidth="lg">
+          <Typography
+            variant="h3"
+            align="center"
+            sx={{ mb: 4, fontWeight: 800, color: '#db1b88' }}
+          >
+            Your Shopping Cart
+          </Typography>
+
+          {/* MAIN LAYOUT: Stack (replaces Grid) */}
+          <Stack
+            direction={{ xs: 'column', lg: 'row' }}
+            spacing={4}
+            alignItems="flex-start"
+          >
+
+            {/* CART TABLE */}
+            <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 65%' } }}>
+              {Object.values(cart).length === 0 ? (
+                <StyledPaper sx={{ textAlign: 'center', p: 6 }}>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    Your cart is empty
+                  </Typography>
+                  <GradientButton onClick={() => router.push('/')}>
+                    Continue Shopping
+                  </GradientButton>
+                </StyledPaper>
+              ) : (
+                <StyledPaper>
+                  <TableContainer>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell><strong>Product</strong></TableCell>
+                          <TableCell align="center"><strong>Qty</strong></TableCell>
+                          <TableCell align="right"><strong>Price</strong></TableCell>
+                          <TableCell align="right"><strong>Total</strong></TableCell>
+                          <TableCell align="center"><strong>Action</strong></TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                      </TableHead>
+                      <TableBody>
+                        {Object.values(cart).map((item) => (
+                          <TableRow key={item.id} hover>
+                            <TableCell>{item.title}</TableCell>
+                            <TableCell align="center">
+                              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+                                <IconButton size="small" onClick={() => handleQuantityChange(item.id, -1)}>
+                                  <Remove />
+                                </IconButton>
+                                <Typography sx={{ minWidth: 32, textAlign: 'center', fontWeight: 600 }}>
+                                  {item.quantity}
+                                </Typography>
+                                <IconButton size="small" onClick={() => handleQuantityChange(item.id, 1)}>
+                                  <Add />
+                                </IconButton>
+                              </Box>
+                            </TableCell>
+                            <TableCell align="right">KES {item.price.toLocaleString()}</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600 }}>
+                              KES {(item.price * item.quantity).toLocaleString()}
+                            </TableCell>
+                            <TableCell align="center">
+                              <IconButton color="error" onClick={() => handleDelete(item.id)}>
+                                <Delete />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
 
-                <Divider sx={{ my: 2 }} />
-                <Box sx={{ p: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography>Subtotal:</Typography>
-                    <Typography>KES {subtotal.toLocaleString()}</Typography>
+                  <Divider sx={{ my: 3 }} />
+                  <Box sx={{ p: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography>Subtotal:</Typography>
+                      <Typography>KES {subtotal.toLocaleString()}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography>Shipping:</Typography>
+                      <Typography>KES {shipping.toLocaleString()}</Typography>
+                    </Box>
+                    <Divider sx={{ my: 1 }} />
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                      <Typography variant="h6">Total:</Typography>
+                      <Typography variant="h6" color="#db1b88">
+                        KES {total.toLocaleString()}
+                      </Typography>
+                    </Box>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography>Shipping:</Typography>
-                    <Typography>KES {shipping.toLocaleString()}</Typography>
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                    <Typography variant="h6">Total:</Typography>
-                    <Typography variant="h6">KES {total.toLocaleString()}</Typography>
-                  </Box>
+                </StyledPaper>
+              )}
+            </Box>
+
+            {/* CHECKOUT */}
+            <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 35%' } }}>
+              <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: '#db1b88' }}>
+                Checkout Details
+              </Typography>
+
+              <StyledPaper>
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <TextField label="Full Name *" size="small" value={checkoutDetails.name} onChange={(e) => handleChange('name', e.target.value)} />
+                  <TextField label="Phone *" size="small" type="tel" value={checkoutDetails.phone} onChange={(e) => handleChange('phone', e.target.value)} />
+                  <TextField label="Email" size="small" value={checkoutDetails.email} onChange={(e) => handleChange('email', e.target.value)} />
+                  <TextField label="Address *" size="small" value={checkoutDetails.address} onChange={(e) => handleChange('address', e.target.value)} />
+                  <TextField label="City *" size="small" value={checkoutDetails.city} onChange={(e) => handleChange('city', e.target.value)} />
+                  <TextField label="Postal Code" size="small" value={checkoutDetails.postalCode} onChange={(e) => handleChange('postalCode', e.target.value)} />
+
+                  <FormControl sx={{ mt: 2 }}>
+                    <FormLabel sx={{ fontWeight: 600 }}>Payment Method</FormLabel>
+                    <RadioGroup value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as any)}>
+                      <FormControlLabel value="paybill" control={<Radio />} label="M-Pesa Paybill" />
+                      <FormControlLabel value="withdraw" control={<Radio />} label="Withdraw Option" />
+                      <FormControlLabel value="cod" control={<Radio />} label="Pay After Delivery (Cash)" />
+                    </RadioGroup>
+                  </FormControl>
+
+                  {/* Pay After Delivery */}
+                  <Collapse in={paymentMethod === 'cod'}>
+                    <Box sx={{ mt: 2, p: 2, bgcolor: '#e8f5e8', borderRadius: 2, border: '1px solid #4caf50' }}>
+                      <Typography fontWeight={600} gutterBottom>
+                        <AttachMoney sx={{ verticalAlign: 'middle', mr: 0.5 }} /> Cash on Delivery
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="Cash Amount (KES)"
+                        type="number"
+                        value={checkoutDetails.cashAmount}
+                        onChange={(e) => handleChange('cashAmount', e.target.value)}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">KES</InputAdornment>,
+                        }}
+                      />
+                      {change > 0 && (
+                        <Alert severity="success" sx={{ mt: 1 }}>
+                          Change: <strong>KES {change.toLocaleString()}</strong> (rider will bring)
+                        </Alert>
+                      )}
+                    </Box>
+                  </Collapse>
+
+                  {/* Paybill Info */}
+                  <Collapse in={paymentMethod === 'paybill'}>
+                    <Box sx={{ mt: 2, p: 2, bgcolor: '#fff8e1', borderRadius: 2 }}>
+                      <Typography fontWeight={600}>Paybill: 247247</Typography>
+                      <Typography>Account: 0722244482</Typography>
+                      <Typography>Amount: KES {total.toLocaleString()}</Typography>
+                    </Box>
+                  </Collapse>
+
+                  {/* Withdraw Info */}
+                  <Collapse in={paymentMethod === 'withdraw'}>
+                    <Box sx={{ mt: 2, p: 2, bgcolor: '#e3f2fd', borderRadius: 2 }}>
+                      <Typography fontWeight={600}>Agent: 2065355</Typography>
+                      <Typography>Store: 2061522</Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        label="M-Pesa Code *"
+                        sx={{ mt: 1 }}
+                        value={checkoutDetails.mpesaCode}
+                        onChange={(e) => handleChange('mpesaCode', e.target.value)}
+                      />
+                    </Box>
+                  </Collapse>
+
+                  <GradientButton
+                    fullWidth
+                    onClick={handleCheckout}
+                    disabled={isProcessing}
+                    startIcon={isProcessing ? <CircularProgress size={20} color="inherit" /> : <CreditCard />}
+                  >
+                    {isProcessing ? 'Processing...' : 'Place Order'}
+                  </GradientButton>
                 </Box>
               </StyledPaper>
-            )}
-          </Box>
+            </Box>
+          </Stack>
 
-          {/* CHECKOUT SECTION */}
-          <Box sx={{ flex: { xs: '1 1 100%', md: '1 1 35%' } }}>
-            <Typography variant="h4" sx={{ fontWeight: 700, mb: 3, color: '#1a237e' }}>
-              Checkout
+          {/* WHAT OTHERS ARE BUYING – Horizontal Scroll */}
+          <Box sx={{ mt: 8 }}>
+            <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: '#db1b88' }}>
+              Others Are Buying
             </Typography>
 
-            <StyledPaper>
-              {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <TextField label="Full Name *" value={checkoutDetails.name} onChange={(e) => handleChange('name', e.target.value)} size="small" />
-                <TextField label="Phone Number *" value={checkoutDetails.phone} onChange={(e) => handleChange('phone', e.target.value)} size="small" type="tel" />
-                <TextField label="Email" value={checkoutDetails.email} onChange={(e) => handleChange('email', e.target.value)} size="small" />
-                <TextField label="Address *" value={checkoutDetails.address} onChange={(e) => handleChange('address', e.target.value)} size="small" />
-                <TextField label="City *" value={checkoutDetails.city} onChange={(e) => handleChange('city', e.target.value)} size="small" />
-                <TextField label="Postal Code" value={checkoutDetails.postalCode} onChange={(e) => handleChange('postalCode', e.target.value)} size="small" />
-
-                <FormControl sx={{ mt: 2 }}>
-                  <FormLabel sx={{ fontWeight: 600, color: '#1a237e' }}>Payment Method *</FormLabel>
-                  <RadioGroup value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'paybill' | 'withdraw')}>
-                    <FormControlLabel value="paybill" control={<Radio />} label="Paybill (247247 - Account 0722244482)" />
-                    <FormControlLabel value="withdraw" control={<Radio />} label="Withdraw Option (Agent 2065355 / Store 2061522)" />
-                  </RadioGroup>
-                </FormControl>
-
-                {/* Paybill Instructions */}
-                <Collapse in={paymentMethod === 'paybill'}>
-                  <Box sx={{ mt: 2, p: 2, bgcolor: '#f9f9f9', borderRadius: 2 }}>
-                    <Typography fontWeight={600}>Paybill Instructions:</Typography>
-                    <Typography>1️⃣ Open M-Pesa → Lipa na M-Pesa</Typography>
-                    <Typography>2️⃣ Select Paybill</Typography>
-                    <Typography>3️⃣ Enter Business Number: <b>247247</b></Typography>
-                    <Typography>4️⃣ Account Number: <b>0722244482</b></Typography>
-                    <Typography>5️⃣ Enter Amount: <b>KES {total.toLocaleString()}</b></Typography>
-                    <Typography>6️⃣ Confirm and Send ✅</Typography>
-                  </Box>
-                </Collapse>
-
-                {/* Withdraw Option */}
-                <Collapse in={paymentMethod === 'withdraw'}>
-                  <Box sx={{ mt: 2, p: 2, bgcolor: '#f9f9f9', borderRadius: 2 }}>
-                    <Typography fontWeight={600}>Withdraw Option:</Typography>
-                    <Typography>Pay to Agent Number: <b>2065355</b></Typography>
-                    <Typography>or Store Number: <b>2061522</b></Typography>
-                    <Typography sx={{ mt: 1 }}>After payment, enter your M-Pesa confirmation code below:</Typography>
-                    <TextField
-                      label="M-Pesa Confirmation Code *"
-                      value={checkoutDetails.mpesaCode}
-                      onChange={(e) => handleChange('mpesaCode', e.target.value)}
-                      fullWidth
-                      size="small"
-                      sx={{ mt: 1 }}
-                    />
-                  </Box>
-                </Collapse>
-
-                <StyledButton
-                  variant="contained"
-                  color="primary"
-                  fullWidth
-                  onClick={handleCheckout}
-                  disabled={isProcessing}
-                  startIcon={isProcessing ? <CircularProgress size={20} /> : null}
+            <Box
+              sx={{
+                display: 'flex',
+                gap: 2,
+                overflowX: 'auto',
+                pb: 2,
+                '&::-webkit-scrollbar': { height: 8 },
+                '&::-webkit-scrollbar-thumb': { bgcolor: '#db1b88', borderRadius: 4 },
+              }}
+            >
+              {trendingProducts.map((product) => (
+                <Card
+                  key={product.id}
+                  sx={{
+                    minWidth: 200,
+                    borderRadius: 3,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                    transition: '0.3s',
+                    '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' },
+                  }}
                 >
-                  {isProcessing ? 'Processing...' : 'Complete Payment'}
-                </StyledButton>
-              </Box>
-            </StyledPaper>
+                  <CardMedia
+                    component="img"
+                    height="120"
+                    image={product.image}
+                    alt={product.title}
+                    sx={{ objectFit: 'cover' }}
+                  />
+                  <CardContent>
+                    <Typography variant="body2" noWrap>{product.title}</Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+                      <Chip label={`KES ${product.price.toLocaleString()}`} color="primary" size="small" />
+                      <IconButton size="small" color="primary">
+                        <Add />
+                      </IconButton>
+                    </Box>
+                  </CardContent>
+                </Card>
+              ))}
+            </Box>
           </Box>
-        </Box>
 
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={3000}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
+          {/* Hidden PDF Template */}
+          <Box sx={{ position: 'absolute', left: '-9999px' }} ref={pdfRef}>
+            <Box sx={{ p: 4, bgcolor: 'white', width: 600 }}>
+              <Typography variant="h4" align="center" gutterBottom>CloudTech Order</Typography>
+              <Typography align="center" color="text.secondary" gutterBottom>Order #{Date.now()}</Typography>
+              <Divider sx={{ my: 2 }} />
+              <Typography><strong>Name:</strong> {checkoutDetails.name}</Typography>
+              <Typography><strong>Phone:</strong> {checkoutDetails.phone}</Typography>
+              <Typography><strong>Address:</strong> {checkoutDetails.address}, {checkoutDetails.city}</Typography>
+              <Typography><strong>Payment:</strong> {paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}</Typography>
+              {change > 0 && <Typography><strong>Change:</strong> KES {change.toLocaleString()}</Typography>}
+              <Divider sx={{ my: 2 }} />
+              {Object.values(cart).map((item) => (
+                <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <span>{item.title} × {item.quantity}</span>
+                  <span>KES {(item.price * item.quantity).toLocaleString()}</span>
+                </Box>
+              ))}
+              <Divider />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, mt: 1 }}>
+                <span>Total:</span>
+                <span>KES {total.toLocaleString()}</span>
+              </Box>
+              <Typography align="center" sx={{ mt: 3, fontSize: 12, color: 'text.secondary' }}>
+                Thank you for shopping with CloudTech!
+              </Typography>
+            </Box>
+          </Box>
+        </Container>
       </Box>
+
+      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={handleCloseSnackbar}>
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

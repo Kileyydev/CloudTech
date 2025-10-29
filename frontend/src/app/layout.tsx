@@ -1,7 +1,13 @@
+// src/app/layout.tsx
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import ClientLayoutWrapper from './components/ClientLayoutWrapper'; // New client-side wrapper
+
+import ClientLayoutWrapper from './components/ClientLayoutWrapper';
+import { CartProvider } from './components/cartContext';
+import ClientRoot from './clientRoot';
+import OfficeHoursWidget from '@/app/components/OfficeHoursWidget'; // Fixed path
+import 'leaflet/dist/leaflet.css';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,23 +20,22 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Ferrouqe Systems", // Updated to reflect your brand
-  description: "Explore cutting-edge electronics, repairs, and trade-ins with Ferrouqe Systems.",
+  title: "CloudTech",
+  description: "Premium Electronics | Trade-in | Nationwide Delivery",
 };
 
-import { CartProvider } from './components/cartContext';
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+// Single RootLayout — NO DUPLICATES
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        {/* Floating Office Hours Widget */}
+        <OfficeHoursWidget heroSectionId="hero" />
+
+        {/* App Providers & Layout */}
         <CartProvider>
           <ClientLayoutWrapper>
-            {children}
+            <ClientRoot>{children}</ClientRoot>
           </ClientLayoutWrapper>
         </CartProvider>
       </body>
