@@ -26,47 +26,49 @@ const MEDIA_BASE =
     ? 'http://localhost:8000'
     : 'https://cloudtech-c4ft.onrender.com';
 
+/** Smart fetch with timeout and retries */
+async function fetchWithTimeoutRetry(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeout = 12000,
+  retries = 1
+) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort('timeout'), timeout);
 
-/**
- * fetchWithTimeout: wraps fetch with abort & timeout
- */
-async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeout = 15000) {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeout);
-  try {
-    const merged = { ...init, signal: controller.signal };
-    const res = await fetch(input, merged);
-    clearTimeout(id);
-    return res;
-  } catch (err) {
-    clearTimeout(id);
-    throw err;
+    try {
+      const res = await fetch(input, { ...init, signal: controller.signal });
+      clearTimeout(id);
+      return res;
+    } catch (err: any) {
+      clearTimeout(id);
+      if (err.name === 'AbortError' && attempt < retries) {
+        console.warn(`Fetch timeout — retrying (${attempt + 1}/${retries})…`);
+        await new Promise((r) => setTimeout(r, 1500)); // small delay
+        timeout += 4000; // give more time next attempt
+        continue;
+      }
+      throw err;
+    }
   }
+  throw new Error('Max retries reached');
 }
 
-/**
- * keepAlivePing: pings /health/ (or root) and caches result in sessionStorage for `ttlMs`
- * Purpose: reduce cold start delays by warming the backend (if allowed)
- */
-async function keepAlivePing(ttlMs = 5 * 60 * 1000) {
+/** Warm Render dyno */
+async function warmBackend(ttlMs = 5 * 60 * 1000) {
   const key = 'api_warm_until';
   const until = Number(sessionStorage.getItem(key) || '0');
-  if (Date.now() < until) return true; // still warm
+  if (Date.now() < until) return true;
 
   try {
-    // try health endpoint first, fall back to API root
-    const healthUrl = `${API_BASE}/health/`;
-    const res = await fetchWithTimeout(healthUrl, { method: 'GET' }, 5000).catch(() =>
-      fetchWithTimeout(`${API_BASE}/`, { method: 'GET' }, 5000)
-    );
-    if (res && res.ok) {
+    const res = await fetchWithTimeoutRetry(`${API_BASE}/health/`, { method: 'GET' }, 5000, 2);
+    if (res.ok) {
       sessionStorage.setItem(key, String(Date.now() + ttlMs));
       return true;
     }
-    return false;
-  } catch {
-    return false;
-  }
+  } catch {}
+  return false;
 }
 
 export default function AdminLogin() {
@@ -75,30 +77,23 @@ export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
   const [otpStep, setOtpStep] = useState(false);
   const [otp, setOtp] = useState('');
   const [otpId, setOtpId] = useState<string | null>(null);
-
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState<{ open: boolean; severity?: 'success' | 'error' | 'info'; text: string }>({
     open: false,
     text: '',
   });
 
-  // Warm the API on mount (cached)
   useEffect(() => {
-    keepAlivePing().then((warm) => {
-      if (!warm) {
-        // Not fatal — just informative
-        console.info('API keep-alive failed or not reachable; cold starts possible.');
-      }
+    warmBackend().then((ok) => {
+      console.info(ok ? '✅ Backend warm' : '🧊 Backend cold, warming up…');
     });
   }, []);
 
   const openSnack = (text: string, severity: 'success' | 'error' | 'info' = 'info') =>
     setSnackbar({ open: true, text, severity });
-
   const closeSnack = () => setSnackbar((s) => ({ ...s, open: false }));
 
   const handleLogin = async () => {
@@ -109,22 +104,23 @@ export default function AdminLogin() {
 
     setLoading(true);
     try {
-      // POST /auth/login/
-      const res = await fetchWithTimeout(`${API_BASE}/auth/login/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      }, 12000); // 12s timeout
+      const res = await fetchWithTimeoutRetry(
+        `${API_BASE}/auth/login/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        },
+        12000,
+        2
+      );
 
       if (!res.ok) {
-        // try to parse error body for friendly message
         let msg = `Login failed (${res.status})`;
         try {
           const err = await res.json();
           msg = err.detail || err.message || JSON.stringify(err);
-        } catch {
-          // ignore parse errors
-        }
+        } catch {}
         openSnack(msg, 'error');
         setLoading(false);
         return;
@@ -138,7 +134,6 @@ export default function AdminLogin() {
         setOtpStep(true);
         openSnack('OTP sent — check your email', 'success');
       } else if (data.access) {
-        // some backends may return access immediately (no OTP)
         localStorage.setItem('access', data.access);
         if (data.refresh) localStorage.setItem('refresh', data.refresh);
         openSnack('Login successful', 'success');
@@ -148,8 +143,11 @@ export default function AdminLogin() {
       }
     } catch (err: any) {
       console.error('Login Error:', err);
-      if (err.name === 'AbortError') openSnack('Request timed out. Try again.', 'error');
-      else openSnack('Error contacting server. Check network/CORS.', 'error');
+      if (err.name === 'AbortError' || err.message.includes('timeout')) {
+        openSnack('Waking up server… please retry in a few seconds ⏳', 'info');
+      } else {
+        openSnack('Error contacting server. Check network/CORS.', 'error');
+      }
     } finally {
       setLoading(false);
     }
@@ -162,11 +160,16 @@ export default function AdminLogin() {
     }
     setLoading(true);
     try {
-      const res = await fetchWithTimeout(`${API_BASE}/auth/verify-otp/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ otp_id: otpId, code: otp }),
-      }, 12000);
+      const res = await fetchWithTimeoutRetry(
+        `${API_BASE}/auth/verify-otp/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ otp_id: otpId, code: otp }),
+        },
+        12000,
+        2
+      );
 
       if (!res.ok) {
         let msg = `OTP verify failed (${res.status})`;
@@ -192,14 +195,16 @@ export default function AdminLogin() {
       }
     } catch (err: any) {
       console.error('OTP Error:', err);
-      if (err.name === 'AbortError') openSnack('Request timed out. Try again.', 'error');
-      else openSnack('Error contacting server. Check network/CORS.', 'error');
+      if (err.name === 'AbortError' || err.message.includes('timeout')) {
+        openSnack('Server still waking up — please retry.', 'info');
+      } else {
+        openSnack('Error contacting server. Check network/CORS.', 'error');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // handle Enter key
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       if (!otpStep) handleLogin();
@@ -229,8 +234,6 @@ export default function AdminLogin() {
           px: { xs: 3, sm: 4 },
           py: { xs: 3, sm: 5 },
         }}
-        role="form"
-        aria-label="Admin login form"
       >
         <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, textAlign: 'center' }}>
           Admin Login
@@ -248,7 +251,6 @@ export default function AdminLogin() {
               autoComplete="email"
               autoFocus
             />
-
             <TextField
               label="Password"
               value={password}
@@ -261,39 +263,25 @@ export default function AdminLogin() {
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      onClick={() => setShowPassword((s) => !s)}
-                      edge="end"
-                      size="large"
-                    >
+                    <IconButton onClick={() => setShowPassword((s) => !s)} edge="end" size="large">
                       {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
                   </InputAdornment>
                 ),
               }}
             />
-
             <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-              <Button
-                onClick={handleLogin}
-                fullWidth
-                variant="contained"
-                disabled={loading}
-                sx={{ textTransform: 'none', py: 1.25 }}
-              >
+              <Button onClick={handleLogin} fullWidth variant="contained" disabled={loading}>
                 {loading ? <CircularProgress size={20} /> : 'Send OTP / Login'}
               </Button>
               <Button
                 onClick={() => {
-                  // convenience: clear fields
                   setEmail('');
                   setPassword('');
                 }}
                 fullWidth
                 variant="outlined"
                 disabled={loading}
-                sx={{ textTransform: 'none', py: 1.25 }}
               >
                 Clear
               </Button>
@@ -304,7 +292,6 @@ export default function AdminLogin() {
             <Typography variant="body2" sx={{ mb: 1 }}>
               Enter the OTP sent to your email
             </Typography>
-
             <TextField
               label="OTP"
               value={otp}
@@ -314,20 +301,12 @@ export default function AdminLogin() {
               margin="normal"
               inputMode="numeric"
             />
-
             <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-              <Button
-                onClick={handleOtpVerify}
-                fullWidth
-                variant="contained"
-                disabled={loading}
-                sx={{ textTransform: 'none', py: 1.25 }}
-              >
+              <Button onClick={handleOtpVerify} fullWidth variant="contained" disabled={loading}>
                 {loading ? <CircularProgress size={20} /> : 'Verify & Login'}
               </Button>
               <Button
                 onClick={() => {
-                  // go back to credentials step
                   setOtpStep(false);
                   setOtp('');
                   setOtpId(null);
@@ -335,7 +314,6 @@ export default function AdminLogin() {
                 fullWidth
                 variant="outlined"
                 disabled={loading}
-                sx={{ textTransform: 'none', py: 1.25 }}
               >
                 Back
               </Button>
@@ -344,7 +322,12 @@ export default function AdminLogin() {
         )}
       </Box>
 
-      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={closeSnack} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={closeSnack}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
         <Alert severity={snackbar.severity || 'info'} sx={{ width: '100%' }} onClose={closeSnack}>
           {snackbar.text}
         </Alert>

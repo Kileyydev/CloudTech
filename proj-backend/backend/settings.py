@@ -50,6 +50,11 @@ MIDDLEWARE = [
 
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://cloudtech-c4ft.vercel.app",
+    "https://cloudtech-c4ft.onrender.com",
+]
+
 ROOT_URLCONF = 'backend.urls'
 
 TEMPLATES = [
