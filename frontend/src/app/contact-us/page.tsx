@@ -212,7 +212,6 @@ const ContactUsPage = () => {
         </Container>
       </Box>
 
-      <FooterBottom />
     </>
   );
 };

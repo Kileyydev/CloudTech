@@ -32,6 +32,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "https://cloudtech-c4ft.onrender.com",
     "https://cloud-tech-eta.vercel.app",
+    "https://www.cloudtechstore.net",
+    "https://cloudtechstore.net",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -53,6 +55,8 @@ MIDDLEWARE = [
 CSRF_TRUSTED_ORIGINS = [
     "https://cloudtech-c4ft.vercel.app",
     "https://cloudtech-c4ft.onrender.com",
+    "https://www.cloudtechstore.net",
+    "https://cloudtechstore.net",
 ]
 
 ROOT_URLCONF = 'backend.urls'
