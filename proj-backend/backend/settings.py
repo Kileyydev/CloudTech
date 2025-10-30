@@ -8,9 +8,9 @@ env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-your-secret-key-here")
-DEBUG = env.bool("DEBUG", default=True)
+DEBUG = env.bool("DEBUG", default=False)
 
-# ✅ Include localhost for local testing + all deployed domains
+# ✅ Allowed hosts for both backend + frontend
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
@@ -18,9 +18,10 @@ ALLOWED_HOSTS = [
     "cloudtechstore.net",
     "www.cloudtechstore.net",
     "cloudtech-c4ft.onrender.com",
+    "cloudtech-c4ft.vercel.app",
 ]
 
-# ✅ Apps
+# ✅ Installed apps
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -37,34 +38,12 @@ INSTALLED_APPS = [
     "testimonials",
 ]
 
-# ✅ CORS Settings — allow frontends from Vercel/Render/localhost
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://cloudtech-c4ft.onrender.com",
-    "https://cloudtech-c4ft.vercel.app",
-    "https://cloud-tech-eta.vercel.app",
-    "https://www.cloudtechstore.net",
-    "https://cloudtechstore.net",
-]
-
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = False
-
-# ✅ CSRF Trusted Origins
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "https://cloudtech-c4ft.vercel.app",
-    "https://cloudtech-c4ft.onrender.com",
-    "https://www.cloudtechstore.net",
-    "https://cloudtechstore.net",
-]
-
+# ✅ Middleware (CORS FIRST, before CommonMiddleware)
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "corsheaders.middleware.CorsMiddleware",       # must come before CommonMiddleware
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -92,9 +71,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "backend.wsgi.application"
 
-# ✅ Custom user model
-AUTH_USER_MODEL = "accounts.User"
-
 # ✅ Database — Neon PostgreSQL
 DATABASES = {
     "default": {
@@ -104,23 +80,46 @@ DATABASES = {
         "PASSWORD": "npg_i6HWNMPIJfb7",
         "HOST": "ep-holy-silence-adqn8djl-pooler.c-2.us-east-1.aws.neon.tech",
         "PORT": "5432",
-        "OPTIONS": {
-            "sslmode": "require",
-        },
+        "OPTIONS": {"sslmode": "require"},
     }
 }
 
-# ✅ Django REST Framework
+# ✅ REST Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],
 }
+
+# ✅ Custom user model
+AUTH_USER_MODEL = "accounts.User"
+
+# ✅ CORS Settings
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://cloudtech-c4ft.onrender.com",
+    "https://cloudtech-c4ft.vercel.app",
+    "https://cloud-tech-eta.vercel.app",
+    "https://www.cloudtechstore.net",
+    "https://cloudtechstore.net",
+]
+
+# ✅ CSRF Trusted Origins
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "https://cloudtech-c4ft.onrender.com",
+    "https://cloudtech-c4ft.vercel.app",
+    "https://www.cloudtechstore.net",
+    "https://cloudtechstore.net",
+]
 
 # ✅ Email (SendGrid)
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
@@ -145,19 +144,13 @@ TIME_ZONE = "Africa/Nairobi"
 USE_I18N = True
 USE_TZ = True
 
-# ✅ Static + Media
+# ✅ Static and Media setup
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-# ✅ (Optional) Health check for Render warmup
-# Add this function to backend/urls.py
-# from django.http import JsonResponse
-# def health_check(request): return JsonResponse({"status": "ok"})
