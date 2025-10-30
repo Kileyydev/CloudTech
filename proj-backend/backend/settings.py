@@ -133,7 +133,6 @@ CORS_ALLOWED_ORIGINS = [
     "https://cloud-tech-eta.vercel.app",
     "https://www.cloudtechstore.net",
     "https://cloudtechstore.net",
-    "https://api.cloudtechstore.net",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -202,3 +201,6 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ADD THIS LINE
+APPEND_SLASH = False
