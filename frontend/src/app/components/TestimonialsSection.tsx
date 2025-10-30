@@ -10,10 +10,13 @@ import {
   IconButton,
   CircularProgress,
   Alert,
+  Fab,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import AddIcon from "@mui/icons-material/Add";
+import { useRouter } from "next/navigation";
 
 // 🌸 Styled Components
 const SectionBox = styled(Box)(({ theme }) => ({
@@ -112,6 +115,7 @@ export default function TestimonialsSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const sliderRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // ✅ Fetch approved testimonials
   useEffect(() => {
@@ -173,6 +177,24 @@ export default function TestimonialsSection() {
         >
           What Our Customers Say 💬
         </Typography>
+
+        {/* ➕ Add Testimonial Button */}
+        <Fab
+          color="secondary"
+          size="small"
+          sx={{
+            position: "absolute",
+            top: 16,
+            left: 16,
+            backgroundColor: "#e91e63",
+            color: "#fff",
+            zIndex: 3,
+            "&:hover": { backgroundColor: "#d81b60" },
+          }}
+          onClick={() => router.push("/testimonials")}
+        >
+          <AddIcon />
+        </Fab>
 
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>

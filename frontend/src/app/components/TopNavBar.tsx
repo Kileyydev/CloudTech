@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -25,9 +25,11 @@ import {
   Menu as MenuIcon,
   Build as BuildIcon,
   Close as CloseIcon,
+  SwapHoriz as TradeInIcon, // NEW: Dedicated Trade-in Icon
 } from '@mui/icons-material';
 import { styled, useTheme } from '@mui/material/styles';
 import Link, { LinkProps } from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCart } from '@/app/hooks/useCart';
 import { IconButtonProps } from '@mui/material/IconButton';
 
@@ -70,10 +72,6 @@ const Search = styled('div')(({ theme }) => ({
   backgroundColor: '#DC1A8A',
   border: '2px solid #DC1A8A',
   boxShadow: '0 0 8px rgba(220, 26, 138, 0.5)',
-  '&:hover': {
-    backgroundColor: '#B31774',
-    boxShadow: '0 0 12px rgba(220, 26, 138, 0.7)',
-  },
   marginLeft: theme.spacing(1),
   width: '100%',
   maxWidth: '400px',
@@ -137,7 +135,7 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
     },
     [theme.breakpoints.up('md')]: {
       width: '14ch',
-      '&:focus': {
+      '&:14ch': {
         width: '18ch',
       },
     },
@@ -153,12 +151,7 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
 
 const ActionButton = styled(IconButton)<LinkIconButtonProps>(({ theme }) => ({
   padding: theme.spacing(0.5),
-  borderRadius: '0',
   transition: 'all 0.2s ease',
-  '&:hover': {
-    backgroundColor: 'rgba(220, 26, 138, 0.1)',
-    transform: 'scale(1.1)',
-  },
   [theme.breakpoints.up('sm')]: {
     padding: theme.spacing(0.6),
   },
@@ -193,12 +186,36 @@ const StyledDrawer = styled(Drawer)(({ theme }) => ({
 
 const TopNavBar = () => {
   const theme = useTheme();
+  const router = useRouter();
   const [searchValue, setSearchValue] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const { cart } = useCart();
+  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Calculate total cart quantity
+  const cartItemCount = Object.values(cart).reduce((sum, item) => sum + (item.quantity || 0), 0);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  // Search handler with debounce
+  const handleSearch = (value: string) => {
+    const query = value.trim();
+    if (!query) return;
+
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+
+    searchTimeout.current = setTimeout(() => {
+      router.push(`/search?q=${encodeURIComponent(query)}`);
+      setSearchValue('');
+    }, 500);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSearch(searchValue);
+    }
   };
 
   const drawerContent = (
@@ -234,31 +251,60 @@ const TopNavBar = () => {
           <CloseIcon sx={{ color: '#000000' }} />
         </IconButton>
       </Box>
-      <Search>
+
+      {/* Mobile Search */}
+      <Search sx={{ mb: 2 }}>
         <SearchIconWrapper>
           <SearchIcon sx={{ color: 'white', fontSize: 'clamp(1.1rem, 2.8vw, 1.2rem)' }} />
         </SearchIconWrapper>
         <StyledInputBase
           value={searchValue}
           onChange={(e) => setSearchValue(e.target.value)}
+          onKeyPress={handleKeyPress}
           placeholder="Search products..."
           inputProps={{ 'aria-label': 'search' }}
         />
+        {searchValue && (
+          <IconButton
+            size="small"
+            onClick={() => handleSearch(searchValue)}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'white',
+            }}
+          >
+            <SearchIcon fontSize="small" />
+          </IconButton>
+        )}
       </Search>
+
       <List>
         {[
           { text: 'Contact Us', icon: <PhoneIcon />, href: '/contact-us' },
           { text: 'Repair', icon: <BuildIcon />, href: '/repair' },
-          { text: 'Trade-in', icon: <FeedbackIcon />, href: '/trade-in' },
-          { text: 'Cart', icon: <ShoppingCartIcon />, href: '/cart', badge: cart.length },
-          { text: 'Profile', icon: <PersonIcon />, href: '/profile', badge: 0 },
+          { text: 'Feedback', icon: <FeedbackIcon />, href: '/testimonials' },
+          { text: 'Trade-in', icon: <TradeInIcon />, href: '/trade-in' },
+          { text: 'Cart', icon: <ShoppingCartIcon />, href: '/cart', badge: cartItemCount },
         ].map((item) => (
           <ListItem key={item.text} disablePadding>
-            <ListItemButton component={Link} href={item.href} onClick={handleDrawerToggle}>
+            <ListItemButton
+              component={Link}
+              href={item.href}
+              onClick={() => {
+                handleDrawerToggle();
+                if (item.text === 'Cart' && cartItemCount === 0) {
+                  // Optional: show toast
+                }
+              }}
+            >
               <ListItemIcon>
                 <Badge
                   badgeContent={item.badge}
                   color="error"
+                  invisible={item.badge === 0}
                   sx={{ '& .MuiBadge-badge': { fontSize: '0.55rem', padding: '2px 4px' } }}
                 >
                   <Box sx={{ color: '#000000', fontSize: 'clamp(1.2rem, 2.8vw, 1.4rem)' }}>
@@ -283,8 +329,10 @@ const TopNavBar = () => {
 
   return (
     <>
+      {/* Desktop Nav */}
       <StyledAppBar position="static">
         <Toolbar sx={{ flexWrap: { sm: 'nowrap' }, justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* Logo */}
           <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 0, mr: { sm: 2 } }}>
             <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
               <img
@@ -316,6 +364,8 @@ const TopNavBar = () => {
               </Typography>
             </Link>
           </Box>
+
+          {/* Search Bar */}
           <Box
             sx={{
               flexGrow: 1,
@@ -333,11 +383,29 @@ const TopNavBar = () => {
               <StyledInputBase
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
+                onKeyPress={handleKeyPress}
                 placeholder="Search products..."
                 inputProps={{ 'aria-label': 'search' }}
               />
+              {searchValue && (
+                <IconButton
+                  size="small"
+                  onClick={() => handleSearch(searchValue)}
+                  sx={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'white',
+                  }}
+                >
+                  <SearchIcon fontSize="small" />
+                </IconButton>
+              )}
             </Search>
           </Box>
+
+          {/* Action Buttons */}
           <Box
             sx={{
               display: 'flex',
@@ -350,37 +418,38 @@ const TopNavBar = () => {
               <PhoneIcon sx={{ color: '#DC1A8A', fontSize: { sm: 'clamp(1.1rem, 2.5vw, 1.2rem)' } }} />
               <ActionText>Contact Us</ActionText>
             </ActionButton>
+
             <ActionButton component={Link} href="/repair" aria-label="repair">
               <BuildIcon sx={{ color: '#DC1A8A', fontSize: { sm: 'clamp(1.1rem, 2.5vw, 1.2rem)' } }} />
               <ActionText>Repair</ActionText>
             </ActionButton>
-            <ActionButton component={Link} href="/trade-in" aria-label="Trade-in">
+
+            <ActionButton component={Link} href="/testimonials" aria-label="feedback">
               <FeedbackIcon sx={{ color: '#DC1A8A', fontSize: { sm: 'clamp(1.1rem, 2.5vw, 1.2rem)' } }} />
+              <ActionText>Feedback</ActionText>
+            </ActionButton>
+
+            <ActionButton component={Link} href="/trade-in" aria-label="trade in">
+              <TradeInIcon sx={{ color: '#DC1A8A', fontSize: { sm: 'clamp(1.1rem, 2.5vw, 1.2rem)' } }} />
               <ActionText>Trade-in</ActionText>
             </ActionButton>
+
             <ActionButton component={Link} href="/cart" aria-label="cart">
               <Badge
-                badgeContent={cart.length}
+                badgeContent={cartItemCount}
                 color="error"
+                invisible={cartItemCount === 0}
                 sx={{ '& .MuiBadge-badge': { fontSize: '0.55rem', padding: '2px 4px' } }}
               >
                 <ShoppingCartIcon sx={{ color: '#DC1A8A', fontSize: { sm: 'clamp(1.1rem, 2.5vw, 1.2rem)' } }} />
               </Badge>
               <ActionText>Cart</ActionText>
             </ActionButton>
-            <ActionButton component={Link} href="/profile" aria-label="profile">
-              <Badge
-                badgeContent={0}
-                color="error"
-                sx={{ '& .MuiBadge-badge': { fontSize: '0.55rem', padding: '2px 4px' } }}
-              >
-                <PersonIcon sx={{ color: '#DC1A8A', fontSize: { sm: 'clamp(1.1rem, 2.5vw, 1.2rem)' } }} />
-              </Badge>
-              <ActionText>Profile</ActionText>
-            </ActionButton>
           </Box>
         </Toolbar>
       </StyledAppBar>
+
+      {/* Mobile Nav */}
       <MobileAppBar position="static">
         <Toolbar sx={{ justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -422,14 +491,14 @@ const TopNavBar = () => {
           </IconButton>
         </Toolbar>
       </MobileAppBar>
+
+      {/* Mobile Drawer */}
       <StyledDrawer
         variant="temporary"
         anchor="left"
         open={mobileOpen}
         onClose={handleDrawerToggle}
-        ModalProps={{
-          keepMounted: true,
-        }}
+        ModalProps={{ keepMounted: true }}
       >
         {drawerContent}
       </StyledDrawer>

@@ -45,24 +45,29 @@ const LogoSection = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'flex-start',
-  gap: theme.spacing(1),
+  gap: theme.spacing(2),
   flex: '0 0 280px',
 }));
 
 const Logo = styled('img')({
   height: '90px',
   width: 'auto',
-  borderRadius: '8px',
-  boxShadow: '0 4px 12px rgba(219, 27, 136, 0.3)',
+  boxShadow: '0 4px 16px rgba(219, 27, 136, 0.25)',
 });
 
-const BrandName = styled(Typography)({
-  fontSize: '2.2rem',
+// REDUCED FONT SIZE + BETTER BALANCE
+const BrandName = styled(Typography)(({ theme }) => ({
+  fontSize: '1.9rem',        // Reduced from 2.4rem
   fontWeight: 800,
-  fontFamily: 'cursive',
-  letterSpacing: '1px',
-  marginTop: '-12px',
-});
+  letterSpacing: '0.5px',
+  lineHeight: 1,
+  marginTop: '-10px',        // Slightly lower to align with logo
+  fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+  [theme.breakpoints.down('sm')]: {
+    fontSize: '1.7rem',
+    marginTop: '-8px',
+  },
+}));
 
 const CloudText = styled('span')({
   color: '#db1b88',
@@ -84,7 +89,7 @@ const ColumnTitle = styled(Typography)(({ theme }) => ({
   fontWeight: 700,
   fontSize: '1.1rem',
   color: '#fff',
-  marginBottom: theme.spacing(1),
+  marginBottom: theme.spacing(1.5),
 }));
 
 const FooterLink = styled(Typography)(({ theme }) => ({
@@ -100,7 +105,6 @@ const FooterLink = styled(Typography)(({ theme }) => ({
 const ContactForm = styled(Box)(({ theme }) => ({
   backgroundColor: '#111',
   padding: theme.spacing(3),
-  borderRadius: 12,
   border: '1px solid #333',
   flex: 1,
   minWidth: 300,
@@ -112,7 +116,7 @@ const Copyright = styled(Typography)(({ theme }) => ({
   fontSize: '0.8rem',
   paddingTop: theme.spacing(3),
   borderTop: '1px solid #333',
-  marginTop: theme.spacing(4),
+  marginTop: theme.spacing(5),
 }));
 
 const WhatsAppButton = styled(IconButton)(({ theme }) => ({
@@ -155,7 +159,6 @@ export default function Footer() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('idle');
-    // Simulate send
     await new Promise(resolve => setTimeout(resolve, 1000));
     setStatus('success');
     setFormData({ name: '', email: '', message: '' });
@@ -176,7 +179,7 @@ export default function Footer() {
               <CloudText>CLOUD</CloudText>
               <TechText>TECH</TechText>
             </BrandName>
-            <Typography variant="body2" color="#aaa" sx={{ maxWidth: 240 }}>
+            <Typography variant="body2" color="#aaa" sx={{ maxWidth: 150, lineHeight: 1.6 }}>
               Premium Electronics | Trade-in | Nationwide Delivery
             </Typography>
           </LogoSection>
@@ -219,25 +222,30 @@ export default function Footer() {
                 <FooterLink>Trade-in</FooterLink>
               </MuiLink>
             </Link>
+            <Link href="/warranty" passHref legacyBehavior>
+              <MuiLink underline="none">
+                <FooterLink>Terms and Conditions</FooterLink>
+              </MuiLink>
+            </Link>
           </Column>
 
           {/* Contact Info */}
           <Column>
             <ColumnTitle>Contact Us</ColumnTitle>
             <FooterLink>
-              <strong style={{ color: '#fff' }}>+254 716 265 661</strong>
+              <strong style={{ color: '#fff' }}>+254722244482 / +254711357878</strong>
               <br />
               Call, Text or WhatsApp
             </FooterLink>
             <FooterLink>
               Email:{' '}
               <MuiLink
-                href="mailto:info@cloudtech.co.ke"
+                href="mailto:info@cloudtechstore.net"
                 color="#ccc"
                 underline="hover"
                 sx={{ '&:hover': { color: '#db1b88' } }}
               >
-                info@cloudtech.co.ke
+                info@cloudtechstore.net
               </MuiLink>
             </FooterLink>
             <FooterLink>
@@ -247,14 +255,14 @@ export default function Footer() {
             </FooterLink>
           </Column>
 
-          {/* Contact Form */}
+          {/* Contact Form (Desktop) */}
           {!isMobile && (
             <ContactForm>
-              <Typography variant="h6" sx={{ color: '#db1b88', mb: 2, fontWeight: 600 }}>
+              <Typography variant="h6" sx={{ color: '#db1b88', mb: 2, fontWeight: 700 }}>
                 Get in Touch
               </Typography>
               {status === 'success' && (
-                <Alert severity="success" sx={{ mb: 2, fontSize: '0.8rem' }}>
+                <Alert severity="success" sx={{ mb: 2, fontSize: '0.85rem', py: 0.5 }}>
                   Message sent! We'll reply soon.
                 </Alert>
               )}
@@ -274,6 +282,7 @@ export default function Footer() {
                       '& .MuiOutlinedInput-root': {
                         '& fieldset': { borderColor: '#444' },
                         '&:hover fieldset': { borderColor: '#666' },
+                        '&.Mui-focused fieldset': { borderColor: '#db1b88' },
                       },
                     }}
                   />
@@ -292,6 +301,7 @@ export default function Footer() {
                       '& .MuiOutlinedInput-root': {
                         '& fieldset': { borderColor: '#444' },
                         '&:hover fieldset': { borderColor: '#666' },
+                        '&.Mui-focused fieldset': { borderColor: '#db1b88' },
                       },
                     }}
                   />
@@ -311,6 +321,7 @@ export default function Footer() {
                       '& .MuiOutlinedInput-root': {
                         '& fieldset': { borderColor: '#444' },
                         '&:hover fieldset': { borderColor: '#666' },
+                        '&.Mui-focused fieldset': { borderColor: '#db1b88' },
                       },
                     }}
                   />
@@ -320,9 +331,12 @@ export default function Footer() {
                     fullWidth
                     sx={{
                       bgcolor: '#db1b88',
+                      color: '#fff',
                       '&:hover': { bgcolor: '#b1166f' },
                       textTransform: 'none',
-                      fontWeight: 600,
+                      fontWeight: 700,
+                      py: 1.2,
+                    
                     }}
                   >
                     Send Message
@@ -335,19 +349,56 @@ export default function Footer() {
 
         {/* Mobile Form */}
         {isMobile && (
-          <ContactForm sx={{ mt: 2 }}>
-            <Typography variant="h6" sx={{ color: '#db1b88', mb: 2 }}>
+          <ContactForm sx={{ mt: 3 }}>
+            <Typography variant="h6" sx={{ color: '#db1b88', mb: 2, fontWeight: 700 }}>
               Quick Message
             </Typography>
             <form onSubmit={handleSubmit}>
               <Stack spacing={1.5}>
-                <TextField name="name" placeholder="Name" size="small" fullWidth required />
-                <TextField name="email" placeholder="Email" type="email" size="small" fullWidth required />
+                <TextField
+                  name="name"
+                  placeholder="Name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  size="small"
+                  fullWidth
+                  required
+                  variant="outlined"
+                  InputProps={{ style: { backgroundColor: '#222', color: '#fff' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: '#444' },
+                      '&:hover fieldset': { borderColor: '#666' },
+                    },
+                  }}
+                />
+                <TextField
+                  name="email"
+                  placeholder="Email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  size="small"
+                  fullWidth
+                  required
+                  variant="outlined"
+                  InputProps={{ style: { backgroundColor: '#222', color: '#fff' } }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      '& fieldset': { borderColor: '#444' },
+                      '&:hover fieldset': { borderColor: '#666' },
+                    },
+                  }}
+                />
                 <Button
                   type="submit"
                   variant="contained"
                   fullWidth
-                  sx={{ bgcolor: '#db1b88', '&:hover': { bgcolor: '#b1166f' } }}
+                  sx={{
+                    bgcolor: '#db1b88',
+                   
+                  
+                  }}
                 >
                   Send
                 </Button>
@@ -361,11 +412,9 @@ export default function Footer() {
         </Copyright>
       </FooterContainer>
 
-      {/* WhatsApp Button */}
-      <MuiLink href="https://wa.me/254716265661" target="_blank" rel="noopener noreferrer" underline="none">
-        <WhatsAppButton
-          aria-label="Chat on WhatsApp"
-        >
+      {/* WhatsApp Floating Button */}
+      <MuiLink href="https://wa.me/254722244482" target="_blank" rel="noopener noreferrer" underline="none">
+        <WhatsAppButton aria-label="Chat on WhatsApp">
           <WhatsAppIcon sx={{ fontSize: 32 }} />
         </WhatsAppButton>
       </MuiLink>

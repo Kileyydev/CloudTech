@@ -21,18 +21,20 @@ import TopNavBar from '../components/TopNavBar';
 import MainNavBar from '../components/MainNavBar';
 import Footer from '../components/FooterSection';
 import { useState } from 'react';
-import { CardMediaProps } from '@mui/material/CardMedia';
 
-// Define interface to extend CardMediaProps with component support
-interface CustomCardMediaProps extends CardMediaProps {
-  component?: 'img';
-  image?: string;
-  alt?: string;
-}
-
-const API_BASE = 'http://localhost:8000/api/repairs/';
+// 🔧 Dynamic API endpoint based on environment
+const getApiBase = () => {
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  if (hostname.includes('localhost')) return 'http://localhost:8000/api/repairs/';
+  if (hostname.includes('render.com')) return 'https://cloudtech-c4ft.onrender.com/api/repairs/';
+  if (hostname.includes('vercel.app')) return 'https://cloud-tech-eta.vercel.app/api/repairs/';
+  if (hostname.includes('cloudtechstore.net')) return 'https://api.cloudtechstore.net/repairs/';
+  return 'http://localhost:8000/api/repairs/';
+};
 
 export default function SmartphoneRepairPage() {
+  const API_BASE = getApiBase();
+
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
   const [formData, setFormData] = useState({
@@ -69,11 +71,7 @@ export default function SmartphoneRepairPage() {
       data.append('description', formData.description);
       if (file) data.append('media', file);
 
-      const res = await fetch(API_BASE, {
-        method: 'POST',
-        body: data,
-      });
-
+      const res = await fetch(API_BASE, { method: 'POST', body: data });
       if (!res.ok) throw new Error('Failed to submit request');
 
       setSnackbar({ open: true, message: 'Repair request submitted successfully!', severity: 'success' });
@@ -121,7 +119,8 @@ export default function SmartphoneRepairPage() {
     <>
       <TopNavBar />
       <MainNavBar />
-      <Box sx={{ backgroundColor: '#fff', color: '#000', py: 6, px: { xs: 2, md: 6 } }}>
+
+      <Box sx={{ backgroundColor: '#fff', color: '#000', py: { xs: 4, md: 6 }, px: { xs: 2, md: 6 } }}>
         {/* REPAIR CATEGORIES */}
         {repairCategories.map((category, index) => (
           <Box
@@ -129,18 +128,12 @@ export default function SmartphoneRepairPage() {
             sx={{
               display: 'flex',
               flexWrap: 'wrap',
-              gap: { xs: 2, md: 4 }, // Matches original Grid spacing={4}
+              gap: { xs: 2, md: 4 },
               alignItems: 'center',
               mb: 8,
-              flexDirection: {
-                xs: 'column',
-                md: index % 2 === 1 ? 'row-reverse' : 'row',
-              },
+              flexDirection: { xs: 'column', md: index % 2 === 1 ? 'row-reverse' : 'row' },
               '& > *': {
-                flex: {
-                  xs: '1 1 100%', // Full width on xs (xs={12})
-                  md: '1 1 calc(50% - 32px)', // Two columns on md (md={6})
-                },
+                flex: { xs: '1 1 100%', md: '1 1 calc(50% - 32px)' },
                 minWidth: 0,
               },
             }}
@@ -151,11 +144,7 @@ export default function SmartphoneRepairPage() {
                 height="400"
                 image={category.image}
                 alt={category.title}
-                sx={{
-                  width: '100%',
-                  objectFit: 'cover',
-                  borderRadius: 0,
-                }}
+                sx={{ width: '100%', objectFit: 'cover', borderRadius: 0 }}
               />
             </Box>
 
@@ -177,25 +166,22 @@ export default function SmartphoneRepairPage() {
           </Box>
         ))}
 
-        {/* FAQ */}
+        {/* FAQ Section */}
         <Box
           sx={{
             display: 'flex',
             flexWrap: 'wrap',
-            gap: { xs: 2, md: 6 }, // Matches original Grid spacing={6}
+            gap: { xs: 2, md: 6 },
             alignItems: 'center',
             borderTop: '1px solid #eee',
             pt: 6,
             '& > *': {
-              flex: {
-                xs: '1 1 100%', // Full width on xs (xs={12})
-                md: '1 1 calc(50% - 48px)', // Two columns on md (md={6})
-              },
+              flex: { xs: '1 1 100%', md: '1 1 calc(50% - 48px)' },
               minWidth: 0,
             },
           }}
         >
-          <Box sx={{ position: 'relative', width: '100%', height: 400 }}>
+          <Box sx={{ width: '100%', height: 400, position: 'relative' }}>
             <video width="100%" height="100%" controls style={{ objectFit: 'cover' }}>
               <source src="/videos/repair-demo.mp4" type="video/mp4" />
             </video>
@@ -210,9 +196,7 @@ export default function SmartphoneRepairPage() {
             </Typography>
             {faqs.map((faq, i) => (
               <Accordion key={i} sx={{ mb: 2, border: '1px solid #eee' }}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: '#db1b88' }} />}>
-                  {faq.question}
-                </AccordionSummary>
+                <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: '#db1b88' }} />}>{faq.question}</AccordionSummary>
                 <AccordionDetails>{faq.answer}</AccordionDetails>
               </Accordion>
             ))}
@@ -249,12 +233,7 @@ export default function SmartphoneRepairPage() {
           </Box>
         </Box>
 
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={4000}
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
+        <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
           <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
         </Snackbar>
       </Box>

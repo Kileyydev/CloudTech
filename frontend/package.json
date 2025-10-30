@@ -16,6 +16,7 @@
     "@mui/material": "^7.3.4",
     "@mui/x-data-grid": "^8.14.0",
     "form-data": "^4.0.4",
+    "framer-motion": "^12.23.24",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.3",
     "leaflet": "^1.9.4",

@@ -57,9 +57,9 @@ const ContactUsPage = () => {
 
   const shop = {
     name: 'CloudTech – Nairobi CBD',
-    address: 'Kenya Cinema Building, Moi Avenue, Nairobi, Kenya',
-    phone: '+254 716 265 661',
-    email: 'info@cloudtech.co.ke',
+    address: 'Cookie House, 3rd Floor, Shop 301, Nairobi CBD',
+    phone: '+254722244482',
+    email: 'info@cloudtechstore.net',
     whatsapp: '254722244482',
   };
 

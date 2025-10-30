@@ -17,18 +17,20 @@ import { Send } from '@mui/icons-material';
 import TopNavBar from '../components/TopNavBar';
 import MainNavBar, { navCategories } from '../components/MainNavBar';
 import Footer from '../components/FooterSection';
-import { CardMediaProps } from '@mui/material/CardMedia';
 
-// Define interface for CardMedia in case it's added later
-interface CustomCardMediaProps extends CardMediaProps {
-  component?: 'img';
-  image?: string;
-  alt?: string;
-}
-
-const API_ENDPOINT = 'http://localhost:8000/api/testimonials/';
+// 🔧 Determine API endpoint dynamically
+const getApiEndpoint = () => {
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+  if (hostname.includes('localhost')) return 'http://localhost:8000/api/testimonials/';
+  if (hostname.includes('render.com')) return 'https://cloudtech-c4ft.onrender.com/api/testimonials/';
+  if (hostname.includes('vercel.app')) return 'https://cloud-tech-eta.vercel.app/api/testimonials/';
+  if (hostname.includes('cloudtechstore.net')) return 'https://api.cloudtechstore.net/testimonials/';
+  return 'http://localhost:8000/api/testimonials/';
+};
 
 export default function TestimonialsPage() {
+  const API_ENDPOINT = getApiEndpoint();
+
   const [formData, setFormData] = useState({
     category: '',
     product: '',
@@ -40,26 +42,18 @@ export default function TestimonialsPage() {
   });
   const [image, setImage] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [snack, setSnack] = useState<{
-    open: boolean;
-    severity: 'success' | 'error';
-    msg: string;
-  }>({
+  const [snack, setSnack] = useState<{ open: boolean; severity: 'success' | 'error'; msg: string }>({
     open: false,
     severity: 'success',
     msg: '',
   });
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setImage(e.target.files[0]);
-    }
+    if (e.target.files && e.target.files.length > 0) setImage(e.target.files[0]);
   };
 
   const validate = () => {
@@ -74,50 +68,25 @@ export default function TestimonialsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const err = validate();
-    if (err) {
-      setSnack({ open: true, severity: 'error', msg: err });
-      return;
-    }
+    if (err) return setSnack({ open: true, severity: 'error', msg: err });
 
     setLoading(true);
     try {
       const formPayload = new FormData();
-      Object.entries(formData).forEach(([key, value]) => {
-        formPayload.append(key, value);
-      });
+      Object.entries(formData).forEach(([key, value]) => formPayload.append(key, value));
       if (image) formPayload.append('image', image);
 
-      const res = await fetch(API_ENDPOINT, {
-        method: 'POST',
-        body: formPayload,
-      });
-
+      const res = await fetch(API_ENDPOINT, { method: 'POST', body: formPayload });
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || 'Failed to submit testimonial');
       }
 
-      setSnack({
-        open: true,
-        severity: 'success',
-        msg: 'Thank you! Your testimonial has been submitted for review.',
-      });
-      setFormData({
-        category: '',
-        product: '',
-        experience: '',
-        rating: '',
-        name: '',
-        email: '',
-        phone: '',
-      });
+      setSnack({ open: true, severity: 'success', msg: 'Thank you! Your testimonial has been submitted for review.' });
+      setFormData({ category: '', product: '', experience: '', rating: '', name: '', email: '', phone: '' });
       setImage(null);
     } catch (error: any) {
-      setSnack({
-        open: true,
-        severity: 'error',
-        msg: error.message || 'Submission failed',
-      });
+      setSnack({ open: true, severity: 'error', msg: error.message || 'Submission failed' });
     } finally {
       setLoading(false);
     }
@@ -141,7 +110,7 @@ export default function TestimonialsPage() {
           backgroundColor: '#fff',
           minHeight: '100vh',
           py: { xs: 4, md: 8 },
-          px: { xs: 2, md: 6 },
+          px: { xs: 2, sm: 4, md: 6, lg: 8 },
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -153,13 +122,11 @@ export default function TestimonialsPage() {
             color: '#555',
             mb: 5,
             textAlign: 'center',
-            maxWidth: 700,
+            maxWidth: { xs: '100%', sm: 600, md: 700 },
             lineHeight: 1.6,
           }}
         >
-          We’d love to hear from you! Please tell us about your experience with
-          our products or services — your words help others choose with
-          confidence.
+          We’d love to hear from you! Please tell us about your experience with our products or services — your words help others choose with confidence.
         </Typography>
 
         <Card
@@ -175,17 +142,9 @@ export default function TestimonialsPage() {
             <Box
               component="form"
               onSubmit={handleSubmit}
-              sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}
+              sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, md: 3 } }}
             >
-              <TextField
-                select
-                label="Product Category"
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-                required
-                fullWidth
-              >
+              <TextField select label="Product Category" name="category" value={formData.category} onChange={handleChange} required fullWidth>
                 {navCategories.map((option, index) => (
                   <MenuItem key={index} value={option}>
                     {option}
@@ -210,20 +169,12 @@ export default function TestimonialsPage() {
                 value={formData.experience}
                 onChange={handleChange}
                 multiline
-                rows={5}
+                rows={4}
                 required
                 fullWidth
               />
 
-              <TextField
-                select
-                label="Overall Rating"
-                name="rating"
-                value={formData.rating}
-                onChange={handleChange}
-                required
-                fullWidth
-              >
+              <TextField select label="Overall Rating" name="rating" value={formData.rating} onChange={handleChange} required fullWidth>
                 {ratings.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
                     {option.label}
@@ -231,28 +182,9 @@ export default function TestimonialsPage() {
                 ))}
               </TextField>
 
-              <TextField
-                label="Your Name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                fullWidth
-              />
-              <TextField
-                label="Email (optional)"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                fullWidth
-              />
-              <TextField
-                label="Phone (optional)"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                fullWidth
-              />
+              <TextField label="Your Name" name="name" value={formData.name} onChange={handleChange} required fullWidth />
+              <TextField label="Email (optional)" name="email" value={formData.email} onChange={handleChange} fullWidth />
+              <TextField label="Phone (optional)" name="phone" value={formData.phone} onChange={handleChange} fullWidth />
 
               <Button
                 variant="outlined"
@@ -261,19 +193,11 @@ export default function TestimonialsPage() {
                   borderColor: '#db1b88',
                   color: '#db1b88',
                   textTransform: 'none',
-                  '&:hover': {
-                    borderColor: '#b1166f',
-                    color: '#b1166f',
-                  },
+                  '&:hover': { borderColor: '#b1166f', color: '#b1166f' },
                 }}
               >
                 {image ? `Selected: ${image.name}` : 'Upload an Image (optional)'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  hidden
-                  onChange={handleImageChange}
-                />
+                <input type="file" accept="image/*" hidden onChange={handleImageChange} />
               </Button>
 
               <Divider sx={{ my: 2 }} />
@@ -282,11 +206,7 @@ export default function TestimonialsPage() {
                 type="submit"
                 variant="contained"
                 endIcon={<Send />}
-                sx={{
-                  backgroundColor: '#db1b88',
-                  color: '#fff',
-                  '&:hover': { backgroundColor: '#b1166f' },
-                }}
+                sx={{ backgroundColor: '#db1b88', color: '#fff', '&:hover': { backgroundColor: '#b1166f' } }}
                 disabled={loading}
               >
                 {loading ? 'Sending...' : 'Submit Testimonial'}
@@ -298,11 +218,7 @@ export default function TestimonialsPage() {
 
       <Footer />
 
-      <Snackbar
-        open={snack.open}
-        onClose={() => setSnack((s) => ({ ...s, open: false }))}
-        autoHideDuration={4000}
-      >
+      <Snackbar open={snack.open} onClose={() => setSnack((s) => ({ ...s, open: false }))} autoHideDuration={4000}>
         <Alert severity={snack.severity}>{snack.msg}</Alert>
       </Snackbar>
     </>
