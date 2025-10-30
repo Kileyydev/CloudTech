@@ -11,6 +11,12 @@ SECRET_KEY = env("SECRET_KEY", default="django-insecure-your-secret-key-here")
 DEBUG = env.bool("DEBUG", default=True)
 ALLOWED_HOSTS = ['*']
 
+ALLOWED_HOSTS = [
+    "api.cloudtechstore.net",
+    "cloudtechstore.net",
+    "www.cloudtechstore.net",
+]
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',

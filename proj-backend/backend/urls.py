@@ -4,6 +4,12 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
 from . import views
+from django.http import JsonResponse
+
+def health_check(request):
+    return JsonResponse({"status": "ok"})
+
+
 
 urlpatterns = [
     path('', views.home, name='home'),
@@ -14,6 +20,7 @@ urlpatterns = [
     #path('api/testimonials/', include('testimonials.urls')),
     path('api/', include('testimonials.urls')),  # ✅ this line is key
     path('api/repairs/', include('repairs.urls')),
+    path('api/health', health_check, name='health'),
 
     
 
