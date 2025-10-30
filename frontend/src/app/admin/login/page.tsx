@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -11,6 +11,7 @@ import {
   TextField,
   Typography,
   Alert,
+  Skeleton,
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
@@ -26,7 +27,9 @@ const MEDIA_BASE =
     ? 'http://localhost:8000'
     : 'https://cloudtech-c4ft.onrender.com';
 
-/** Smart fetch with timeout and retries */
+/* ------------------------------------------------------------------ */
+/* Smart fetch – timeout + retries + exponential back-off              */
+/* ------------------------------------------------------------------ */
 async function fetchWithTimeoutRetry(
   input: RequestInfo | URL,
   init: RequestInit = {},
@@ -44,9 +47,9 @@ async function fetchWithTimeoutRetry(
     } catch (err: any) {
       clearTimeout(id);
       if (err.name === 'AbortError' && attempt < retries) {
-        console.warn(`Fetch timeout — retrying (${attempt + 1}/${retries})…`);
-        await new Promise((r) => setTimeout(r, 1500)); // small delay
-        timeout += 4000; // give more time next attempt
+        console.warn(`Fetch timeout – retry ${attempt + 1}/${retries}`);
+        await new Promise((r) => setTimeout(r, 1500));
+        timeout = Math.min(timeout + 8000, 30000); // cap at 30 s
         continue;
       }
       throw err;
@@ -55,54 +58,74 @@ async function fetchWithTimeoutRetry(
   throw new Error('Max retries reached');
 }
 
-/** Warm Render dyno */
-async function warmBackend(ttlMs = 5 * 60 * 1000) {
-  const key = 'api_warm_until';
-  const until = Number(sessionStorage.getItem(key) || '0');
+/* ------------------------------------------------------------------ */
+/* Warm the Render dyno – keep it alive for 4 min after a successful ping */
+/* ------------------------------------------------------------------ */
+async function warmBackend() {
+  const KEY = 'api_warm_until';
+  const until = Number(sessionStorage.getItem(KEY) || '0');
   if (Date.now() < until) return true;
 
+  const healthUrl = `${API_BASE.replace(/\/$/, '')}/health`;
+  console.log('Warming backend →', healthUrl);
+
   try {
-    const res = await fetchWithTimeoutRetry(`${API_BASE}/health/`, { method: 'GET' }, 5000, 2);
+    const res = await fetchWithTimeoutRetry(healthUrl, { method: 'GET' }, 8000, 2);
     if (res.ok) {
-      sessionStorage.setItem(key, String(Date.now() + ttlMs));
+      const ttl = 4 * 60 * 1000; // 4 min
+      sessionStorage.setItem(KEY, String(Date.now() + ttl));
+      console.info('Backend warm');
       return true;
     }
-  } catch {}
+  } catch (e) {
+    console.warn('Health check failed (cold start expected)', e);
+  }
   return false;
 }
 
+/* ------------------------------------------------------------------ */
+/* MAIN COMPONENT                                                     */
+/* ------------------------------------------------------------------ */
 export default function AdminLogin() {
   const router = useRouter();
 
+  // ----- form state -------------------------------------------------
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [otpStep, setOtpStep] = useState(false);
   const [otp, setOtp] = useState('');
   const [otpId, setOtpId] = useState<string | null>(null);
+
+  // ----- UI state ---------------------------------------------------
   const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; severity?: 'success' | 'error' | 'info'; text: string }>({
-    open: false,
-    text: '',
-  });
+  const [isWaking, setIsWaking] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    severity?: 'success' | 'error' | 'info';
+    text: string;
+  }>({ open: false, text: '' });
 
-  useEffect(() => {
-    warmBackend().then((ok) => {
-      console.info(ok ? '✅ Backend warm' : '🧊 Backend cold, warming up…');
-    });
-  }, []);
-
+  // ----- helpers ----------------------------------------------------
   const openSnack = (text: string, severity: 'success' | 'error' | 'info' = 'info') =>
     setSnackbar({ open: true, text, severity });
   const closeSnack = () => setSnackbar((s) => ({ ...s, open: false }));
 
+  // ----- warm on mount ----------------------------------------------
+  useEffect(() => {
+    warmBackend().then((ok) => console.info(ok ? 'Backend warm' : 'Backend cold'));
+    // optional: ping every 4 min while page is open
+    const interval = setInterval(warmBackend, 4 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ----- login -------------------------------------------------------
   const handleLogin = async () => {
-    if (!email || !password) {
-      openSnack('Please enter email and password', 'error');
-      return;
-    }
+    if (!email || !password) return openSnack('Enter email and password', 'error');
 
     setLoading(true);
+    setIsWaking(true);
+
     try {
       const res = await fetchWithTimeoutRetry(
         `${API_BASE}/auth/login/`,
@@ -111,53 +134,49 @@ export default function AdminLogin() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
         },
-        12000,
+        30000, // 30 s for cold start
         2
       );
 
       if (!res.ok) {
-        let msg = `Login failed (${res.status})`;
-        try {
-          const err = await res.json();
-          msg = err.detail || err.message || JSON.stringify(err);
-        } catch {}
+        const err = await res.json().catch(() => ({}));
+        const msg = err.detail || err.message || `Login failed (${res.status})`;
         openSnack(msg, 'error');
-        setLoading(false);
         return;
       }
 
       const data = await res.json();
-      console.log('Login Response:', data);
+      console.log('Login →', data);
 
       if (data.otp_id) {
         setOtpId(String(data.otp_id));
         setOtpStep(true);
-        openSnack('OTP sent — check your email', 'success');
+        openSnack('OTP sent – check your inbox', 'success');
       } else if (data.access) {
         localStorage.setItem('access', data.access);
         if (data.refresh) localStorage.setItem('refresh', data.refresh);
-        openSnack('Login successful', 'success');
+        openSnack('Logged in!', 'success');
         router.push('/admin-dashboard');
       } else {
-        openSnack('Login succeeded but no otp/access returned', 'info');
+        openSnack('No token/OTP returned', 'info');
       }
     } catch (err: any) {
-      console.error('Login Error:', err);
-      if (err.name === 'AbortError' || err.message.includes('timeout')) {
-        openSnack('Waking up server… please retry in a few seconds ⏳', 'info');
+      console.error('Login error:', err);
+      if (err.name === 'AbortError' || err.message?.includes('timeout')) {
+        openSnack('Server is waking up – please wait 15-30 s and try again', 'info');
       } else {
-        openSnack('Error contacting server. Check network/CORS.', 'error');
+        openSnack('Network error – check connection / CORS', 'error');
       }
     } finally {
       setLoading(false);
+      setIsWaking(false);
     }
   };
 
+  // ----- OTP verify -------------------------------------------------
   const handleOtpVerify = async () => {
-    if (!otpId || !otp) {
-      openSnack('Missing OTP or OTP id', 'error');
-      return;
-    }
+    if (!otpId || !otp) return openSnack('Enter OTP', 'error');
+
     setLoading(true);
     try {
       const res = await fetchWithTimeoutRetry(
@@ -167,51 +186,48 @@ export default function AdminLogin() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ otp_id: otpId, code: otp }),
         },
-        12000,
+        30000,
         2
       );
 
       if (!res.ok) {
-        let msg = `OTP verify failed (${res.status})`;
-        try {
-          const err = await res.json();
-          msg = err.detail || err.message || JSON.stringify(err);
-        } catch {}
+        const err = await res.json().catch(() => ({}));
+        const msg = err.detail || err.message || `OTP failed (${res.status})`;
         openSnack(msg, 'error');
-        setLoading(false);
         return;
       }
 
       const data = await res.json();
-      console.log('OTP Verify Response:', data);
+      console.log('OTP verify →', data);
 
       if (data.access) {
         localStorage.setItem('access', data.access);
         if (data.refresh) localStorage.setItem('refresh', data.refresh);
-        openSnack('OTP verified — logged in!', 'success');
+        openSnack('OTP verified – logged in!', 'success');
         router.push('/admin-dashboard');
       } else {
-        openSnack('OTP verification succeeded but no token returned', 'info');
+        openSnack('No token returned', 'info');
       }
     } catch (err: any) {
-      console.error('OTP Error:', err);
-      if (err.name === 'AbortError' || err.message.includes('timeout')) {
-        openSnack('Server still waking up — please retry.', 'info');
+      console.error('OTP error:', err);
+      if (err.name === 'AbortError') {
+        openSnack('Server still waking – retry in a few seconds', 'info');
       } else {
-        openSnack('Error contacting server. Check network/CORS.', 'error');
+        openSnack('Network error', 'error');
       }
     } finally {
       setLoading(false);
     }
   };
 
+  // ----- enter key --------------------------------------------------
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      if (!otpStep) handleLogin();
-      else handleOtpVerify();
+      otpStep ? handleOtpVerify() : handleLogin();
     }
   };
 
+  // ------------------------------------------------------------------
   return (
     <Box
       onKeyDown={onKeyDown}
@@ -224,6 +240,7 @@ export default function AdminLogin() {
         p: 2,
       }}
     >
+      {/* ------------------- CARD ------------------- */}
       <Box
         sx={{
           width: { xs: '100%', sm: 420, md: 520 },
@@ -239,7 +256,16 @@ export default function AdminLogin() {
           Admin Login
         </Typography>
 
-        {!otpStep ? (
+        {/* ----- SKELETON WHILE WAKING ----- */}
+        {isWaking && (
+          <Box sx={{ mb: 2 }}>
+            <Skeleton height={56} sx={{ mb: 1 }} />
+            <Skeleton height={56} />
+          </Box>
+        )}
+
+        {/* ----- EMAIL / PASSWORD ----- */}
+        {!otpStep && !isWaking && (
           <>
             <TextField
               label="Email"
@@ -250,6 +276,7 @@ export default function AdminLogin() {
               margin="normal"
               autoComplete="email"
               autoFocus
+              disabled={loading}
             />
             <TextField
               label="Password"
@@ -260,10 +287,16 @@ export default function AdminLogin() {
               variant="outlined"
               margin="normal"
               autoComplete="current-password"
+              disabled={loading}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton onClick={() => setShowPassword((s) => !s)} edge="end" size="large">
+                    <IconButton
+                      onClick={() => setShowPassword((s) => !s)}
+                      edge="end"
+                      size="large"
+                      disabled={loading}
+                    >
                       {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
                   </InputAdornment>
@@ -271,7 +304,12 @@ export default function AdminLogin() {
               }}
             />
             <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-              <Button onClick={handleLogin} fullWidth variant="contained" disabled={loading}>
+              <Button
+                onClick={handleLogin}
+                fullWidth
+                variant="contained"
+                disabled={loading}
+              >
                 {loading ? <CircularProgress size={20} /> : 'Send OTP / Login'}
               </Button>
               <Button
@@ -287,7 +325,10 @@ export default function AdminLogin() {
               </Button>
             </Box>
           </>
-        ) : (
+        )}
+
+        {/* ----- OTP STEP ----- */}
+        {otpStep && !isWaking && (
           <>
             <Typography variant="body2" sx={{ mb: 1 }}>
               Enter the OTP sent to your email
@@ -300,9 +341,15 @@ export default function AdminLogin() {
               variant="outlined"
               margin="normal"
               inputMode="numeric"
+              disabled={loading}
             />
             <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-              <Button onClick={handleOtpVerify} fullWidth variant="contained" disabled={loading}>
+              <Button
+                onClick={handleOtpVerify}
+                fullWidth
+                variant="contained"
+                disabled={loading}
+              >
                 {loading ? <CircularProgress size={20} /> : 'Verify & Login'}
               </Button>
               <Button
@@ -322,13 +369,14 @@ export default function AdminLogin() {
         )}
       </Box>
 
+      {/* ------------------- SNACKBAR ------------------- */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={4000}
+        autoHideDuration={6000}
         onClose={closeSnack}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert severity={snackbar.severity || 'info'} sx={{ width: '100%' }} onClose={closeSnack}>
+        <Alert severity={snackbar.severity || 'info'} onClose={closeSnack} sx={{ width: '100%' }}>
           {snackbar.text}
         </Alert>
       </Snackbar>
