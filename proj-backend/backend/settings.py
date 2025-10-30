@@ -7,10 +7,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
+# -------------------------------------------------------------------------------------
+# GENERAL CONFIG
+# -------------------------------------------------------------------------------------
+
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-your-secret-key-here")
 DEBUG = env.bool("DEBUG", default=False)
 
-# ✅ Allowed hosts for both backend + frontend
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
@@ -21,7 +24,10 @@ ALLOWED_HOSTS = [
     "cloudtech-c4ft.vercel.app",
 ]
 
-# ✅ Installed apps
+# -------------------------------------------------------------------------------------
+# INSTALLED APPS
+# -------------------------------------------------------------------------------------
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -29,8 +35,12 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+
+    # Third-party
     "rest_framework",
     "corsheaders",
+
+    # Local apps
     "products",
     "accounts",
     "contact",
@@ -38,11 +48,16 @@ INSTALLED_APPS = [
     "testimonials",
 ]
 
-# ✅ Middleware (CORS FIRST, before CommonMiddleware)
+# -------------------------------------------------------------------------------------
+# MIDDLEWARE
+# -------------------------------------------------------------------------------------
+# ✅ Order matters: corsheaders.middleware.CorsMiddleware must be placed
+# before CommonMiddleware and after SecurityMiddleware/WhiteNoiseMiddleware.
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
-    "corsheaders.middleware.CorsMiddleware",       # must come before CommonMiddleware
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -71,7 +86,10 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "backend.wsgi.application"
 
-# ✅ Database — Neon PostgreSQL
+# -------------------------------------------------------------------------------------
+# DATABASE
+# -------------------------------------------------------------------------------------
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -84,7 +102,10 @@ DATABASES = {
     }
 }
 
-# ✅ REST Framework
+# -------------------------------------------------------------------------------------
+# REST FRAMEWORK
+# -------------------------------------------------------------------------------------
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -96,10 +117,13 @@ REST_FRAMEWORK = {
     ],
 }
 
-# ✅ Custom user model
 AUTH_USER_MODEL = "accounts.User"
 
-# ✅ CORS Settings
+# -------------------------------------------------------------------------------------
+# CORS & CSRF
+# -------------------------------------------------------------------------------------
+
+# ✅ These must be exactly correct in production:
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
@@ -112,25 +136,45 @@ CORS_ALLOWED_ORIGINS = [
     "https://cloudtechstore.net",
 ]
 
-# ✅ CSRF Trusted Origins
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "https://cloudtech-c4ft.onrender.com",
     "https://cloudtech-c4ft.vercel.app",
     "https://www.cloudtechstore.net",
     "https://cloudtechstore.net",
+    "https://api.cloudtechstore.net",  # ✅ ADD THIS
 ]
 
-# ✅ Email (SendGrid)
+# ✅ Optional: Explicitly allow headers and methods (some browsers require these)
+CORS_ALLOW_HEADERS = list(default_headers := [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+])
+CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+
+# -------------------------------------------------------------------------------------
+# EMAIL (SENDGRID)
+# -------------------------------------------------------------------------------------
+
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.sendgrid.net"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="apikey")
-EMAIL_HOST_PASSWORD = env("SENDGRID_API_KEY")
+EMAIL_HOST_PASSWORD = env("SENDGRID_API_KEY", default="")
 DEFAULT_FROM_EMAIL = env("EMAIL_FROM", default="no-reply@cloudtech.com")
 
-# ✅ Password validation
+# -------------------------------------------------------------------------------------
+# PASSWORD VALIDATION
+# -------------------------------------------------------------------------------------
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -138,13 +182,19 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# ✅ Localization
+# -------------------------------------------------------------------------------------
+# LOCALIZATION
+# -------------------------------------------------------------------------------------
+
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Africa/Nairobi"
 USE_I18N = True
 USE_TZ = True
 
-# ✅ Static and Media setup
+# -------------------------------------------------------------------------------------
+# STATIC & MEDIA
+# -------------------------------------------------------------------------------------
+
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
