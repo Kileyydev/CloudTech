@@ -39,6 +39,20 @@ type CategoryT = { id: number; name: string };
 const CACHE_KEY = 'deals_cache_v1';
 const CACHE_TIME = 15 * 60 * 1000; // 15 minutes
 
+// 💡 Smart API + Media base URLs (auto-switches between dev and production)
+const API_BASE =
+  process.env.NODE_ENV === 'development'
+    ? 'http://localhost:8000/api'
+    : 'https://cloudtech-c4ft.onrender.com/api';
+
+const MEDIA_BASE =
+  process.env.NODE_ENV === 'development'
+    ? 'http://localhost:8000'
+    : 'https://cloudtech-c4ft.onrender.com';
+
+const API_PRODUCTS = `${API_BASE}/products/`;
+const API_CATEGORIES = `${API_BASE}/categories/`;
+
 const DealsSection = () => {
   const theme = useTheme();
   const router = useRouter();
@@ -58,9 +72,6 @@ const DealsSection = () => {
   });
 
   const mounted = useRef(true);
-  const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE!;
-  const API_PRODUCTS = `${process.env.NEXT_PUBLIC_API_BASE}/products/`;
-  const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
 
   // ✅ Load cached data first
   useEffect(() => {
@@ -206,7 +217,7 @@ const DealsSection = () => {
             p.stock > 0 && p.categories?.some((c) => c.id === activeCategory)
         );
 
-  // ✅ Skeleton UI (white background)
+  // ✅ Skeleton UI
   const renderSkeletonCard = (_: any, index: number) => (
     <Card key={index} sx={{ width: 220, height: 360, backgroundColor: '#fff', borderRadius: 0 }}>
       <Skeleton variant="rectangular" width="100%" height={180} />
