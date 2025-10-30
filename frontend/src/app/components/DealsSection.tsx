@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -15,11 +15,11 @@ import {
   useMediaQuery,
   Snackbar,
   Alert,
-  CircularProgress,
+  Skeleton,
 } from '@mui/material';
 import { Favorite, ShoppingCart, Add, Remove } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
-import { useCart } from './cartContext'; // Ensure cartContext is set up in your project
+import { useCart } from './cartContext';
 
 type ProductT = {
   id: number;
@@ -34,108 +34,144 @@ type ProductT = {
   is_active?: boolean;
 };
 
+type CategoryT = { id: number; name: string };
+
+const CACHE_KEY = 'deals_cache_v1';
+const CACHE_TIME = 15 * 60 * 1000; // 15 minutes
+
 const DealsSection = () => {
   const theme = useTheme();
   const router = useRouter();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
   const { cart, addToCart, updateQuantity } = useCart();
+
   const [products, setProducts] = useState<ProductT[]>([]);
+  const [categories, setCategories] = useState<CategoryT[]>([]);
   const [wishlist, setWishlist] = useState<Set<number>>(new Set());
   const [currentIndexes, setCurrentIndexes] = useState<Record<number, number>>({});
-  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [activeCategory, setActiveCategory] = useState<number | 'all'>('all');
+  const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
     severity: 'success',
   });
-  const [loading, setLoading] = useState(true);
 
-const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE!;
-const API_PRODUCTS = `${process.env.NEXT_PUBLIC_API_BASE}/products/`;
-const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
+  const mounted = useRef(true);
+  const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE!;
+  const API_PRODUCTS = `${process.env.NEXT_PUBLIC_API_BASE}/products/`;
+  const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
 
-
-  // Fetch discounted, active products and categories
+  // ✅ Load cached data first
   useEffect(() => {
-    const fetchData = async () => {
+    const cached = sessionStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      if (Date.now() - timestamp < CACHE_TIME) {
+        setProducts(data.products);
+        setCategories(data.categories);
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  // ✅ Fetch fresh data in parallel and cache
+  useEffect(() => {
+    mounted.current = true;
+
+    const fetchDealsAndCategories = async () => {
       try {
-        // Fetch products
-        const productRes = await fetch(API_PRODUCTS);
-        if (!productRes.ok) throw new Error('Failed to fetch products');
+        const [productRes, categoryRes] = await Promise.all([
+          fetch(API_PRODUCTS, { cache: 'no-store' }),
+          fetch(API_CATEGORIES, { cache: 'no-store' }),
+        ]);
+
+        if (!productRes.ok || !categoryRes.ok) throw new Error('Failed to fetch');
+
         const productData = await productRes.json();
-        const allProducts: ProductT[] = Array.isArray(productData) ? productData : (productData.results ?? []);
+        const categoryData = await categoryRes.json();
+
+        const allProducts: ProductT[] = Array.isArray(productData)
+          ? productData
+          : productData.results ?? [];
+
         const discounted = allProducts.filter(
           (p) => p.is_active && p.discount && p.discount > 0
         );
 
+        const catsArray: CategoryT[] = Array.isArray(categoryData)
+          ? categoryData
+          : categoryData.results ?? [];
+
         const indexes: Record<number, number> = {};
         discounted.forEach((p) => (indexes[p.id] = 0));
-        setCurrentIndexes(indexes);
-        setProducts(discounted);
 
-        // Fetch categories
-        const categoryRes = await fetch(API_CATEGORIES);
-        if (!categoryRes.ok) throw new Error('Failed to fetch categories');
-        const categoryData = await categoryRes.json();
-        const catsArray = Array.isArray(categoryData) ? categoryData : (categoryData.results ?? []);
-        setCategories(catsArray);
+        if (mounted.current) {
+          setProducts(discounted);
+          setCategories(catsArray);
+          setCurrentIndexes(indexes);
+          setLoading(false);
+        }
+
+        // Cache results
+        sessionStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({
+            data: { products: discounted, categories: catsArray },
+            timestamp: Date.now(),
+          })
+        );
       } catch (err) {
-        console.error('Error fetching data:', err);
-        setSnackbar({ open: true, message: 'Failed to load deals or categories', severity: 'error' });
-      } finally {
-        setLoading(false);
+        console.error('Fetch error:', err);
+        if (mounted.current) {
+          setSnackbar({
+            open: true,
+            message: 'Failed to load deals',
+            severity: 'error',
+          });
+          setLoading(false);
+        }
       }
     };
 
-    fetchData();
+    fetchDealsAndCategories();
+
+    return () => {
+      mounted.current = false;
+    };
   }, []);
 
-  // Load wishlist from localStorage
+  // ✅ Load wishlist from localStorage
   useEffect(() => {
     try {
       const storedWishlist = localStorage.getItem('wishlist');
-      if (storedWishlist) {
-        setWishlist(new Set(JSON.parse(storedWishlist)));
-      }
+      if (storedWishlist) setWishlist(new Set(JSON.parse(storedWishlist)));
     } catch (error) {
       console.error('Error loading wishlist:', error);
     }
   }, []);
 
-  const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
+  // Handlers
+  const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') =>
     setSnackbar({ open: true, message, severity });
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar((prev) => ({ ...prev, open: false }));
-  };
+  const handleCloseSnackbar = () => setSnackbar((prev) => ({ ...prev, open: false }));
 
   const handleWishlistToggle = (id: number) => {
     setWishlist((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
       localStorage.setItem('wishlist', JSON.stringify(Array.from(newSet)));
       return newSet;
     });
   };
 
   const handleAddToCart = (product: ProductT) => {
-    if (product.stock === 0) {
-      showSnackbar('This product is out of stock', 'error');
-      return;
-    }
-
+    if (product.stock === 0)
+      return showSnackbar('This product is out of stock', 'error');
     const cartItem = cart[product.id];
-    if (cartItem && cartItem.quantity >= product.stock) {
-      showSnackbar(`Only ${product.stock} items available in stock`, 'error');
-      return;
-    }
-
+    if (cartItem && cartItem.quantity >= product.stock)
+      return showSnackbar(`Only ${product.stock} available`, 'error');
     const success = addToCart({
       id: product.id,
       title: product.title,
@@ -143,58 +179,59 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
       quantity: 1,
       stock: product.stock,
     });
-
-    if (success) {
-      showSnackbar(cartItem ? `Added another ${product.title} to cart` : `${product.title} added to cart!`);
-    } else {
-      showSnackbar('Failed to add to cart', 'error');
-    }
+    showSnackbar(success ? `${product.title} added to cart!` : 'Failed to add', success ? 'success' : 'error');
   };
 
   const handleDecreaseQuantity = (id: number) => {
-    const cartItem = cart[id];
-    if (!cartItem) return;
-
     const success = updateQuantity(id, -1);
-    if (success && cartItem.quantity <= 1) {
-      showSnackbar(`${cartItem.title} removed from cart`);
-    } else if (success) {
-      showSnackbar(`Updated quantity for ${cartItem.title}`);
-    }
-  };
-
-  const handleViewCart = () => {
-    if (Object.keys(cart).length === 0) {
-      showSnackbar('Your cart is empty', 'error');
-      return;
-    }
-    router.push('/cart');
-  };
-
-  const getCartItemCount = () => {
-    return Object.values(cart).reduce((total, item) => total + (item.quantity || 0), 0);
+    if (success) showSnackbar('Cart updated');
   };
 
   const handleTabChange = (_: any, newVal: number | 'all') => setActiveCategory(newVal);
 
+  const getCartItemCount = () =>
+    Object.values(cart).reduce((total, item) => total + (item.quantity || 0), 0);
+
+  const handleViewCart = () => {
+    if (Object.keys(cart).length === 0) return showSnackbar('Cart is empty', 'error');
+    router.push('/cart');
+  };
+
+  // Filter deals by category
   const displayedProducts =
     activeCategory === 'all'
       ? products.filter((p) => p.stock > 0)
-      : products.filter((p) => p.stock > 0 && p.categories?.some((c) => c.id === activeCategory));
+      : products.filter(
+          (p) =>
+            p.stock > 0 && p.categories?.some((c) => c.id === activeCategory)
+        );
 
+  // ✅ Skeleton UI (white background)
+  const renderSkeletonCard = (_: any, index: number) => (
+    <Card key={index} sx={{ width: 220, height: 360, backgroundColor: '#fff', borderRadius: 0 }}>
+      <Skeleton variant="rectangular" width="100%" height={180} />
+      <CardContent sx={{ p: 2 }}>
+        <Skeleton width="80%" height={24} sx={{ mb: 1 }} />
+        <Skeleton width="60%" height={20} sx={{ mb: 2 }} />
+        <Skeleton width="40%" height={28} />
+      </CardContent>
+    </Card>
+  );
+
+  // ✅ Product cards
   const renderCard = (product: ProductT) => {
-    const images = [product.cover_image, ...(product.images || [])].filter(Boolean).slice(0, 3);
+    const images = [product.cover_image, ...(product.images || [])]
+      .filter(Boolean)
+      .slice(0, 3);
     const currentIndex = currentIndexes[product.id] || 0;
     const cartItem = cart[product.id];
+    const imageSrc =
+      images[currentIndex]?.startsWith('http')
+        ? images[currentIndex]
+        : `${MEDIA_BASE}${images[currentIndex]}`;
     const finalPrice = product.discount
       ? (product.price - product.price * (product.discount / 100)).toFixed(2)
       : product.price.toFixed(2);
-
-    const imageSrc = images[currentIndex] && typeof images[currentIndex] === 'string'
-      ? images[currentIndex].startsWith('http')
-        ? images[currentIndex]
-        : `${MEDIA_BASE}${images[currentIndex]}`
-      : '/images/fallback.jpg';
 
     return (
       <Card
@@ -202,37 +239,16 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
         sx={{
           width: 220,
           height: 360,
-          flex: '0 0 220px',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-          borderRadius: 0,
-          overflow: 'hidden',
-          position: 'relative',
           backgroundColor: '#fff',
+          borderRadius: 0,
+          boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+          overflow: 'hidden',
           transition: 'transform 0.2s',
-          '&:hover': {
-            transform: 'translateY(-4px)',
-          },
+          '&:hover': { transform: 'translateY(-4px)' },
+          flex: '0 0 220px',
         }}
       >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 8,
-            left: 8,
-            backgroundColor: '#e91e63',
-            color: '#fff',
-            fontSize: '0.8rem',
-            fontWeight: 700,
-            px: 1,
-            py: 0.5,
-            borderRadius: 0,
-          }}
-        >
-          {product.discount}% OFF
-        </Box>
-
+        {/* ❤️ Wishlist */}
         <Box
           sx={{
             position: 'absolute',
@@ -255,50 +271,24 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
           }}
         >
           <Favorite
-            sx={{
-              color: wishlist.has(product.id) ? '#e91e63' : '#888',
-              fontSize: 18,
-            }}
+            sx={{ color: wishlist.has(product.id) ? '#e91e63' : '#888', fontSize: 18 }}
           />
         </Box>
 
+        {/* 🖼 Image */}
         <Box
-          sx={{
-            width: 220,
-            height: 180,
-            cursor: 'pointer',
-            overflow: 'hidden',
-          }}
+          sx={{ width: 220, height: 180, cursor: 'pointer', overflow: 'hidden' }}
           onClick={() => router.push(`/product/${product.id}`)}
         >
           <CardMedia
             component="img"
-            image={imageSrc}
+            image={imageSrc || '/images/fallback.jpg'}
             alt={product.title}
-            sx={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
+            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
-          {product.stock < 5 && (
-            <Box
-              sx={{
-                position: 'absolute',
-                bottom: 8,
-                left: 8,
-                backgroundColor: 'rgba(0,0,0,0.75)',
-                color: '#fff',
-                padding: '4px 8px',
-                fontSize: '0.8rem',
-                fontWeight: 500,
-              }}
-            >
-              Only {product.stock} left!
-            </Box>
-          )}
         </Box>
 
+        {/* 📦 Content */}
         <CardContent
           sx={{
             flexGrow: 1,
@@ -315,7 +305,6 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
               sx={{
                 fontWeight: 600,
                 color: '#222',
-                fontSize: '1rem',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -340,23 +329,13 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
             <Box sx={{ mt: 1 }}>
               <Typography
                 variant="caption"
-                sx={{
-                  textDecoration: 'line-through',
-                  color: '#888',
-                  fontSize: '0.85rem',
-                  mr: 1,
-                }}
+                sx={{ textDecoration: 'line-through', color: '#888', fontSize: '0.85rem', mr: 1 }}
               >
                 KES {product.price.toLocaleString()}
               </Typography>
               <Typography
                 variant="subtitle1"
-                sx={{
-                  fontWeight: 700,
-                  color: '#222',
-                  fontSize: '1rem',
-                  display: 'inline',
-                }}
+                sx={{ fontWeight: 700, color: '#222', fontSize: '1rem' }}
               >
                 KES {Number(finalPrice).toLocaleString()}
               </Typography>
@@ -364,7 +343,7 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
           </Box>
 
           {cartItem ? (
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 1.5, gap: 1.5 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1.5, gap: 1.5 }}>
               <IconButton
                 size="small"
                 onClick={(e) => {
@@ -374,16 +353,13 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
                 sx={{
                   color: '#e91e63',
                   border: '1px solid #e91e63',
-                  '&:hover': { backgroundColor: 'rgba(233, 30, 99, 0.1)' },
                   width: 32,
                   height: 32,
                 }}
               >
                 <Remove sx={{ fontSize: 16 }} />
               </IconButton>
-              <Typography sx={{ fontWeight: 600, fontSize: '1rem', minWidth: 24, textAlign: 'center' }}>
-                {cartItem.quantity}
-              </Typography>
+              <Typography sx={{ fontWeight: 600 }}>{cartItem.quantity}</Typography>
               <IconButton
                 size="small"
                 onClick={(e) => {
@@ -394,8 +370,6 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
                 sx={{
                   color: '#e91e63',
                   border: '1px solid #e91e63',
-                  '&:hover': { backgroundColor: 'rgba(233, 30, 99, 0.1)' },
-                  '&[disabled]': { color: '#ccc', borderColor: '#ccc' },
                   width: 32,
                   height: 32,
                 }}
@@ -414,16 +388,12 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
                 textTransform: 'none',
                 fontSize: '0.9rem',
                 mt: 1.5,
-                py: 0.75,
                 borderRadius: 0,
-                '&:hover': { backgroundColor: '#c2185b' },
-                '&:disabled': { backgroundColor: '#ccc' },
               }}
               onClick={(e) => {
                 e.stopPropagation();
                 handleAddToCart(product);
               }}
-              disabled={product.stock === 0}
             >
               Add to Cart
             </Button>
@@ -433,18 +403,10 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
     );
   };
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   return (
-    <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, background: 'linear-gradient(180deg, #f5f5f5 40%, #fff 100%)' }}>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: '#222', fontSize: '1.5rem' }}>
+    <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, backgroundColor: '#fff' }}>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between' }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: '#222' }}>
           Hot Deals
         </Typography>
         <Button
@@ -455,12 +417,7 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
             backgroundColor: '#e91e63',
             color: '#fff',
             textTransform: 'none',
-            fontSize: '0.9rem',
-            py: 0.75,
-            px: 2,
             borderRadius: 0,
-            '&:hover': { backgroundColor: '#c2185b' },
-            '&:disabled': { backgroundColor: '#ccc' },
           }}
           disabled={getCartItemCount() === 0}
         >
@@ -468,6 +425,7 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
         </Button>
       </Box>
 
+      {/* Category Tabs */}
       <Tabs
         value={activeCategory}
         onChange={handleTabChange}
@@ -481,14 +439,9 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
             fontSize: '0.9rem',
             fontWeight: 500,
             color: '#666',
-            '&.Mui-selected': {
-              color: '#e91e63',
-              fontWeight: 700,
-            },
+            '&.Mui-selected': { color: '#e91e63', fontWeight: 700 },
           },
-          '& .MuiTabs-indicator': {
-            backgroundColor: '#e91e63',
-          },
+          '& .MuiTabs-indicator': { backgroundColor: '#e91e63' },
         }}
       >
         <Tab label="All" value="all" />
@@ -497,6 +450,7 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
         ))}
       </Tabs>
 
+      {/* Product Grid */}
       <Box
         sx={{
           maxWidth: '1200px',
@@ -504,19 +458,11 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
           ...(isSmallScreen
             ? {
                 display: 'flex',
-                flexWrap: 'nowrap',
                 overflowX: 'auto',
                 gap: 2,
                 pb: 2,
                 scrollSnapType: 'x mandatory',
-                msOverflowStyle: 'none',
-                scrollbarWidth: 'none',
-                '&::-webkit-scrollbar': {
-                  display: 'none',
-                },
-                '& > *': {
-                  scrollSnapAlign: 'start',
-                },
+                '&::-webkit-scrollbar': { display: 'none' },
               }
             : {
                 display: 'grid',
@@ -524,26 +470,27 @@ const API_CATEGORIES = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
                   md: 'repeat(4, minmax(220px, 1fr))',
                   lg: 'repeat(5, minmax(220px, 1fr))',
                 },
-                gap: { md: 3 },
+                gap: 3,
               }),
         }}
       >
-        {displayedProducts.length === 0 ? (
-          <Typography variant="body1" sx={{ width: '100%', textAlign: 'center', mt: 4 }}>
-            No deals found.
-          </Typography>
-        ) : (
-          displayedProducts.map(renderCard)
-        )}
+        {loading
+          ? Array.from({ length: 8 }).map(renderSkeletonCard)
+          : displayedProducts.map(renderCard)}
       </Box>
 
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>

@@ -18,6 +18,8 @@ import {
 import { Favorite, ShoppingCart, Add, Remove } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
+import TopNavBar from '../components/TopNavBar';
+import MainNavBar from '../components/MainNavBar';
 
 type ProductT = {
   id: number;
@@ -30,12 +32,12 @@ type ProductT = {
   discount?: number;
 };
 
-const CACHE_KEY = 'smartphones_cache';
+const CACHE_KEY = 'powerbanks_cache';
 const CACHE_TIME = 15 * 60 * 1000; // 15 minutes
-const categorySlug = 'smartphones';
+const categorySlug = 'powerbanks';
 const API_BASE = `https://cloudtech-c4ft.onrender.com/api/products/?category=${categorySlug}`;
 
-const SmartphonesSection = () => {
+const PowerbanksSection = () => {
   const theme = useTheme();
   const router = useRouter();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
@@ -83,9 +85,9 @@ const SmartphonesSection = () => {
 
         sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: list, timestamp: Date.now() }));
       } catch (err) {
-        console.error('Error fetching smartphones:', err);
+        console.error('Error fetching powerbanks:', err);
         if (mounted.current) {
-          setSnackbar({ open: true, message: 'Failed to load smartphones', severity: 'error' });
+          setSnackbar({ open: true, message: 'Failed to load powerbanks', severity: 'error' });
           setLoading(false);
         }
       }
@@ -303,52 +305,56 @@ const SmartphonesSection = () => {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, backgroundColor: '#fff' }}>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: '#222', fontSize: '1.5rem' }}>
-          Smartphones
-        </Typography>
-        <Button variant="contained" startIcon={<ShoppingCart sx={{ fontSize: 16 }} />} onClick={handleViewCart}
-          sx={{ backgroundColor: '#e91e63', color: '#fff', textTransform: 'none', fontSize: '0.9rem', py: 0.75, px: 2, borderRadius: 0, '&:hover': { backgroundColor: '#c2185b' } }}
-          disabled={getCartItemCount() === 0}>
-          View Cart ({getCartItemCount()})
-        </Button>
-      </Box>
+    <>
+      <TopNavBar />
+      <MainNavBar />
+      <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, backgroundColor: '#fff' }}>
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#222', fontSize: '1.5rem' }}>
+            Powerbanks
+          </Typography>
+          <Button variant="contained" startIcon={<ShoppingCart sx={{ fontSize: 16 }} />} onClick={handleViewCart}
+            sx={{ backgroundColor: '#e91e63', color: '#fff', textTransform: 'none', fontSize: '0.9rem', py: 0.75, px: 2, borderRadius: 0, '&:hover': { backgroundColor: '#c2185b' } }}
+            disabled={getCartItemCount() === 0}>
+            View Cart ({getCartItemCount()})
+          </Button>
+        </Box>
 
-      {/* Product Grid */}
-      <Box
-        sx={{
-          maxWidth: '1200px',
-          mx: 'auto',
-          ...(isSmallScreen
-            ? {
-                display: 'flex',
-                flexWrap: 'nowrap',
-                overflowX: 'auto',
-                gap: 2,
-                pb: 2,
-                scrollSnapType: 'x mandatory',
-                '&::-webkit-scrollbar': { display: 'none' },
-              }
-            : {
-                display: 'grid',
-                gridTemplateColumns: { md: 'repeat(4, minmax(220px, 1fr))', lg: 'repeat(5, minmax(220px, 1fr))' },
-                gap: 3,
-              }),
-        }}
-      >
-        {loading
-          ? Array.from({ length: 8 }).map(renderSkeletonCard)
-          : products.filter((p) => p.stock > 0).map(renderCard)}
-      </Box>
+        {/* Product Grid */}
+        <Box
+          sx={{
+            maxWidth: '1200px',
+            mx: 'auto',
+            ...(isSmallScreen
+              ? {
+                  display: 'flex',
+                  flexWrap: 'nowrap',
+                  overflowX: 'auto',
+                  gap: 2,
+                  pb: 2,
+                  scrollSnapType: 'x mandatory',
+                  '&::-webkit-scrollbar': { display: 'none' },
+                }
+              : {
+                  display: 'grid',
+                  gridTemplateColumns: { md: 'repeat(4, minmax(220px, 1fr))', lg: 'repeat(5, minmax(220px, 1fr))' },
+                  gap: 3,
+                }),
+          }}
+        >
+          {loading
+            ? Array.from({ length: 8 }).map(renderSkeletonCard)
+            : products.filter((p) => p.stock > 0).map(renderCard)}
+        </Box>
 
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+        <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
+      </Box>
+    </>
   );
 };
 
-export default SmartphonesSection;
+export default PowerbanksSection;
