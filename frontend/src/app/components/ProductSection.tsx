@@ -1,4 +1,3 @@
-// ProductSection.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -33,11 +32,8 @@ type ProductT = {
 const ProductSection = () => {
   const theme = useTheme();
   const router = useRouter();
-  const isLargeScreen = useMediaQuery(theme.breakpoints.up('lg'));
-  const isMediumScreen = useMediaQuery(theme.breakpoints.up('md'));
   const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
-
-  const { cart, addToCart, updateQuantity, removeFromCart } = useCart();
+  const { cart, addToCart, updateQuantity } = useCart();
   const [products, setProducts] = useState<ProductT[]>([]);
   const [wishlist, setWishlist] = useState<Set<number>>(new Set());
   const [currentIndexes, setCurrentIndexes] = useState<Record<number, number>>({});
@@ -47,11 +43,11 @@ const ProductSection = () => {
     severity: 'success',
   });
 
-  // Fetch featured products
+  // ✅ Fetch featured products
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE}/products/?is_featured=true`;
+        const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/?is_featured=true`;
         const res = await fetch(API_BASE);
         if (!res.ok) throw new Error('Failed to fetch products');
         const data = await res.json();
@@ -69,7 +65,7 @@ const ProductSection = () => {
     fetchProducts();
   }, []);
 
-  // Load wishlist from localStorage
+  // ✅ Load wishlist from localStorage
   useEffect(() => {
     try {
       const storedWishlist = localStorage.getItem('wishlist');
@@ -103,7 +99,6 @@ const ProductSection = () => {
   };
 
   const handleAddToCart = (product: ProductT) => {
-    console.log('Adding to cart:', product);
     if (product.stock === 0) {
       showSnackbar('This product is out of stock', 'error');
       return;
@@ -124,7 +119,11 @@ const ProductSection = () => {
     });
 
     if (success) {
-      showSnackbar(cartItem ? `Added another ${product.title} to cart` : `${product.title} added to cart!`);
+      showSnackbar(
+        cartItem
+          ? `Added another ${product.title} to cart`
+          : `${product.title} added to cart!`
+      );
     } else {
       showSnackbar('Failed to add to cart', 'error');
     }
@@ -151,9 +150,7 @@ const ProductSection = () => {
   };
 
   const getCartItemCount = () => {
-    const count = Object.values(cart).reduce((total, item) => total + (item.quantity || 0), 0);
-    console.log('Cart count:', count, 'Cart:', cart);
-    return count;
+    return Object.values(cart).reduce((total, item) => total + (item.quantity || 0), 0);
   };
 
   const renderCard = (product: ProductT) => {
@@ -161,11 +158,12 @@ const ProductSection = () => {
     const currentIndex = currentIndexes[product.id] || 0;
     const cartItem = cart[product.id];
 
-    const imageSrc = images[currentIndex] && typeof images[currentIndex] === 'string'
-      ? images[currentIndex].startsWith('http')
-        ? images[currentIndex]
-        : `${process.env.NEXT_PUBLIC_API_BASE}${images[currentIndex]}`
-      : '/images/fallback.jpg';
+    const imageSrc =
+      images[currentIndex] && typeof images[currentIndex] === 'string'
+        ? images[currentIndex].startsWith('http')
+          ? images[currentIndex]
+          : `${process.env.NEXT_PUBLIC_API_BASE}${images[currentIndex]}`
+        : '/images/fallback.jpg';
 
     return (
       <Card
@@ -182,11 +180,10 @@ const ProductSection = () => {
           position: 'relative',
           backgroundColor: '#fff',
           transition: 'transform 0.2s',
-          '&:hover': {
-            transform: 'translateY(-4px)',
-          },
+          '&:hover': { transform: 'translateY(-4px)' },
         }}
       >
+        {/* ❤️ Wishlist */}
         <Box
           sx={{
             position: 'absolute',
@@ -216,6 +213,7 @@ const ProductSection = () => {
           />
         </Box>
 
+        {/* 🖼 Product Image */}
         <Box
           sx={{
             width: 220,
@@ -229,11 +227,7 @@ const ProductSection = () => {
             component="img"
             image={imageSrc}
             alt={product.title}
-            sx={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-            }}
+            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
           {product.stock < 5 && (
             <Box
@@ -253,6 +247,7 @@ const ProductSection = () => {
           )}
         </Box>
 
+        {/* 📦 Card Content */}
         <CardContent
           sx={{
             flexGrow: 1,
@@ -266,14 +261,7 @@ const ProductSection = () => {
           <Box>
             <Typography
               variant="subtitle1"
-              sx={{
-                fontWeight: 600,
-                color: '#222',
-                fontSize: '1rem',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
+              sx={{ fontWeight: 600, color: '#222', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
             >
               {product.title}
             </Typography>
@@ -291,15 +279,7 @@ const ProductSection = () => {
             >
               {product.description}
             </Typography>
-            <Typography
-              variant="subtitle1"
-              sx={{
-                fontWeight: 700,
-                color: '#222',
-                fontSize: '1rem',
-                mt: 1,
-              }}
-            >
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#222', fontSize: '1rem', mt: 1 }}>
               KES {product.price.toLocaleString()}
             </Typography>
           </Box>
@@ -315,7 +295,7 @@ const ProductSection = () => {
                 sx={{
                   color: '#e91e63',
                   border: '1px solid #e91e63',
-                  '&:hover': { backgroundColor: 'rgba(233, 30, 99, 0.1)' },
+                  '&:hover': { backgroundColor: 'rgba(233,30,99,0.1)' },
                   width: 32,
                   height: 32,
                 }}
@@ -335,7 +315,7 @@ const ProductSection = () => {
                 sx={{
                   color: '#e91e63',
                   border: '1px solid #e91e63',
-                  '&:hover': { backgroundColor: 'rgba(233, 30, 99, 0.1)' },
+                  '&:hover': { backgroundColor: 'rgba(233,30,99,0.1)' },
                   '&[disabled]': { color: '#ccc', borderColor: '#ccc' },
                   width: 32,
                   height: 32,
@@ -393,7 +373,6 @@ const ProductSection = () => {
             px: 2,
             borderRadius: 0,
             '&:hover': { backgroundColor: '#c2185b' },
-            '&:disabled': { backgroundColor: '#ccc' },
           }}
           disabled={getCartItemCount() === 0}
         >
@@ -401,6 +380,7 @@ const ProductSection = () => {
         </Button>
       </Box>
 
+      {/* Product Grid */}
       <Box
         sx={{
           maxWidth: '1200px',
@@ -413,14 +393,7 @@ const ProductSection = () => {
                 gap: 2,
                 pb: 2,
                 scrollSnapType: 'x mandatory',
-                msOverflowStyle: 'none',
-                scrollbarWidth: 'none',
-                '&::-webkit-scrollbar': {
-                  display: 'none',
-                },
-                '& > *': {
-                  scrollSnapAlign: 'start',
-                },
+                '&::-webkit-scrollbar': { display: 'none' },
               }
             : {
                 display: 'grid',
@@ -428,7 +401,7 @@ const ProductSection = () => {
                   md: 'repeat(4, minmax(220px, 1fr))',
                   lg: 'repeat(5, minmax(220px, 1fr))',
                 },
-                gap: { md: 3 },
+                gap: 3,
               }),
         }}
       >
