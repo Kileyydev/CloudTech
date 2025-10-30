@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -18,23 +18,9 @@ import TopNavBar from '../components/TopNavBar';
 import MainNavBar, { navCategories } from '../components/MainNavBar';
 import Footer from '../components/FooterSection';
 
-const CACHE_KEY = 'testimonials_page_cache';
-const CACHE_TIME = 15 * 60 * 1000; // 15 min
-
-const getApiEndpoint = () => {
-  if (typeof window === 'undefined') return process.env.NEXT_PUBLIC_API_BASE_URL + '/testimonials/' || 'http://localhost:8000/api/testimonials/';
-  const hostname = window.location.hostname;
-  if (hostname.includes('localhost')) return 'http://localhost:8000/api/testimonials/';
-  if (hostname.includes('render.com')) return 'https://cloudtech-c4ft.onrender.com/api/testimonials/';
-  if (hostname.includes('vercel.app')) return 'https://cloud-tech-eta.vercel.app/api/testimonials/';
-  if (hostname.includes('cloudtechstore.net')) return process.env.NEXT_PUBLIC_API_BASE_URL + '/testimonials/';
-  return 'http://localhost:8000/api/testimonials/';
-};
+const API_ENDPOINT = process.env.NEXT_PUBLIC_API_BASE_URL + '/testimonials/';
 
 export default function TestimonialsPage() {
-  const API_ENDPOINT = getApiEndpoint();
-  const mounted = useRef(true);
-
   const [formData, setFormData] = useState({
     category: '',
     product: '',
@@ -51,31 +37,10 @@ export default function TestimonialsPage() {
     severity: 'success',
     msg: '',
   });
-  const [ratings, setRatings] = useState<any[]>([]);
 
-  // ✅ Load cached ratings (or defaults)
-  useEffect(() => {
-    const cached = sessionStorage.getItem(CACHE_KEY);
-    if (cached) {
-      const { ratings: cachedRatings, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < CACHE_TIME) {
-        setRatings(cachedRatings);
-        return;
-      }
-    }
-    const defaultRatings = [
-      { value: 5, label: '⭐⭐⭐⭐⭐ Excellent' },
-      { value: 4, label: '⭐⭐⭐⭐ Good' },
-      { value: 3, label: '⭐⭐⭐ Average' },
-      { value: 2, label: '⭐⭐ Poor' },
-      { value: 1, label: '⭐ Terrible' },
-    ];
-    setRatings(defaultRatings);
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ratings: defaultRatings, timestamp: Date.now() }));
-  }, []);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) setImage(e.target.files[0]);
@@ -117,6 +82,14 @@ export default function TestimonialsPage() {
     }
   };
 
+  const ratings = [
+    { value: 5, label: '⭐⭐⭐⭐⭐ Excellent' },
+    { value: 4, label: '⭐⭐⭐⭐ Good' },
+    { value: 3, label: '⭐⭐⭐ Average' },
+    { value: 2, label: '⭐⭐ Poor' },
+    { value: 1, label: '⭐ Terrible' },
+  ];
+
   return (
     <>
       <TopNavBar />
@@ -137,7 +110,9 @@ export default function TestimonialsPage() {
               </TextField>
 
               <TextField label="Product Name or Service" name="product" placeholder="e.g. iPhone 15 Pro Max" value={formData.product} onChange={handleChange} required fullWidth />
+
               <TextField label="Your Experience" name="experience" placeholder="Tell us how your experience was..." value={formData.experience} onChange={handleChange} multiline rows={4} required fullWidth />
+
               <TextField select label="Overall Rating" name="rating" value={formData.rating} onChange={handleChange} required fullWidth>
                 {ratings.map((option) => (
                   <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>

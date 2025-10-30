@@ -20,100 +20,25 @@ import UploadIcon from '@mui/icons-material/Upload';
 import TopNavBar from '../components/TopNavBar';
 import MainNavBar from '../components/MainNavBar';
 import Footer from '../components/FooterSection';
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 
-const CACHE_KEY = 'repair_page_cache';
-const CACHE_TIME = 15 * 60 * 1000; // 15 min
-
-const getApiBase = () => {
-  if (typeof window === 'undefined') return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/repairs/';
-  const hostname = window.location.hostname;
-  if (hostname.includes('localhost')) return 'http://localhost:8000/api/repairs/';
-  if (hostname.includes('render.com')) return 'https://cloudtech-c4ft.onrender.com/api/repairs/';
-  if (hostname.includes('vercel.app')) return 'https://cloud-tech-eta.vercel.app/api/repairs/';
-  if (hostname.includes('cloudtechstore.net')) return process.env.NEXT_PUBLIC_API_BASE_URL + '/repairs/';
-  return 'http://localhost:8000/api/repairs/';
-};
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL + '/repairs/';
+const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE;
 
 export default function SmartphoneRepairPage() {
-  const API_BASE = getApiBase();
-  const mounted = useRef(true);
-
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
-  const [formData, setFormData] = useState({ full_name: '', phone_number: '', description: '' });
+  const [formData, setFormData] = useState({
+    full_name: '',
+    phone_number: '',
+    description: '',
+  });
   const [loading, setLoading] = useState(false);
-  const [repairCategories, setRepairCategories] = useState<any[]>([]);
-  const [faqs, setFaqs] = useState<any[]>([]);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
     severity: 'success',
   });
-
-  // ✅ Load cached repair data
-  useEffect(() => {
-    const cached = sessionStorage.getItem(CACHE_KEY);
-    if (cached) {
-      const { categories, faqs, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < CACHE_TIME) {
-        setRepairCategories(categories);
-        setFaqs(faqs);
-      }
-    }
-  }, []);
-
-  // ✅ Fetch repair categories & FAQs (simulate API)
-  useEffect(() => {
-    mounted.current = true;
-    const fetchRepairData = async () => {
-      try {
-        // You could replace this with actual API call later
-        const categories = [
-          {
-            title: 'Personal Computer Repair',
-            image: '/images/repair.jpg',
-            services: [
-              { name: 'Screen Replacement', price: 'Ksh 8,000' },
-              { name: 'Charging Port Repair', price: 'Ksh 3,500' },
-              { name: 'Battery Replacement', price: 'Ksh 5,000' },
-              { name: 'Software Reset', price: 'Ksh 2,000' },
-            ],
-          },
-          {
-            title: 'Mobile Phone Repair',
-            image: '/images/repair.jpg',
-            services: [
-              { name: 'Screen Replacement', price: 'Ksh 4,000' },
-              { name: 'Charging Port Repair', price: 'Ksh 2,000' },
-              { name: 'Battery Replacement', price: 'Ksh 3,000' },
-              { name: 'Software Reset', price: 'Ksh 1,500' },
-            ],
-          },
-        ];
-        const faqsData = [
-          { question: 'Can I buy spare parts here?', answer: 'Yes, we sell genuine spare parts and accessories.' },
-          { question: 'How long does a laptop battery replacement take?', answer: 'Usually 1–2 hours depending on model.' },
-          { question: 'How many branches does Trefik have?', answer: 'We have several centers across major towns.' },
-          { question: 'What payment methods are available?', answer: 'We accept M-Pesa, cards, and cash payments.' },
-        ];
-
-        if (mounted.current) {
-          setRepairCategories(categories);
-          setFaqs(faqsData);
-
-          // Cache
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ categories, faqs: faqsData, timestamp: Date.now() }));
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchRepairData();
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -122,12 +47,14 @@ export default function SmartphoneRepairPage() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
     try {
       const data = new FormData();
       data.append('full_name', formData.full_name);
@@ -136,7 +63,7 @@ export default function SmartphoneRepairPage() {
       if (file) data.append('media', file);
 
       const res = await fetch(API_BASE, { method: 'POST', body: data });
-      if (!res.ok) throw new Error('Failed to submit request');
+      if (!res.ok) throw new Error('Failed to submit repair request');
 
       setSnackbar({ open: true, message: 'Repair request submitted successfully!', severity: 'success' });
       setFormData({ full_name: '', phone_number: '', description: '' });
@@ -148,6 +75,36 @@ export default function SmartphoneRepairPage() {
       setLoading(false);
     }
   };
+
+  const faqs = [
+    { question: 'Can I buy spare parts here?', answer: 'Yes, we sell genuine spare parts and accessories.' },
+    { question: 'How long does a laptop battery replacement take?', answer: 'Usually 1–2 hours depending on model.' },
+    { question: 'How many branches does Trefik have?', answer: 'We have several centers across major towns.' },
+    { question: 'What payment methods are available?', answer: 'We accept M-Pesa, cards, and cash payments.' },
+  ];
+
+  const repairCategories = [
+    {
+      title: 'Personal Computer Repair',
+      image: '/images/repair.jpg',
+      services: [
+        { name: 'Screen Replacement', price: 'Ksh 8,000' },
+        { name: 'Charging Port Repair', price: 'Ksh 3,500' },
+        { name: 'Battery Replacement', price: 'Ksh 5,000' },
+        { name: 'Software Reset', price: 'Ksh 2,000' },
+      ],
+    },
+    {
+      title: 'Mobile Phone Repair',
+      image: '/images/repair.jpg',
+      services: [
+        { name: 'Screen Replacement', price: 'Ksh 4,000' },
+        { name: 'Charging Port Repair', price: 'Ksh 2,000' },
+        { name: 'Battery Replacement', price: 'Ksh 3,000' },
+        { name: 'Software Reset', price: 'Ksh 1,500' },
+      ],
+    },
+  ];
 
   return (
     <>
@@ -174,13 +131,14 @@ export default function SmartphoneRepairPage() {
             </Box>
 
             <Box sx={{ px: { xs: 1, md: 4 } }}>
-              <Typography variant="h5" sx={{ color: '#db1b88', fontWeight: 700, mb: 2 }}>
-                {category.title}
-              </Typography>
+              <Typography variant="h5" sx={{ color: '#db1b88', fontWeight: 700, mb: 2 }}>{category.title}</Typography>
               <List>
-                {category.services.map((service: { name: string; price: string }, idx: number) => (
+                {category.services.map((service, idx) => (
                   <ListItem key={idx} sx={{ px: 0, borderBottom: '1px solid #eee' }}>
-                    <ListItemText primary={<Typography sx={{ fontWeight: 500 }}>{service.name}</Typography>} secondary={<Typography color="text.secondary">{service.price}</Typography>} />
+                    <ListItemText
+                      primary={<Typography sx={{ fontWeight: 500 }}>{service.name}</Typography>}
+                      secondary={<Typography color="text.secondary">{service.price}</Typography>}
+                    />
                   </ListItem>
                 ))}
               </List>
@@ -207,12 +165,8 @@ export default function SmartphoneRepairPage() {
           </Box>
 
           <Box>
-            <Typography variant="h5" color="#db1b88" sx={{ fontWeight: 700, mb: 1 }}>
-              THE FAQs
-            </Typography>
-            <Typography variant="h4" sx={{ fontWeight: 700, mb: 4 }}>
-              Frequently Asked Questions
-            </Typography>
+            <Typography variant="h5" color="#db1b88" sx={{ fontWeight: 700, mb: 1 }}>THE FAQs</Typography>
+            <Typography variant="h4" sx={{ fontWeight: 700, mb: 4 }}>Frequently Asked Questions</Typography>
             {faqs.map((faq, i) => (
               <Accordion key={i} sx={{ mb: 2, border: '1px solid #eee' }}>
                 <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: '#db1b88' }} />}>{faq.question}</AccordionSummary>
@@ -224,12 +178,8 @@ export default function SmartphoneRepairPage() {
 
         {/* FORM */}
         <Box sx={{ mt: 10, py: 6, borderTop: '1px solid #eee', textAlign: 'center' }}>
-          <Typography variant="h4" sx={{ fontWeight: 700, color: '#db1b88', mb: 3 }}>
-            Schedule a Repair or Consultation
-          </Typography>
-          <Typography variant="body1" sx={{ mb: 5, color: '#444' }}>
-            Upload a short video or image showing your device issue and we’ll contact you via WhatsApp.
-          </Typography>
+          <Typography variant="h4" sx={{ fontWeight: 700, color: '#db1b88', mb: 3 }}>Schedule a Repair or Consultation</Typography>
+          <Typography variant="body1" sx={{ mb: 5, color: '#444' }}>Upload a short video or image showing your device issue and we’ll contact you via WhatsApp.</Typography>
 
           <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, width: { xs: '100%', md: '60%' }, mx: 'auto' }}>
             <TextField label="Full Name" name="full_name" value={formData.full_name} onChange={handleChange} fullWidth />
@@ -248,7 +198,7 @@ export default function SmartphoneRepairPage() {
           </Box>
         </Box>
 
-        <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
           <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
         </Snackbar>
       </Box>
