@@ -3,9 +3,9 @@ from pathlib import Path
 import environ
 from corsheaders.defaults import default_headers
 
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables
 env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
@@ -53,13 +53,11 @@ INSTALLED_APPS = [
 # -------------------------------------------------------------------------------------
 # MIDDLEWARE
 # -------------------------------------------------------------------------------------
-# ✅ Order matters: corsheaders.middleware.CorsMiddleware must be placed
-# before CommonMiddleware and after SecurityMiddleware/WhiteNoiseMiddleware.
-
+# ✅ Order matters: CorsMiddleware must be above CommonMiddleware
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",  # must be above CommonMiddleware
     "whitenoise.middleware.WhiteNoiseMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -125,7 +123,6 @@ AUTH_USER_MODEL = "accounts.User"
 # CORS & CSRF
 # -------------------------------------------------------------------------------------
 
-# ✅ These must be exactly correct in production:
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
@@ -145,22 +142,20 @@ CSRF_TRUSTED_ORIGINS = [
     "https://cloudtech-c4ft.vercel.app",
     "https://www.cloudtechstore.net",
     "https://cloudtechstore.net",
-    "https://api.cloudtechstore.net",  # ✅ ADD THIS
+    "https://api.cloudtechstore.net",
 ]
 
-# ✅ Optional: Explicitly allow headers and methods (some browsers require these)
-CORS_ALLOW_HEADERS = list(default_headers := [
-    "accept",
-    "accept-encoding",
-    "authorization",
-    "content-type",
-    "dnt",
-    "origin",
-    "user-agent",
-    "x-csrftoken",
-    "x-requested-with",
-])
-CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "Content-Type",
+    "Authorization",
+    "X-CSRFToken",
+]
+
+CORS_ALLOW_METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"]
+CORS_URLS_REGEX = r"^/api/.*$"
+
+# Render-specific fix for proxy SSL headers
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # -------------------------------------------------------------------------------------
 # EMAIL (SENDGRID)
