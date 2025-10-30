@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 import environ
+from corsheaders.defaults import default_headers
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
