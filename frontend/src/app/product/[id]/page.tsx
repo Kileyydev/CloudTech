@@ -33,7 +33,15 @@ import TopNavBar from "@/app/components/TopNavBar";
 import MainNavBar from "@/app/components/MainNavBar";
 
 
-const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || "http://localhost:8000";
+const API_BASE =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:8000/api"
+    : "https://cloudtech-c4ft.onrender.com/api";
+
+const MEDIA_BASE =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:8000"
+    : "https://cloudtech-c4ft.onrender.com";
 
 type ProductT = {
   id: string;
@@ -71,8 +79,9 @@ const ProductDetailPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [isWishlisted, setIsWishlisted] = useState(false);
 
-  const API_PRODUCT = `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api"}/products/${id}/`;
-  const API_RELATED = `${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api"}/products/`;
+  const API_PRODUCT = `${API_BASE}/products/${id}/`;
+  const API_RELATED = `${API_BASE}/products/`;
+
 
 
   useEffect(() => {
