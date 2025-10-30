@@ -23,6 +23,7 @@ import { useRouter } from 'next/navigation';
 const getApiBase = () => {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
+    console.log('🌐 Current hostname:', host);
     if (host.includes('localhost') || host.includes('127.0.0.1'))
       return 'http://localhost:8000/api';
     return process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.cloudtechstore.net/api';
@@ -31,6 +32,7 @@ const getApiBase = () => {
 };
 
 const API_BASE = getApiBase();
+console.log('🔗 Using API_BASE:', API_BASE);
 
 /* ------------------------------------------------------------------ */
 /* 🚀 SMART FETCH WITH RETRY + TIMEOUT                                */
@@ -45,17 +47,21 @@ async function fetchWithTimeoutRetry(
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort('timeout'), timeout);
     try {
+      console.log(`⏳ Fetch attempt ${attempt + 1} →`, input);
       const res = await fetch(input, { ...init, signal: controller.signal });
       clearTimeout(id);
+      console.log(`✅ Fetch success →`, input, res.status);
       return res;
     } catch (err: any) {
       clearTimeout(id);
+      console.warn(`❌ Fetch failed (attempt ${attempt + 1}/${retries}):`, err);
       if (attempt < retries) {
-        console.warn(`Fetch failed (attempt ${attempt + 1}/${retries}):`, err);
+        console.log('⏱ Retrying fetch in 2s...');
         await new Promise((r) => setTimeout(r, 2000));
         timeout = Math.min(timeout + 10000, 60000);
         continue;
       }
+      console.error('💥 Max retries reached for fetch:', input);
       throw err;
     }
   }
@@ -97,7 +103,6 @@ async function warmBackend() {
 export default function AdminLogin() {
   const router = useRouter();
 
-  // form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -105,7 +110,6 @@ export default function AdminLogin() {
   const [otp, setOtp] = useState('');
   const [otpId, setOtpId] = useState<string | null>(null);
 
-  // ui state
   const [loading, setLoading] = useState(false);
   const [isWaking, setIsWaking] = useState(false);
   const [snackbar, setSnackbar] = useState<{
@@ -118,9 +122,6 @@ export default function AdminLogin() {
     setSnackbar({ open: true, text, severity });
   const closeSnack = () => setSnackbar((s) => ({ ...s, open: false }));
 
-  /* ------------------------------------------------------------------ */
-  /* 🚀 Warm backend on mount + keep alive                             */
-  /* ------------------------------------------------------------------ */
   useEffect(() => {
     warmBackend();
     const interval = setInterval(warmBackend, 4 * 60 * 1000);
@@ -131,11 +132,11 @@ export default function AdminLogin() {
   /* 🔑 Login Handler                                                  */
   /* ------------------------------------------------------------------ */
   const handleLogin = async () => {
-    if (!email || !password)
-      return openSnack('Enter email and password', 'error');
+    if (!email || !password) return openSnack('Enter email and password', 'error');
 
     setLoading(true);
     setIsWaking(true);
+    console.log('✉️ Attempting login with email:', email);
 
     try {
       const res = await fetchWithTimeoutRetry(
@@ -145,19 +146,22 @@ export default function AdminLogin() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
         },
-        60000, // ⏱ longer timeout for cold start
+        60000,
         2
       );
 
+      console.log('📨 Login response status:', res.status);
+
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        console.warn('⚠️ Login error body:', err);
         const msg = err.detail || err.message || `Login failed (${res.status})`;
         openSnack(msg, 'error');
         return;
       }
 
       const data = await res.json();
-      console.log('Login →', data);
+      console.log('✅ Login →', data);
 
       if (data.otp_id) {
         setOtpId(String(data.otp_id));
@@ -172,7 +176,7 @@ export default function AdminLogin() {
         openSnack('No token/OTP returned', 'info');
       }
     } catch (err: any) {
-      console.error('Login error:', err);
+      console.error('💥 Login error caught:', err);
       if (err.name === 'AbortError' || err.message?.includes('timeout')) {
         openSnack('Server is waking up – please wait 15–30 s and try again', 'info');
       } else {
@@ -190,6 +194,8 @@ export default function AdminLogin() {
   const handleOtpVerify = async () => {
     if (!otpId || !otp) return openSnack('Enter OTP', 'error');
     setLoading(true);
+    console.log('🔑 Verifying OTP:', otp, 'for otpId:', otpId);
+
     try {
       const res = await fetchWithTimeoutRetry(
         `${API_BASE}/auth/verify-otp/`,
@@ -201,6 +207,9 @@ export default function AdminLogin() {
         30000,
         2
       );
+
+      console.log('📨 OTP response status:', res.status);
+
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         const msg = err.detail || err.message || `OTP failed (${res.status})`;
@@ -209,6 +218,8 @@ export default function AdminLogin() {
       }
 
       const data = await res.json();
+      console.log('✅ OTP Verify →', data);
+
       if (data.access) {
         localStorage.setItem('access', data.access);
         if (data.refresh) localStorage.setItem('refresh', data.refresh);
@@ -218,7 +229,7 @@ export default function AdminLogin() {
         openSnack('No token returned', 'info');
       }
     } catch (err: any) {
-      console.error('OTP error:', err);
+      console.error('💥 OTP error caught:', err);
       if (err.name === 'AbortError') {
         openSnack('Server still waking – retry soon', 'info');
       } else {
@@ -233,9 +244,6 @@ export default function AdminLogin() {
     if (e.key === 'Enter') otpStep ? handleOtpVerify() : handleLogin();
   };
 
-  /* ------------------------------------------------------------------ */
-  /* 🧱 UI                                                             */
-  /* ------------------------------------------------------------------ */
   return (
     <Box
       onKeyDown={onKeyDown}
