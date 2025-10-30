@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Button,
@@ -17,32 +17,24 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useRouter } from 'next/navigation';
 
+/* ------------------------------------------------------------------ */
+/* 🔧 API BASE SETUP                                                  */
+/* ------------------------------------------------------------------ */
 const getApiBase = () => {
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
-
-    // Running locally
-    if (host.includes('localhost') || host.includes('127.0.0.1')) {
+    if (host.includes('localhost') || host.includes('127.0.0.1'))
       return 'http://localhost:8000/api';
-    }
-
-    // ✅ Production — use your Render backend
     return process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.cloudtechstore.net/api';
   }
-
-  // fallback for SSR
   return process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.cloudtechstore.net/api';
 };
 
 const API_BASE = getApiBase();
 
-// ✅ Media base (for images)
-const MEDIA_BASE =
-  process.env.NODE_ENV === 'development'
-    ? 'http://localhost:8000'
-    : process.env.NEXT_PUBLIC_MEDIA_BASE || 'https://api.cloudtechstore.net';
-
-
+/* ------------------------------------------------------------------ */
+/* 🚀 SMART FETCH WITH RETRY + TIMEOUT                                */
+/* ------------------------------------------------------------------ */
 async function fetchWithTimeoutRetry(
   input: RequestInfo | URL,
   init: RequestInit = {},
@@ -52,17 +44,16 @@ async function fetchWithTimeoutRetry(
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort('timeout'), timeout);
-
     try {
       const res = await fetch(input, { ...init, signal: controller.signal });
       clearTimeout(id);
       return res;
     } catch (err: any) {
       clearTimeout(id);
-      if (err.name === 'AbortError' && attempt < retries) {
-        console.warn(`Fetch timeout – retry ${attempt + 1}/${retries}`);
-        await new Promise((r) => setTimeout(r, 1500));
-        timeout = Math.min(timeout + 8000, 30000); // cap at 30 s
+      if (attempt < retries) {
+        console.warn(`Fetch failed (attempt ${attempt + 1}/${retries}):`, err);
+        await new Promise((r) => setTimeout(r, 2000));
+        timeout = Math.min(timeout + 10000, 60000);
         continue;
       }
       throw err;
@@ -72,37 +63,41 @@ async function fetchWithTimeoutRetry(
 }
 
 /* ------------------------------------------------------------------ */
-/* Warm the Render dyno – keep it alive for 4 min after a successful ping */
+/* 🧊 WARM BACKEND (health + login)                                   */
 /* ------------------------------------------------------------------ */
 async function warmBackend() {
   const KEY = 'api_warm_until';
   const until = Number(sessionStorage.getItem(KEY) || '0');
   if (Date.now() < until) return true;
 
-  const healthUrl = `${API_BASE.replace(/\/$/, '')}/health`;
-  console.log('Warming backend →', healthUrl);
+  const endpoints = [
+    `${API_BASE.replace(/\/$/, '')}/health`,
+    `${API_BASE.replace(/\/$/, '')}/auth/login/`,
+  ];
+  console.log('🔥 Warming backend →', endpoints);
 
   try {
-    const res = await fetchWithTimeoutRetry(healthUrl, { method: 'GET' }, 8000, 2);
-    if (res.ok) {
-      const ttl = 4 * 60 * 1000; // 4 min
-      sessionStorage.setItem(KEY, String(Date.now() + ttl));
-      console.info('Backend warm');
-      return true;
-    }
+    await Promise.all(
+      endpoints.map((url) =>
+        fetchWithTimeoutRetry(url, { method: 'OPTIONS' }, 10000, 2)
+      )
+    );
+    sessionStorage.setItem(KEY, String(Date.now() + 4 * 60 * 1000)); // 4 min cache
+    console.info('✅ Backend fully warm');
+    return true;
   } catch (e) {
-    console.warn('Health check failed (cold start expected)', e);
+    console.warn('⚠️ Warm-up failed (cold start expected):', e);
   }
   return false;
 }
 
 /* ------------------------------------------------------------------ */
-/* MAIN COMPONENT                                                     */
+/* 🧠 MAIN COMPONENT                                                  */
 /* ------------------------------------------------------------------ */
 export default function AdminLogin() {
   const router = useRouter();
 
-  // ----- form state -------------------------------------------------
+  // form state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -110,7 +105,7 @@ export default function AdminLogin() {
   const [otp, setOtp] = useState('');
   const [otpId, setOtpId] = useState<string | null>(null);
 
-  // ----- UI state ---------------------------------------------------
+  // ui state
   const [loading, setLoading] = useState(false);
   const [isWaking, setIsWaking] = useState(false);
   const [snackbar, setSnackbar] = useState<{
@@ -119,22 +114,25 @@ export default function AdminLogin() {
     text: string;
   }>({ open: false, text: '' });
 
-  // ----- helpers ----------------------------------------------------
   const openSnack = (text: string, severity: 'success' | 'error' | 'info' = 'info') =>
     setSnackbar({ open: true, text, severity });
   const closeSnack = () => setSnackbar((s) => ({ ...s, open: false }));
 
-  // ----- warm on mount ----------------------------------------------
+  /* ------------------------------------------------------------------ */
+  /* 🚀 Warm backend on mount + keep alive                             */
+  /* ------------------------------------------------------------------ */
   useEffect(() => {
-    warmBackend().then((ok) => console.info(ok ? 'Backend warm' : 'Backend cold'));
-    // optional: ping every 4 min while page is open
+    warmBackend();
     const interval = setInterval(warmBackend, 4 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // ----- login -------------------------------------------------------
+  /* ------------------------------------------------------------------ */
+  /* 🔑 Login Handler                                                  */
+  /* ------------------------------------------------------------------ */
   const handleLogin = async () => {
-    if (!email || !password) return openSnack('Enter email and password', 'error');
+    if (!email || !password)
+      return openSnack('Enter email and password', 'error');
 
     setLoading(true);
     setIsWaking(true);
@@ -147,7 +145,7 @@ export default function AdminLogin() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
         },
-        30000, // 30 s for cold start
+        60000, // ⏱ longer timeout for cold start
         2
       );
 
@@ -176,9 +174,9 @@ export default function AdminLogin() {
     } catch (err: any) {
       console.error('Login error:', err);
       if (err.name === 'AbortError' || err.message?.includes('timeout')) {
-        openSnack('Server is waking up – please wait 15-30 s and try again', 'info');
+        openSnack('Server is waking up – please wait 15–30 s and try again', 'info');
       } else {
-        openSnack('Network error – check connection / CORS', 'error');
+        openSnack('Network/CORS error – please check connection', 'error');
       }
     } finally {
       setLoading(false);
@@ -186,10 +184,11 @@ export default function AdminLogin() {
     }
   };
 
-  // ----- OTP verify -------------------------------------------------
+  /* ------------------------------------------------------------------ */
+  /* 🔐 OTP Verify Handler                                             */
+  /* ------------------------------------------------------------------ */
   const handleOtpVerify = async () => {
     if (!otpId || !otp) return openSnack('Enter OTP', 'error');
-
     setLoading(true);
     try {
       const res = await fetchWithTimeoutRetry(
@@ -202,7 +201,6 @@ export default function AdminLogin() {
         30000,
         2
       );
-
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         const msg = err.detail || err.message || `OTP failed (${res.status})`;
@@ -211,8 +209,6 @@ export default function AdminLogin() {
       }
 
       const data = await res.json();
-      console.log('OTP verify →', data);
-
       if (data.access) {
         localStorage.setItem('access', data.access);
         if (data.refresh) localStorage.setItem('refresh', data.refresh);
@@ -224,7 +220,7 @@ export default function AdminLogin() {
     } catch (err: any) {
       console.error('OTP error:', err);
       if (err.name === 'AbortError') {
-        openSnack('Server still waking – retry in a few seconds', 'info');
+        openSnack('Server still waking – retry soon', 'info');
       } else {
         openSnack('Network error', 'error');
       }
@@ -233,14 +229,13 @@ export default function AdminLogin() {
     }
   };
 
-  // ----- enter key --------------------------------------------------
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      otpStep ? handleOtpVerify() : handleLogin();
-    }
+    if (e.key === 'Enter') otpStep ? handleOtpVerify() : handleLogin();
   };
 
-  // ------------------------------------------------------------------
+  /* ------------------------------------------------------------------ */
+  /* 🧱 UI                                                             */
+  /* ------------------------------------------------------------------ */
   return (
     <Box
       onKeyDown={onKeyDown}
@@ -253,11 +248,9 @@ export default function AdminLogin() {
         p: 2,
       }}
     >
-      {/* ------------------- CARD ------------------- */}
       <Box
         sx={{
           width: { xs: '100%', sm: 420, md: 520 },
-          maxWidth: '100%',
           bgcolor: 'background.paper',
           borderRadius: 2,
           boxShadow: 3,
@@ -269,7 +262,6 @@ export default function AdminLogin() {
           Admin Login
         </Typography>
 
-        {/* ----- SKELETON WHILE WAKING ----- */}
         {isWaking && (
           <Box sx={{ mb: 2 }}>
             <Skeleton height={56} sx={{ mb: 1 }} />
@@ -277,7 +269,6 @@ export default function AdminLogin() {
           </Box>
         )}
 
-        {/* ----- EMAIL / PASSWORD ----- */}
         {!otpStep && !isWaking && (
           <>
             <TextField
@@ -317,12 +308,7 @@ export default function AdminLogin() {
               }}
             />
             <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-              <Button
-                onClick={handleLogin}
-                fullWidth
-                variant="contained"
-                disabled={loading}
-              >
+              <Button onClick={handleLogin} fullWidth variant="contained" disabled={loading}>
                 {loading ? <CircularProgress size={20} /> : 'Send OTP / Login'}
               </Button>
               <Button
@@ -340,7 +326,6 @@ export default function AdminLogin() {
           </>
         )}
 
-        {/* ----- OTP STEP ----- */}
         {otpStep && !isWaking && (
           <>
             <Typography variant="body2" sx={{ mb: 1 }}>
@@ -357,12 +342,7 @@ export default function AdminLogin() {
               disabled={loading}
             />
             <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-              <Button
-                onClick={handleOtpVerify}
-                fullWidth
-                variant="contained"
-                disabled={loading}
-              >
+              <Button onClick={handleOtpVerify} fullWidth variant="contained" disabled={loading}>
                 {loading ? <CircularProgress size={20} /> : 'Verify & Login'}
               </Button>
               <Button
@@ -382,7 +362,6 @@ export default function AdminLogin() {
         )}
       </Box>
 
-      {/* ------------------- SNACKBAR ------------------- */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
