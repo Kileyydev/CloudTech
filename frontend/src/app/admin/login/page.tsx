@@ -16,7 +16,16 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useRouter } from 'next/navigation';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE?.replace(/\/$/, '') || 'http://localhost:8000/api';
+const API_BASE =
+  process.env.NODE_ENV === 'development'
+    ? 'http://localhost:8000/api'
+    : 'https://cloudtech-c4ft.onrender.com/api';
+
+const MEDIA_BASE =
+  process.env.NODE_ENV === 'development'
+    ? 'http://localhost:8000'
+    : 'https://cloudtech-c4ft.onrender.com';
+
 
 /**
  * fetchWithTimeout: wraps fetch with abort & timeout
