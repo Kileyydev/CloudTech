@@ -22,8 +22,13 @@ import MainNavBar from '../components/MainNavBar';
 import Footer from '../components/FooterSection';
 import { useState } from 'react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL + '/repairs/';
-const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE;
+const API_BASE =
+  `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '')}/repairs/` ||
+  'https://api.cloudtechstore.net/api/repairs/';
+
+const MEDIA_BASE =
+  process.env.NEXT_PUBLIC_MEDIA_BASE?.replace(/\/$/, '') ||
+  'https://api.cloudtechstore.net';
 
 export default function SmartphoneRepairPage() {
   const [file, setFile] = useState<File | null>(null);

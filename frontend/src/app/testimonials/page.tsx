@@ -18,7 +18,10 @@ import TopNavBar from '../components/TopNavBar';
 import MainNavBar, { navCategories } from '../components/MainNavBar';
 import Footer from '../components/FooterSection';
 
-const API_ENDPOINT = process.env.NEXT_PUBLIC_API_BASE_URL + '/testimonials/';
+const API_ENDPOINT =
+  `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '')}/testimonials/` ||
+  'https://api.cloudtechstore.net/api/testimonials/';
+
 
 export default function TestimonialsPage() {
   const [formData, setFormData] = useState({
