@@ -31,11 +31,10 @@ type ProductT = {
   stock: number;
 };
 
-// 🧠 Cache Settings
 const CACHE_KEY = 'featured_products_cache';
-const CACHE_TIME = 15 * 60 * 1000; // 15 minutes
+const CACHE_TIME = 15 * 60 * 1000;
 
-// ✅ Smart API + Media base URLs
+
 const API_BASE =
   process.env.NODE_ENV === 'development'
     ? 'http://localhost:8000/api'

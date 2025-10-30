@@ -20,12 +20,13 @@ import { useRouter } from 'next/navigation';
 const API_BASE =
   process.env.NODE_ENV === 'development'
     ? 'http://localhost:8000/api'
-    : 'https://cloudtech-c4ft.onrender.com/api';
+    : process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
 
 const MEDIA_BASE =
   process.env.NODE_ENV === 'development'
     ? 'http://localhost:8000'
-    : 'https://cloudtech-c4ft.onrender.com';
+    : process.env.NEXT_PUBLIC_MEDIA_BASE;
+
 
 /* ------------------------------------------------------------------ */
 /* Smart fetch – timeout + retries + exponential back-off              */
