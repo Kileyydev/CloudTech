@@ -17,20 +17,32 @@ import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useRouter } from 'next/navigation';
 
-const API_BASE =
-  process.env.NODE_ENV === 'development'
-    ? 'http://localhost:8000/api'
-    : process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api';
+const getApiBase = () => {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
 
+    // Running locally
+    if (host.includes('localhost') || host.includes('127.0.0.1')) {
+      return 'http://localhost:8000/api';
+    }
+
+    // ✅ Production — use your Render backend
+    return process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.cloudtechstore.net/api';
+  }
+
+  // fallback for SSR
+  return process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.cloudtechstore.net/api';
+};
+
+const API_BASE = getApiBase();
+
+// ✅ Media base (for images)
 const MEDIA_BASE =
   process.env.NODE_ENV === 'development'
     ? 'http://localhost:8000'
-    : process.env.NEXT_PUBLIC_MEDIA_BASE;
+    : process.env.NEXT_PUBLIC_MEDIA_BASE || 'https://api.cloudtechstore.net';
 
 
-/* ------------------------------------------------------------------ */
-/* Smart fetch – timeout + retries + exponential back-off              */
-/* ------------------------------------------------------------------ */
 async function fetchWithTimeoutRetry(
   input: RequestInfo | URL,
   init: RequestInit = {},
