@@ -33,10 +33,8 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 # ✅ Product ViewSet (with caching)
 # ----------------------------------------
 @method_decorator(cache_page(60 * 5), name='list')  # cache list responses for 5 min
+@method_decorator(cache_page(60 * 5), name='list')
 class ProductViewSet(viewsets.ModelViewSet):
-    """
-    Product endpoints with caching + optimized queryset
-    """
     queryset = Product.objects.prefetch_related(
         'variants', 'images', 'tags', 'categories'
     ).select_related('brand').all()
@@ -53,33 +51,28 @@ class ProductViewSet(viewsets.ModelViewSet):
         return ProductCreateUpdateSerializer
 
     def get_queryset(self):
-        """
-        Add category filter from query params & cache queryset
-        """
         category_slug = self.request.query_params.get('category')
         cache_key = f"product_qs_{category_slug or 'all'}"
-
-        # Try cache first
         qs = cache.get(cache_key)
         if qs is not None:
             return qs
 
-        # If not cached, hit DB
         queryset = super().get_queryset()
         if category_slug:
             queryset = queryset.filter(categories__slug=category_slug, is_active=True)
         else:
             queryset = queryset.filter(is_active=True)
 
-        # Cache for 5 mins
         cache.set(cache_key, queryset, timeout=60 * 5)
         return queryset
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context.update({"request": self.request})
+        return context
+
     @action(detail=False, methods=['get'])
     def featured(self, request):
-        """
-        Custom route: /api/products/featured/
-        """
         cache_key = "featured_products"
         data = cache.get(cache_key)
         if data is None:
