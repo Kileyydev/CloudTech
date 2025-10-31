@@ -1,7 +1,7 @@
-# accounts/serializers.py
 from rest_framework import serializers
-from django.contrib.auth import authenticate
-from .models import User, EmailOTP
+from django.contrib.auth import authenticate, get_user_model
+
+User = get_user_model()
 
 # ---------------- Register ----------------
 class RegisterSerializer(serializers.ModelSerializer):
@@ -32,18 +32,8 @@ class LoginSerializer(serializers.Serializer):
         return data
 
 
-# ---------------- OTP Verify ----------------
-class OTPVerifySerializer(serializers.Serializer):
-    otp_id = serializers.UUIDField()
-    code = serializers.CharField(max_length=10)
-
-
 # ---------------- User List / Update Serializer ----------------
-from django.contrib.auth import get_user_model
-User = get_user_model()
-
 class UserSerializer(serializers.ModelSerializer):
-    # ✅ Removed source='full_name' because it's redundant
     full_name = serializers.CharField(read_only=True)
 
     class Meta:

@@ -190,6 +190,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://cloudtechstore.net",
     "https://www.cloudtechstore.net",
     "https://cloudtech-c4ft.onrender.com",
+    "http://localhost:3000",
 ]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
@@ -205,6 +206,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://cloudtechstore.net",
     "https://www.cloudtechstore.net",
     "https://cloudtech-c4ft.onrender.com",
+    "http://localhost:3000",
 ]
 
 
