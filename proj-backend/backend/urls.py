@@ -12,13 +12,13 @@ def health_check(request):
 urlpatterns = [
     path('', views.home, name='home'),
     path('admin/', admin.site.urls),
-    path('api/auth/', include('accounts.urls')),
+    #path('api/auth/', include('accounts.urls')),
     path('api/', include('products.urls')),
     path('api/', include('contact.urls')),
     path('api/', include('testimonials.urls')),  # ✅ correct
     path('api/repairs/', include('repairs.urls')),
     path('api/health', health_check, name='health'),
-    path('api/auth/', include('accounts.urls')),  # ← ONLY THIS
+    path('api/accounts/', include('accounts.urls')),  # ← ONLY THIS
 
 ]
 

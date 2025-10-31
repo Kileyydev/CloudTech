@@ -114,7 +114,7 @@ export default function AdminLogin() {
 
       const endpoints = [
         `${getApiBase().replace(/\/$/, '')}/health`,
-        `${getApiBase().replace(/\/$/, '')}/auth/login/`,
+        `${getApiBase().replace(/\/$/, '')}/accounts/login/`,
       ];
       try {
         await Promise.all(
@@ -139,7 +139,7 @@ export default function AdminLogin() {
     setIsWaking(true);
     try {
       const res = await fetchWithTimeoutRetry(
-        `${getApiBase()}/auth/login/`,
+        `${getApiBase()}/accounts/login/`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -185,7 +185,7 @@ export default function AdminLogin() {
     setLoading(true);
     try {
       const res = await fetchWithTimeoutRetry(
-        `${getApiBase()}/auth/verify-otp/`,
+        `${getApiBase()}/accounts/verify-otp/`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
