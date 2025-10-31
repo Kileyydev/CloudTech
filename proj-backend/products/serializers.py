@@ -1,4 +1,5 @@
-from rest_framework import serializers 
+from rest_framework import serializers
+from django.conf import settings
 from .models import Category, Brand, Tag, Product, ProductVariant, ProductImage
 
 
@@ -16,9 +17,20 @@ class BrandSerializer(serializers.ModelSerializer):
 
 
 class ProductImageSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = ProductImage
         fields = ['id', 'image', 'alt_text', 'is_primary', 'variant', 'uploaded_at']
+
+    def get_image(self, obj):
+        request = self.context.get('request')
+        # Build absolute image URL safely
+        if obj.image:
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return f"{getattr(settings, 'SITE_URL', '')}{obj.image.url}"
+        return None
 
 
 class ProductVariantSerializer(serializers.ModelSerializer):
@@ -36,7 +48,7 @@ class ProductListSerializer(serializers.ModelSerializer):
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
-    images = serializers.SerializerMethodField()
+    images = ProductImageSerializer(many=True, read_only=True)
     cover_image = serializers.SerializerMethodField()
     tags = serializers.SlugRelatedField(
         many=True, read_only=True, slug_field='name'
@@ -54,15 +66,11 @@ class ProductListSerializer(serializers.ModelSerializer):
     def get_cover_image(self, obj):
         request = self.context.get('request')
         if obj.cover_image:
-            return request.build_absolute_uri(obj.cover_image.url)
+            if request:
+                return request.build_absolute_uri(obj.cover_image.url)
+            # fallback to production base URL
+            return f"{getattr(settings, 'SITE_URL', '')}{obj.cover_image.url}"
         return None
-
-    def get_images(self, obj):
-        request = self.context.get('request')
-        return [
-            request.build_absolute_uri(img.image.url)
-            for img in obj.images.all() if img.image
-        ]
 
 
 # ---------- CREATE / UPDATE SERIALIZER ----------
@@ -155,7 +163,6 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                 tag_obj, _ = Tag.objects.get_or_create(name=tag_name)
                 instance.tags.add(tag_obj)
 
-        # Update new fields
         if colors is not None:
             instance.colors = colors
         if storage_options is not None:
@@ -182,7 +189,9 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             "tags": [tag.name for tag in instance.tags.all()],
             "is_active": instance.is_active,
             "is_featured": instance.is_featured,
-            "cover_image": instance.cover_image.url if instance.cover_image else None,
+            "cover_image": (
+                instance.cover_image.url if instance.cover_image else None
+            ),
             "price": instance.price,
             "final_price": instance.final_price,
             "stock": instance.stock,
