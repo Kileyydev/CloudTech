@@ -215,3 +215,32 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ADD THIS LINE
 APPEND_SLASH = False
+
+import os
+import environ
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
+
+# --------------------------
+# Cloudinary Configuration
+# --------------------------
+INSTALLED_APPS += [
+    'cloudinary',
+    'cloudinary_storage',
+]
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': env("CLOUDINARY_CLOUD_NAME"),
+    'API_KEY': env("CLOUDINARY_API_KEY"),
+    'API_SECRET': env("CLOUDINARY_API_SECRET"),
+}
+
+# Use Cloudinary for all media uploads
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+# Media URL (Cloudinary generates full URLs automatically)
+MEDIA_URL = '/'

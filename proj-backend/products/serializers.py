@@ -25,8 +25,8 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
     def get_image(self, obj):
         request = self.context.get('request')
-        # Build absolute image URL safely
         if obj.image:
+            # Cloudinary or local storage
             if request:
                 return request.build_absolute_uri(obj.image.url)
             return f"{getattr(settings, 'SITE_URL', '')}{obj.image.url}"
@@ -68,7 +68,6 @@ class ProductListSerializer(serializers.ModelSerializer):
         if obj.cover_image:
             if request:
                 return request.build_absolute_uri(obj.cover_image.url)
-            # fallback to production base URL
             return f"{getattr(settings, 'SITE_URL', '')}{obj.cover_image.url}"
         return None
 
@@ -189,9 +188,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             "tags": [tag.name for tag in instance.tags.all()],
             "is_active": instance.is_active,
             "is_featured": instance.is_featured,
-            "cover_image": (
-                instance.cover_image.url if instance.cover_image else None
-            ),
+            "cover_image": instance.cover_image.url if instance.cover_image else None,
             "price": instance.price,
             "final_price": instance.final_price,
             "stock": instance.stock,
@@ -200,4 +197,5 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             "storage_options": instance.storage_options or [],
             "condition_options": instance.condition_options or [],
             "features": instance.features or [],
+            "images": [img.image.url for img in instance.images.all() if img.image],
         }
