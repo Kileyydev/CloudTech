@@ -7,7 +7,6 @@ import UsersSection from "./components/UsersSection";
 import ProductsSection from "@/app/admin-dashboard/components/ProductSection";
 import DashboardSection from "./components/DashboardSection";
 import DiscountsSection from "./components/DiscountSection";
-import ContactsSection from "./components/ContactsSection";
 import TestimonialsAdminPage from "./components/TestimonialsSection";
 import AdminRepairsPage from "./components/RepairSection";
 
@@ -29,7 +28,6 @@ export default function AdminDashboardPageComponent() {
         {activeSection === "dashboard" && <DashboardSection />}
         {activeSection === "products" && <ProductsSection />}
         {activeSection === "orders" && <Box>Orders content here...</Box>}
-        {activeSection === "contacts" && <ContactsSection />}
         {activeSection === "discounts" && <DiscountsSection />}
         {activeSection === "users" && <UsersSection />}
         {activeSection === "testimonials" && <TestimonialsAdminPage />}

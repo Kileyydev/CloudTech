@@ -28,13 +28,24 @@ import MainNavBar from '@/app/components/MainNavBar';
 /*  API BASE & FETCH HELPERS (unchanged from your original file)      */
 /* ------------------------------------------------------------------ */
 const getApiBase = () => {
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host.includes('localhost') || host.includes('127.0.0.1'))
-      return 'http://localhost:8000/api';
+  if (typeof window === 'undefined') {
     return process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.cloudtechstore.net/api';
   }
-  return process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.cloudtechstore.net/api';
+
+  const host = window.location.hostname;
+
+  // Dev: localhost
+  if (host.includes('localhost') || host.includes('127.0.0.1')) {
+    return 'http://localhost:8000/api';
+  }
+
+  // Preview: Vercel
+  if (host.includes('vercel.app')) {
+    return 'https://api.cloudtechstore.net/api';
+  }
+
+  // Production: cloudtechstore.net
+  return 'https://api.cloudtechstore.net/api';
 };
 const API_BASE = getApiBase();
 
