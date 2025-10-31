@@ -208,7 +208,7 @@ export default function SmartphoneRepairPage() {
         </Snackbar>
       </Box>
 
-      <Footer />
+
     </>
   );
 }

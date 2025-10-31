@@ -141,8 +141,6 @@ export default function TestimonialsPage() {
         </Card>
       </Box>
 
-      <Footer />
-
       <Snackbar open={snack.open} onClose={() => setSnack((s) => ({ ...s, open: false }))} autoHideDuration={4000}>
         <Alert severity={snack.severity}>{snack.msg}</Alert>
       </Snackbar>

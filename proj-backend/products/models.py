@@ -49,26 +49,23 @@ class Product(models.Model):
     slug = models.SlugField(max_length=300, unique=True, blank=True)
     description = models.TextField(blank=True)
 
-    categories = models.ManyToManyField(Category, related_name='products', blank=True)
-    brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, related_name='products')
-    tags = models.ManyToManyField(Tag, blank=True, related_name='products')
+    categories = models.ManyToManyField('Category', related_name='products', blank=True)
+    brand = models.ForeignKey('Brand', on_delete=models.SET_NULL, null=True, related_name='products')
+    tags = models.ManyToManyField('Tag', blank=True, related_name='products')
 
-    # ✅ Cover image (chosen by user)
+    # ✅ Cloudinary automatically stores this
     cover_image = models.ImageField(upload_to='products/covers/', null=True, blank=True)
 
-    # ✅ Pricing and stock
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     stock = models.PositiveIntegerField(default=0)
     discount = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     final_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
-    # ✅ Extra frontend customization fields
-    colors = models.JSONField(blank=True, null=True, help_text='List of available colors')
-    storage_options = models.JSONField(blank=True, null=True, help_text='List of storage options')
-    condition_options = models.JSONField(blank=True, null=True, help_text='["New", "Refurbished"]')
-    features = models.JSONField(blank=True, null=True, help_text='List of product features')
+    colors = models.JSONField(blank=True, null=True)
+    storage_options = models.JSONField(blank=True, null=True)
+    condition_options = models.JSONField(blank=True, null=True)
+    features = models.JSONField(blank=True, null=True)
 
-    # ✅ Status flags
     is_active = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -106,7 +103,7 @@ class ProductVariant(models.Model):
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
-    sku = models.CharField(max_length=120, unique=True, help_text="Stock Keeping Unit")
+    sku = models.CharField(max_length=120, unique=True)
     color = models.CharField(max_length=80, blank=True, null=True)
     storage = models.CharField(max_length=80, blank=True, null=True)
     ram = models.CharField(max_length=80, blank=True, null=True)
@@ -129,13 +126,17 @@ class ProductVariant(models.Model):
 class ProductImage(models.Model):
     """
     Holds gallery images for each product (besides cover).
+    Cloudinary will handle hosting automatically.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
     variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name='images', null=True, blank=True)
+    
+    # ✅ This is now stored and served directly by Cloudinary
     image = models.ImageField(upload_to='products/images/')
+    
     alt_text = models.CharField(max_length=255, blank=True)
-    is_primary = models.BooleanField(default=False, help_text="If true, acts as cover image")
+    is_primary = models.BooleanField(default=False)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -145,12 +146,8 @@ class ProductImage(models.Model):
         return f"Image for {self.product.title}"
 
     def save(self, *args, **kwargs):
-        """
-        Automatically mark this image as cover_image if it's primary.
-        """
         super().save(*args, **kwargs)
-        if self.is_primary:
-            # Update product cover image automatically if marked primary
-            if self.product.cover_image != self.image:
-                self.product.cover_image = self.image
-                self.product.save()
+        # Automatically sync cover image if primary
+        if self.is_primary and self.product.cover_image != self.image:
+            self.product.cover_image = self.image
+            self.product.save()

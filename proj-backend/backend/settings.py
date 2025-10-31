@@ -2,6 +2,11 @@ import os
 from pathlib import Path
 import environ
 from corsheaders.defaults import default_headers
+from dotenv import load_dotenv
+
+# Load environment variables from .env
+load_dotenv()
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -48,7 +53,17 @@ INSTALLED_APPS = [
     "contact",
     "repairs",
     "testimonials",
+    "cloudinary",
+    "cloudinary_storage",
 ]
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
+    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
+}
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # -------------------------------------------------------------------------------------
 # MIDDLEWARE
@@ -199,6 +214,7 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

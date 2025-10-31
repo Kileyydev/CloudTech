@@ -39,7 +39,7 @@ interface LinkIconButtonProps extends IconButtonProps {
 }
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
-  backgroundColor: '#FFFFFF',
+  background: 'linear-gradient(180deg, #fff 40%, #9a979fff 100%)',backgroundColor: '#FFFFFF',
   boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
   padding: theme.spacing(0.75),
   display: 'flex',

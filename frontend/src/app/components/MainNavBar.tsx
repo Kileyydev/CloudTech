@@ -30,7 +30,7 @@ const NavContainer = styled(Box)(({ theme }) => ({
   justifyContent: 'center',
   alignItems: 'center',
   padding: theme.spacing(1),
-  backgroundColor: '#FFFFFF',
+  background: 'linear-gradient(180deg, #9a979fff 40%, #9a979fff 100%)',
   [theme.breakpoints.up('lg')]: {
     flexDirection: 'row',
     padding: theme.spacing(1.5, 3),
