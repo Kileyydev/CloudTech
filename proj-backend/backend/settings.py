@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env
 load_dotenv()
 
-
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables
@@ -57,11 +57,26 @@ INSTALLED_APPS = [
     "django_filters",
 ]
 
+# --------------------------
+# Cloudinary Configuration
+# --------------------------
+INSTALLED_APPS += [
+    'cloudinary',
+    'cloudinary_storage',
+]
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': env("CLOUDINARY_CLOUD_NAME"),
+    'API_KEY': env("CLOUDINARY_API_KEY"),
+    'API_SECRET': env("CLOUDINARY_API_SECRET"),
+}
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+MEDIA_URL = '/'
 
 # -------------------------------------------------------------------------------------
 # MIDDLEWARE
 # -------------------------------------------------------------------------------------
-# ✅ Order matters: CorsMiddleware must be above CommonMiddleware
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",  # must be above CommonMiddleware
@@ -100,13 +115,13 @@ WSGI_APPLICATION = "backend.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "neondb",
-        "USER": "neondb_owner",
-        "PASSWORD": "npg_i6HWNMPIJfb7",
-        "HOST": "ep-holy-silence-adqn8djl-pooler.c-2.us-east-1.aws.neon.tech",
-        "PORT": "5432",
-        "OPTIONS": {"sslmode": "require"},
+"ENGINE": "django.db.backends.postgresql",
+"NAME": "neondb",
+"USER": "neondb_owner",
+"PASSWORD": "npg_i6HWNMPIJfb7",
+"HOST": "ep-holy-silence-adqn8djl-pooler.c-2.us-east-1.aws.neon.tech",
+"PORT": "5432",
+"OPTIONS": {"sslmode": "require"},
     }
 }
 
@@ -135,8 +150,8 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),        # 2 HOURS
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),        # 7 DAYS
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
@@ -173,7 +188,6 @@ CORS_ALLOWED_ORIGINS = [
     "https://cloud-tech-eta.vercel.app",
     "https://www.cloudtechstore.net",
     "https://cloudtechstore.net",
-    "https://admin.cloudtechstore.net"
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -183,7 +197,6 @@ CSRF_TRUSTED_ORIGINS = [
     "https://www.cloudtechstore.net",
     "https://cloudtechstore.net",
     "https://api.cloudtechstore.net",
-    "https://admin.cloudtechstore.net",
 ]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
@@ -242,37 +255,7 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ADD THIS LINE
+# Prevent trailing slash issues
 APPEND_SLASH = False
-
-import os
-import environ
-from pathlib import Path
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-env = environ.Env()
-environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
-
-# --------------------------
-# Cloudinary Configuration
-# --------------------------
-INSTALLED_APPS += [
-    'cloudinary',
-    'cloudinary_storage',
-]
-
-CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': env("CLOUDINARY_CLOUD_NAME"),
-    'API_KEY': env("CLOUDINARY_API_KEY"),
-    'API_SECRET': env("CLOUDINARY_API_SECRET"),
-}
-
-# Use Cloudinary for all media uploads
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-
-# Media URL (Cloudinary generates full URLs automatically)
-MEDIA_URL = '/'
