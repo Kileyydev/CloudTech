@@ -38,12 +38,12 @@ const CACHE_TIME = 15 * 60 * 1000;
 const API_BASE =
   process.env.NODE_ENV === 'development'
     ? 'http://localhost:8000/api'
-    : 'https://www.cloudtechstore.net/api';
+    : 'https://cloudtech-c4ft.onrender.com/api';
 
 const MEDIA_BASE =
   process.env.NODE_ENV === 'development'
     ? 'http://localhost:8000'
-    : 'https://www.cloudtechstore.net';
+    : 'https://cloudtech-c4ft.onrender.com';
 
 const API_FEATURED = `${API_BASE}/products/?is_featured=true`;
 
