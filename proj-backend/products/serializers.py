@@ -36,7 +36,8 @@ class ProductListSerializer(serializers.ModelSerializer):
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
     variants = ProductVariantSerializer(many=True, read_only=True)
-    images = ProductImageSerializer(many=True, read_only=True)
+    images = serializers.SerializerMethodField()
+    cover_image = serializers.SerializerMethodField()
     tags = serializers.SlugRelatedField(
         many=True, read_only=True, slug_field='name'
     )
@@ -48,6 +49,19 @@ class ProductListSerializer(serializers.ModelSerializer):
             'tags', 'is_active', 'is_featured', 'cover_image',
             'variants', 'images', 'created_at', 'price', 'stock', 'discount',
             'final_price', 'colors', 'storage_options', 'condition_options', 'features'
+        ]
+
+    def get_cover_image(self, obj):
+        request = self.context.get('request')
+        if obj.cover_image:
+            return request.build_absolute_uri(obj.cover_image.url)
+        return None
+
+    def get_images(self, obj):
+        request = self.context.get('request')
+        return [
+            request.build_absolute_uri(img.image.url)
+            for img in obj.images.all() if img.image
         ]
 
 

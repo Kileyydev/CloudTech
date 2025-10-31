@@ -1,4 +1,3 @@
-# mysite/urls.py
 from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
@@ -10,22 +9,16 @@ def health_check(request):
     return JsonResponse({"status": "ok"})
 
 
-
 urlpatterns = [
     path('', views.home, name='home'),
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/', include('products.urls')),
     path('api/', include('contact.urls')),
-    #path('api/testimonials/', include('testimonials.urls')),
-    path('api/', include('testimonials.urls')),  # ✅ this line is key
+    path('api/', include('testimonials.urls')),  # ✅ correct
     path('api/repairs/', include('repairs.urls')),
     path('api/health', health_check, name='health'),
-
-    
-
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    
+# ✅ Serve media files in both development and production
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
