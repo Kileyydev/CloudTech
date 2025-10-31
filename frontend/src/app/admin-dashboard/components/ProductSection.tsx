@@ -13,10 +13,11 @@ import { Edit, Delete, AddPhotoAlternate, Image as ImageIcon } from "@mui/icons-
 import { getProductImageSrc } from "@/app/utils/image";
 import type { Product } from "@/app/types/products";
 
-const API_BASE = "http://localhost:8000/api/products/";
-const API_CATEGORIES = "http://localhost:8000/api/categories/";
-const API_BRANDS = "http://localhost:8000/api/brands/";
-const MEDIA_BASE = "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE + "/products/";
+const API_CATEGORIES = process.env.NEXT_PUBLIC_API_BASE + "/categories/";
+const API_BRANDS = process.env.NEXT_PUBLIC_API_BASE + "/brands/";
+const MEDIA_BASE = process.env.NEXT_PUBLIC_API_BASE;
+
 
 // === STYLED COMPONENTS ===
 const StyledPaper = styled(Paper)(({ theme }) => ({
