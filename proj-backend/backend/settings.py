@@ -187,7 +187,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://cloudtech-c4ft.vercel.app",
     "https://cloud-tech-eta.vercel.app",
     "https://www.cloudtechstore.net",
-    "https://cloudtechstore.net",
+    "https://cloudtechstore.net",  # ← ADD THIS
 ]
 
 CSRF_TRUSTED_ORIGINS = [
