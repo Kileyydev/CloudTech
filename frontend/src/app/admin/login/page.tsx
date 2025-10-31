@@ -27,17 +27,16 @@ import MainNavBar from '@/app/components/MainNavBar';
 /*  API BASE & FETCH HELPERS                                          */
 /* ------------------------------------------------------------------ */
 const getApiBase = () => {
-  if (typeof window === 'undefined') return '';
+  let base = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.cloudtechstore.net/api';
 
-  const host = window.location.hostname;
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
 
-  // DEV
-  if (host.includes('localhost') || host.includes('127.0.0.1')) {
-    return 'http://localhost:8000/api';
+    if (host.includes('localhost') || host.includes('127.0.0.1')) base = 'http://localhost:8000/api';
+    if (host.includes('vercel.app')) base = 'https://api.cloudtechstore.net/api';
   }
 
-  // PRODUCTION — USE RENDER URL
-  return 'https://cloudtech-c4ft.onrender.com/api';
+  return base.replace(/\/$/, ''); // <-- ensures no trailing slash
 };
 
 async function fetchWithTimeoutRetry(

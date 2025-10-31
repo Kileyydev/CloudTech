@@ -31,6 +31,13 @@ ALLOWED_HOSTS = [
     "cloudtech-c4ft.vercel.app",
 ]
 
+ALLOWED_HOSTS = [
+    'cloudtech-c4ft.onrender.com',
+    'api.cloudtechstore.net',  # if you use a subdomain for API
+    'localhost',
+]
+
+
 # -------------------------------------------------------------------------------------
 # INSTALLED APPS
 # -------------------------------------------------------------------------------------
