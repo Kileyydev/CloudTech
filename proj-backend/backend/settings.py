@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework_simplejwt",
 
     # Third-party
     "rest_framework",
@@ -127,6 +128,35 @@ REST_FRAMEWORK = {
     ],
 }
 
+# -------------------------------------------------------------------------------------
+# SIMPLE JWT – 2 HOUR ACCESS TOKEN + 7 DAY REFRESH
+# -------------------------------------------------------------------------------------
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=2),        # 2 HOURS
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),        # 7 DAYS
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
+    'AUDIENCE': None,
+    'ISSUER': None,
+
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+    'JTI_CLAIM': 'jti',
+}
+
 AUTH_USER_MODEL = "accounts.User"
 
 # -------------------------------------------------------------------------------------
@@ -143,6 +173,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://cloud-tech-eta.vercel.app",
     "https://www.cloudtechstore.net",
     "https://cloudtechstore.net",
+    "https://admin.cloudtechstore.net"
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -152,6 +183,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://www.cloudtechstore.net",
     "https://cloudtechstore.net",
     "https://api.cloudtechstore.net",
+    "https://admin.cloudtechstore.net",
 ]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [

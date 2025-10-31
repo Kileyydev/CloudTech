@@ -1,9 +1,10 @@
+# products/serializers.py
 from rest_framework import serializers
 from django.conf import settings
 from .models import Category, Brand, Tag, Product, ProductVariant, ProductImage
 
 
-# ---------- BASIC SERIALIZERS ----------
+# ---------- BASIC ----------
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
@@ -21,12 +22,11 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ProductImage
-        fields = ['id', 'image', 'alt_text', 'is_primary', 'variant', 'uploaded_at']
+        fields = ['id', 'image', 'alt_text', 'is_primary']
 
     def get_image(self, obj):
         request = self.context.get('request')
         if obj.image:
-            # Cloudinary or local storage
             if request:
                 return request.build_absolute_uri(obj.image.url)
             return f"{getattr(settings, 'SITE_URL', '')}{obj.image.url}"
@@ -38,29 +38,25 @@ class ProductVariantSerializer(serializers.ModelSerializer):
         model = ProductVariant
         fields = [
             'id', 'sku', 'color', 'storage', 'ram', 'processor',
-            'size', 'price', 'compare_at_price', 'stock',
-            'is_active', 'created_at'
+            'size', 'price', 'compare_at_price', 'stock', 'is_active'
         ]
 
 
-# ---------- LIST / VIEW SERIALIZER ----------
+# ---------- LIST / DETAIL ----------
 class ProductListSerializer(serializers.ModelSerializer):
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
-    variants = ProductVariantSerializer(many=True, read_only=True)
-    images = ProductImageSerializer(many=True, read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True)  # ← REMOVED source='images'
     cover_image = serializers.SerializerMethodField()
-    tags = serializers.SlugRelatedField(
-        many=True, read_only=True, slug_field='name'
-    )
+    tags = serializers.SlugRelatedField(many=True, read_only=True, slug_field='name')
 
     class Meta:
         model = Product
         fields = [
-            'id', 'title', 'slug', 'description', 'brand', 'categories',
-            'tags', 'is_active', 'is_featured', 'cover_image',
-            'variants', 'images', 'created_at', 'price', 'stock', 'discount',
-            'final_price', 'colors', 'storage_options', 'condition_options', 'features'
+            'id', 'title', 'slug', 'description', 'brand', 'categories', 'tags',
+            'cover_image', 'images', 'price', 'stock', 'discount', 'final_price',
+            'is_active', 'is_featured', 'colors', 'storage_options',
+            'condition_options', 'features', 'created_at'
         ]
 
     def get_cover_image(self, obj):
@@ -72,130 +68,92 @@ class ProductListSerializer(serializers.ModelSerializer):
         return None
 
 
-# ---------- CREATE / UPDATE SERIALIZER ----------
+# ---------- CREATE / UPDATE ----------
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
-    brand = serializers.CharField()
-    categories = serializers.ListField(child=serializers.CharField(), required=True)
-    tags = serializers.ListField(child=serializers.CharField(), required=False)
-    colors = serializers.ListField(child=serializers.CharField(), required=False)
-    storage_options = serializers.ListField(child=serializers.CharField(), required=False)
-    condition_options = serializers.ListField(child=serializers.CharField(), required=False)
-    features = serializers.ListField(child=serializers.CharField(), required=False)
+    # Write-only
+    brand_id = serializers.PrimaryKeyRelatedField(
+        queryset=Brand.objects.all(), source='brand', write_only=True
+    )
+    category_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(), many=True, write_only=True
+    )
+    tag_names = serializers.ListField(
+        child=serializers.CharField(max_length=60), write_only=True, required=False
+    )
+    cover_image = serializers.ImageField(write_only=True, required=False)
+    gallery = serializers.ListField(
+        child=serializers.ImageField(), write_only=True, required=False
+    )
+
+    # Read-only
+    brand = BrandSerializer(read_only=True)
+    categories = CategorySerializer(many=True, read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True)  # ← REMOVED source='images'
 
     class Meta:
         model = Product
         fields = [
-            'id', 'title', 'slug', 'description', 'brand', 'categories',
-            'tags', 'is_active', 'is_featured', 'cover_image',
-            'price', 'stock', 'discount', 'final_price',
-            'colors', 'storage_options', 'condition_options', 'features'
+            'id', 'title', 'description', 'price', 'stock', 'discount',
+            'final_price', 'is_active', 'is_featured', 'colors',
+            'storage_options', 'condition_options', 'features',
+            'brand', 'brand_id', 'categories', 'category_ids',
+            'tag_names', 'cover_image', 'gallery', 'images'
         ]
-        read_only_fields = ['slug', 'final_price']
+        read_only_fields = ['final_price', 'id']
 
+    # CREATE
     def create(self, validated_data):
-        brand_val = validated_data.pop('brand')
-        categories_val = validated_data.pop('categories', [])
-        tag_names = validated_data.pop('tags', [])
-        colors = validated_data.pop('colors', [])
-        storage_options = validated_data.pop('storage_options', [])
-        condition_options = validated_data.pop('condition_options', [])
-        features = validated_data.pop('features', [])
+        category_ids = validated_data.pop('category_ids', [])
+        tag_names = validated_data.pop('tag_names', [])
+        cover_file = validated_data.pop('cover_image', None)
+        gallery_files = validated_data.pop('gallery', [])
 
-        # Handle brand
-        try:
-            brand_obj = Brand.objects.get(id=int(brand_val))
-        except (ValueError, Brand.DoesNotExist):
-            brand_obj, _ = Brand.objects.get_or_create(name=brand_val)
+        product = Product.objects.create(**validated_data)
+        product.categories.set(category_ids)
 
-        product = Product.objects.create(
-            brand=brand_obj,
-            colors=colors,
-            storage_options=storage_options,
-            condition_options=condition_options,
-            features=features,
-            **validated_data
-        )
+        for name in tag_names:
+            tag, _ = Tag.objects.get_or_create(name=name)
+            product.tags.add(tag)
 
-        # Handle categories
-        for val in categories_val:
-            try:
-                cat_obj = Category.objects.get(id=int(val))
-            except (ValueError, Category.DoesNotExist):
-                cat_obj, _ = Category.objects.get_or_create(name=val)
-            product.categories.add(cat_obj)
+        if cover_file:
+            product.cover_image = cover_file
 
-        # Handle tags
-        for t in tag_names:
-            tag_obj, _ = Tag.objects.get_or_create(name=t)
-            product.tags.add(tag_obj)
+        for img in gallery_files:
+            ProductImage.objects.create(product=product, image=img)
 
+        product.final_price = self._calc_final_price(product)
+        product.save()
         return product
 
+    # UPDATE
     def update(self, instance, validated_data):
-        brand_val = validated_data.pop('brand', None)
-        categories_val = validated_data.pop('categories', None)
-        tag_names = validated_data.pop('tags', None)
-        colors = validated_data.pop('colors', None)
-        storage_options = validated_data.pop('storage_options', None)
-        condition_options = validated_data.pop('condition_options', None)
-        features = validated_data.pop('features', None)
-
-        if brand_val:
-            try:
-                brand_obj = Brand.objects.get(id=int(brand_val))
-            except (ValueError, Brand.DoesNotExist):
-                brand_obj, _ = Brand.objects.get_or_create(name=brand_val)
-            instance.brand = brand_obj
-
-        if categories_val is not None:
-            instance.categories.clear()
-            for val in categories_val:
-                try:
-                    cat_obj = Category.objects.get(id=int(val))
-                except (ValueError, Category.DoesNotExist):
-                    cat_obj, _ = Category.objects.get_or_create(name=val)
-                instance.categories.add(cat_obj)
-
-        if tag_names is not None:
-            instance.tags.clear()
-            for tag_name in tag_names:
-                tag_obj, _ = Tag.objects.get_or_create(name=tag_name)
-                instance.tags.add(tag_obj)
-
-        if colors is not None:
-            instance.colors = colors
-        if storage_options is not None:
-            instance.storage_options = storage_options
-        if condition_options is not None:
-            instance.condition_options = condition_options
-        if features is not None:
-            instance.features = features
+        category_ids = validated_data.pop('category_ids', None)
+        tag_names = validated_data.pop('tag_names', None)
+        cover_file = validated_data.pop('cover_image', None)
+        gallery_files = validated_data.pop('gallery', None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
+        if category_ids is not None:
+            instance.categories.set(category_ids)
+        if tag_names is not None:
+            instance.tags.clear()
+            for name in tag_names:
+                tag, _ = Tag.objects.get_or_create(name=name)
+                instance.tags.add(tag)
+        if cover_file:
+            instance.cover_image = cover_file
+        if gallery_files is not None:
+            instance.images.all().delete()
+            for img in gallery_files:
+                ProductImage.objects.create(product=instance, image=img)
+
+        instance.final_price = self._calc_final_price(instance)
         instance.save()
         return instance
 
-    def to_representation(self, instance):
-        return {
-            "id": instance.id,
-            "title": instance.title,
-            "slug": instance.slug,
-            "description": instance.description,
-            "brand": {"name": instance.brand.name} if instance.brand else None,
-            "categories": [{"name": c.name} for c in instance.categories.all()],
-            "tags": [tag.name for tag in instance.tags.all()],
-            "is_active": instance.is_active,
-            "is_featured": instance.is_featured,
-            "cover_image": instance.cover_image.url if instance.cover_image else None,
-            "price": instance.price,
-            "final_price": instance.final_price,
-            "stock": instance.stock,
-            "discount": instance.discount,
-            "colors": instance.colors or [],
-            "storage_options": instance.storage_options or [],
-            "condition_options": instance.condition_options or [],
-            "features": instance.features or [],
-            "images": [img.image.url for img in instance.images.all() if img.image],
-        }
+    def _calc_final_price(self, obj):
+        if obj.discount and obj.discount > 0:
+            return obj.price - (obj.price * obj.discount) / 100
+        return obj.price
