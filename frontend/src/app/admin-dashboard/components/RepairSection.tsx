@@ -18,7 +18,7 @@ import {
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 
-const API_BASE = "http://localhost:8000/api/repairs/";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE + "/repairs/";
 
 type RepairT = {
   id: number;

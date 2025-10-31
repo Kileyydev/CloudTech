@@ -19,7 +19,7 @@ type TestimonialT = {
   created_at: string;
 };
 
-const API_BASE = "http://localhost:8000/api/testimonials/";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE + "/testimonials/";
 
 export default function TestimonialsAdminPage() {
   const [items, setItems] = useState<TestimonialT[]>([]);
