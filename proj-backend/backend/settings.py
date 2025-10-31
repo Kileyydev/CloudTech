@@ -184,26 +184,12 @@ AUTH_USER_MODEL = "accounts.User"
 # -------------------------------------------------------------------------------------
 # CORS & CSRF
 # -------------------------------------------------------------------------------------
-
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://cloudtech-c4ft.onrender.com",
-    "https://cloudtech-c4ft.vercel.app",
-    "https://cloud-tech-eta.vercel.app",
-    "https://www.cloudtechstore.net",
-    "https://cloudtechstore.net",  # ← ADD THIS
-]
 
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "https://cloudtech-c4ft.onrender.com",
-    "https://cloudtech-c4ft.vercel.app",
-    "https://www.cloudtechstore.net",
+CORS_ALLOWED_ORIGINS = [
     "https://cloudtechstore.net",
-    "https://api.cloudtechstore.net",
+    "https://www.cloudtechstore.net",
+    "https://cloudtech-c4ft.onrender.com",
 ]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
@@ -215,8 +201,12 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 CORS_ALLOW_METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"]
 CORS_URLS_REGEX = r"^/api/.*$"
 
-# Render-specific fix for proxy SSL headers
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_TRUSTED_ORIGINS = [
+    "https://cloudtechstore.net",
+    "https://www.cloudtechstore.net",
+    "https://cloudtech-c4ft.onrender.com",
+]
+
 
 # -------------------------------------------------------------------------------------
 # EMAIL (SENDGRID)
@@ -265,4 +255,4 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Prevent trailing slash issues
-APPEND_SLASH = False
+APPEND_SLASH = True
