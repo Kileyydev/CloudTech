@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -18,14 +18,13 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useRouter } from 'next/navigation';
 
 /* ------------------------------------------------------------------ */
-/*  Imports – Navigation & Footer (replace with your real components) */
+/*  Navigation & Footer (CLIENT-ONLY FIX FOR HYDRATION)               */
 /* ------------------------------------------------------------------ */
 import TopNavBar from '@/app/components/TopNavBar';
 import MainNavBar from '@/app/components/MainNavBar';
 
-
 /* ------------------------------------------------------------------ */
-/*  API BASE & FETCH HELPERS (unchanged from your original file)      */
+/*  API BASE & FETCH HELPERS                                          */
 /* ------------------------------------------------------------------ */
 const getApiBase = () => {
   if (typeof window === 'undefined') {
@@ -47,7 +46,6 @@ const getApiBase = () => {
   // Production: cloudtechstore.net
   return 'https://api.cloudtechstore.net/api';
 };
-const API_BASE = getApiBase();
 
 async function fetchWithTimeoutRetry(
   input: RequestInfo | URL,
@@ -81,6 +79,9 @@ async function fetchWithTimeoutRetry(
 export default function AdminLogin() {
   const router = useRouter();
 
+  // HYDRATION FIX: Prevent server-client mismatch
+  const [mounted, setMounted] = useState(false);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -99,9 +100,12 @@ export default function AdminLogin() {
     setSnackbar({ open: true, text, severity });
   const closeSnack = () => setSnackbar((s) => ({ ...s, open: false }));
 
-  /* -------------------------------------------------------------- */
-  /*  Warm backend (same as original)                              */
-  /* -------------------------------------------------------------- */
+  // MOUNTED FIX: Only render navbars after client mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Warm backend (unchanged)
   useEffect(() => {
     const warm = async () => {
       const KEY = 'api_warm_until';
@@ -109,8 +113,8 @@ export default function AdminLogin() {
       if (Date.now() < until) return;
 
       const endpoints = [
-        `${API_BASE.replace(/\/$/, '')}/health`,
-        `${API_BASE.replace(/\/$/, '')}/auth/login/`,
+        `${getApiBase().replace(/\/$/, '')}/health`,
+        `${getApiBase().replace(/\/$/, '')}/auth/login/`,
       ];
       try {
         await Promise.all(
@@ -128,9 +132,6 @@ export default function AdminLogin() {
     return () => clearInterval(interval);
   }, []);
 
-  /* -------------------------------------------------------------- */
-  /*  Login / OTP Handlers (unchanged logic, just tiny UI tweaks)   */
-  /* -------------------------------------------------------------- */
   const handleLogin = async () => {
     if (!email || !password) return openSnack('Enter email and password', 'error');
 
@@ -138,7 +139,7 @@ export default function AdminLogin() {
     setIsWaking(true);
     try {
       const res = await fetchWithTimeoutRetry(
-        `${API_BASE}/auth/login/`,
+        `${getApiBase()}/auth/login/`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -184,7 +185,7 @@ export default function AdminLogin() {
     setLoading(true);
     try {
       const res = await fetchWithTimeoutRetry(
-        `${API_BASE}/auth/verify-otp/`,
+        `${getApiBase()}/auth/verify-otp/`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -220,23 +221,24 @@ export default function AdminLogin() {
     if (e.key === 'Enter') otpStep ? handleOtpVerify() : handleLogin();
   };
 
-  /* -------------------------------------------------------------- */
-  /*  UI – Card matching Apple-Products style                       */
-  /* -------------------------------------------------------------- */
+  // HYDRATION FIX: Show loading until mounted
+  if (!mounted) {
+    return (
+      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#fafafa' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <>
-      {/* ---------------------------------------------------------- */}
-      {/*  Navigation bars (keeps page from feeling empty)           */}
-      {/* ---------------------------------------------------------- */}
+      {/* CLIENT-ONLY NAVBARS (FIXES HYDRATION ERROR) */}
       <TopNavBar />
       <MainNavBar />
 
-      {/* ---------------------------------------------------------- */}
-      {/*  Main content – centered card                               */}
-      {/* ---------------------------------------------------------- */}
       <Box
         sx={{
-          minHeight: 'calc(100vh - 180px)', // space for nav + footer
+          minHeight: 'calc(100vh - 180px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -244,6 +246,7 @@ export default function AdminLogin() {
           py: { xs: 2, md: 4 },
           px: { xs: 2, sm: 3 },
         }}
+        onKeyDown={onKeyDown}
       >
         <Box
           sx={{
@@ -255,17 +258,11 @@ export default function AdminLogin() {
             transition: 'transform 0.2s',
             '&:hover': { transform: 'translateY(-4px)' },
           }}
-          onKeyDown={onKeyDown}
         >
-          {/* Title */}
-          <Typography
-            variant="h5"
-            sx={{ mb: 3, fontWeight: 700, color: '#222', textAlign: 'center' }}
-          >
+          <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: '#222', textAlign: 'center' }}>
             Admin Login
           </Typography>
 
-          {/* Waking skeleton */}
           {isWaking && (
             <Box sx={{ mb: 2 }}>
               <Skeleton height={56} sx={{ mb: 1 }} />
@@ -273,9 +270,7 @@ export default function AdminLogin() {
             </Box>
           )}
 
-          {/* ------------------------------------------------------ */}
-          {/*  Email / Password step                                 */}
-          {/* ------------------------------------------------------ */}
+          {/* EMAIL/PASSWORD STEP */}
           {!otpStep && !isWaking && (
             <>
               <TextField
@@ -303,11 +298,7 @@ export default function AdminLogin() {
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword((s) => !s)}
-                        edge="end"
-                        disabled={loading}
-                      >
+                      <IconButton onClick={() => setShowPassword((s) => !s)} edge="end" disabled={loading}>
                         {showPassword ? <VisibilityOff /> : <Visibility />}
                       </IconButton>
                     </InputAdornment>
@@ -348,9 +339,7 @@ export default function AdminLogin() {
             </>
           )}
 
-          {/* ------------------------------------------------------ */}
-          {/*  OTP step                                             */}
-          {/* ------------------------------------------------------ */}
+          {/* OTP STEP */}
           {otpStep && !isWaking && (
             <>
               <Typography variant="body2" sx={{ mb: 1, color: '#555' }}>

@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/', include('testimonials.urls')),  # ✅ correct
     path('api/repairs/', include('repairs.urls')),
     path('api/health', health_check, name='health'),
+    path('api/auth/', include('rest_framework_simplejwt.urls')),  # ADD THIS
 ]
 
 # ✅ Serve media files in both development and production
