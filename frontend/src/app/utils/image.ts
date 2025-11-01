@@ -1,5 +1,5 @@
 // utils/image.ts
-export const MEDIA_BASE = "http://localhost:8000";
+export const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || "http://localhost:8000";
 
 export const getProductImageSrc = (p: {
   cover_image?: string;

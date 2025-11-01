@@ -16,7 +16,7 @@ import type { Product } from "@/app/types/products";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE + "/products/";
 const API_CATEGORIES = process.env.NEXT_PUBLIC_API_BASE + "/categories/";
 const API_BRANDS = process.env.NEXT_PUBLIC_API_BASE + "/brands/";
-const MEDIA_BASE = process.env.NEXT_PUBLIC_API_BASE;
+const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || process.env.NEXT_PUBLIC_API_BASE;
 
 
 // === STYLED COMPONENTS ===
