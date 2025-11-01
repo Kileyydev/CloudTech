@@ -42,7 +42,6 @@ import {
   LocalShipping,
   CreditCard,
   AttachMoney,
-  Download,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { useRouter } from 'next/navigation';
@@ -80,7 +79,6 @@ const GradientButton = styled(Button)(({ theme }) => ({
   },
 }));
 
-// Sample trending products
 const trendingProducts = [
   { id: 1, title: 'iPhone 15 Pro', price: 140000, image: '/images/iphone15.jpg' },
   { id: 2, title: 'AirPods Pro 2', price: 35000, image: '/images/airpods.jpg' },
@@ -166,28 +164,15 @@ export default function CartPage() {
     return true;
   };
 
-  const generatePDF = async () => {
+  const generatePDF = async (orderId: string) => {
     if (!pdfRef.current) return;
     const canvas = await html2canvas(pdfRef.current);
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF();
     const imgWidth = 190;
-    const pageHeight = 295;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 10;
-
-    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-
-    while (heightLeft >= 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-    }
-
-    pdf.save(`CloudTech_Order_${Date.now()}.pdf`);
+    pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+    pdf.save(`CloudTech_${orderId}.pdf`);
   };
 
   const handleCheckout = async () => {
@@ -200,11 +185,53 @@ export default function CartPage() {
     setIsProcessing(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      showSnackbar('Order placed successfully!', 'success');
+      // Generate Order ID
+      const orderId = `CT${Date.now().toString().slice(-8)}`;
+
+      // Prepare Order
+      const order = {
+        id: orderId,
+        date: new Date().toISOString(),
+        name: checkoutDetails.name,
+        phone: checkoutDetails.phone,
+        email: checkoutDetails.email,
+        address: checkoutDetails.address,
+        city: checkoutDetails.city,
+        postalCode: checkoutDetails.postalCode,
+        payment: paymentMethod,
+        mpesaCode: checkoutDetails.mpesaCode,
+        cashAmount: cashPaid,
+        change: change,
+        items: Object.values(cart),
+        subtotal,
+        shipping,
+        total,
+        status: 'received' as const,
+      };
+
+      // Save to localStorage
+      const existingOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+      localStorage.setItem('orders', JSON.stringify([order, ...existingOrders]));
+
+      // Clear cart
       clearCart();
-      setTimeout(generatePDF, 500);
-      router.push('/order-confirmation');
+
+      // Generate PDF
+      await generatePDF(orderId);
+
+      // Redirect with query params
+      const params = new URLSearchParams({
+        name: order.name,
+        phone: order.phone,
+        address: order.address,
+        city: order.city,
+        payment: order.payment,
+        cash: order.cashAmount.toString(),
+        change: order.change.toString(),
+      });
+
+      showSnackbar('Order placed successfully!', 'success');
+      router.push(`/order-confirmation?${params.toString()}`);
     } catch (err) {
       showSnackbar('Order failed. Please try again.', 'error');
     } finally {
@@ -227,13 +254,7 @@ export default function CartPage() {
             Your Shopping Cart
           </Typography>
 
-          {/* MAIN LAYOUT: Stack (replaces Grid) */}
-          <Stack
-            direction={{ xs: 'column', lg: 'row' }}
-            spacing={4}
-            alignItems="flex-start"
-          >
-
+          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={4} alignItems="flex-start">
             {/* CART TABLE */}
             <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 65%' } }}>
               {Object.values(cart).length === 0 ? (
@@ -338,7 +359,6 @@ export default function CartPage() {
                     </RadioGroup>
                   </FormControl>
 
-                  {/* Pay After Delivery */}
                   <Collapse in={paymentMethod === 'cod'}>
                     <Box sx={{ mt: 2, p: 2, bgcolor: '#e8f5e8', borderRadius: 2, border: '1px solid #4caf50' }}>
                       <Typography fontWeight={600} gutterBottom>
@@ -357,13 +377,12 @@ export default function CartPage() {
                       />
                       {change > 0 && (
                         <Alert severity="success" sx={{ mt: 1 }}>
-                          Change: <strong>KES {change.toLocaleString()}</strong> (rider will bring)
+                          Change: <strong>KES {change.toLocaleString()}</strong>
                         </Alert>
                       )}
                     </Box>
                   </Collapse>
 
-                  {/* Paybill Info */}
                   <Collapse in={paymentMethod === 'paybill'}>
                     <Box sx={{ mt: 2, p: 2, bgcolor: '#fff8e1', borderRadius: 2 }}>
                       <Typography fontWeight={600}>Paybill: 247247</Typography>
@@ -372,7 +391,6 @@ export default function CartPage() {
                     </Box>
                   </Collapse>
 
-                  {/* Withdraw Info */}
                   <Collapse in={paymentMethod === 'withdraw'}>
                     <Box sx={{ mt: 2, p: 2, bgcolor: '#e3f2fd', borderRadius: 2 }}>
                       <Typography fontWeight={600}>Agent: 2065355</Typography>
@@ -401,40 +419,28 @@ export default function CartPage() {
             </Box>
           </Stack>
 
-          {/* WHAT OTHERS ARE BUYING – Horizontal Scroll */}
+          {/* TRENDING */}
           <Box sx={{ mt: 8 }}>
             <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: '#db1b88' }}>
               Others Are Buying
             </Typography>
-
-            <Box
-              sx={{
-                display: 'flex',
-                gap: 2,
-                overflowX: 'auto',
-                pb: 2,
-                '&::-webkit-scrollbar': { height: 8 },
-                '&::-webkit-scrollbar-thumb': { bgcolor: '#db1b88', borderRadius: 4 },
-              }}
-            >
+            <Box sx={{
+              display: 'flex',
+              gap: 2,
+              overflowX: 'auto',
+              pb: 2,
+              '&::-webkit-scrollbar': { height: 8 },
+              '&::-webkit-scrollbar-thumb': { bgcolor: '#db1b88', borderRadius: 4 },
+            }}>
               {trendingProducts.map((product) => (
-                <Card
-                  key={product.id}
-                  sx={{
-                    minWidth: 200,
-                    borderRadius: 3,
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
-                    transition: '0.3s',
-                    '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' },
-                  }}
-                >
-                  <CardMedia
-                    component="img"
-                    height="120"
-                    image={product.image}
-                    alt={product.title}
-                    sx={{ objectFit: 'cover' }}
-                  />
+                <Card key={product.id} sx={{
+                  minWidth: 200,
+                  borderRadius: 3,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                  transition: '0.3s',
+                  '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' },
+                }}>
+                  <CardMedia component="img" height="120" image={product.image} alt={product.title} sx={{ objectFit: 'cover' }} />
                   <CardContent>
                     <Typography variant="body2" noWrap>{product.title}</Typography>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
@@ -449,32 +455,49 @@ export default function CartPage() {
             </Box>
           </Box>
 
-          {/* Hidden PDF Template */}
+          {/* HIDDEN PDF TEMPLATE */}
           <Box sx={{ position: 'absolute', left: '-9999px' }} ref={pdfRef}>
-            <Box sx={{ p: 4, bgcolor: 'white', width: 600 }}>
-              <Typography variant="h4" align="center" gutterBottom>CloudTech Order</Typography>
-              <Typography align="center" color="text.secondary" gutterBottom>Order #{Date.now()}</Typography>
-              <Divider sx={{ my: 2 }} />
-              <Typography><strong>Name:</strong> {checkoutDetails.name}</Typography>
+            <Box sx={{ p: 8, bgcolor: '#fff', width: 600, fontFamily: 'Arial, sans-serif' }}>
+              <Box textAlign="center" mb={3}>
+                <img src="/cloudtech-logo.png" alt="CloudTech" style={{ height: 70 }} />
+              </Box>
+              <Typography variant="h4" align="center" gutterBottom sx={{ color: '#db1b88', fontWeight: 700 }}>
+                Order Receipt
+              </Typography>
+              <Typography align="center" color="text.secondary" gutterBottom>
+                Order ID: CT{Date.now().toString().slice(-8)}
+              </Typography>
+              <Divider sx={{ my: 3 }} />
+              <Typography><strong>Customer:</strong> {checkoutDetails.name}</Typography>
               <Typography><strong>Phone:</strong> {checkoutDetails.phone}</Typography>
-              <Typography><strong>Address:</strong> {checkoutDetails.address}, {checkoutDetails.city}</Typography>
+              <Typography><strong>Delivery:</strong> {checkoutDetails.address}, {checkoutDetails.city}</Typography>
               <Typography><strong>Payment:</strong> {paymentMethod === 'cod' ? 'Cash on Delivery' : paymentMethod.toUpperCase()}</Typography>
               {change > 0 && <Typography><strong>Change:</strong> KES {change.toLocaleString()}</Typography>}
-              <Divider sx={{ my: 2 }} />
-              {Object.values(cart).map((item) => (
+              <Divider sx={{ my: 3 }} />
+              {Object.values(cart).map((item: any) => (
                 <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                   <span>{item.title} × {item.quantity}</span>
                   <span>KES {(item.price * item.quantity).toLocaleString()}</span>
                 </Box>
               ))}
-              <Divider />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, mt: 1 }}>
+              <Divider sx={{ my: 2 }} />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                <span>Subtotal:</span>
+                <span>KES {subtotal.toLocaleString()}</span>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                <span>Shipping:</span>
+                <span>KES {shipping.toLocaleString()}</span>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, mt: 1, fontSize: '1.2rem', color: '#db1b88' }}>
                 <span>Total:</span>
                 <span>KES {total.toLocaleString()}</span>
               </Box>
-              <Typography align="center" sx={{ mt: 3, fontSize: 12, color: 'text.secondary' }}>
-                Thank you for shopping with CloudTech!
-              </Typography>
+              <Box textAlign="center" mt={5} sx={{ fontSize: 12, color: '#888' }}>
+                <Typography>Thank you for shopping with</Typography>
+                <Typography fontWeight={700} sx={{ color: '#db1b88' }}>CloudTech</Typography>
+                <Typography>Kenya Cinema Building, Moi Avenue, Nairobi</Typography>
+              </Box>
             </Box>
           </Box>
         </Container>

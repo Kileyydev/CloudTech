@@ -26,10 +26,6 @@ const API_BASE =
   `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '')}/repairs/` ||
   'https://api.cloudtechstore.net/api/repairs/';
 
-const MEDIA_BASE =
-  process.env.NEXT_PUBLIC_MEDIA_BASE?.replace(/\/$/, '') ||
-  'https://api.cloudtechstore.net';
-
 export default function SmartphoneRepairPage() {
   const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState('');
@@ -103,10 +99,22 @@ export default function SmartphoneRepairPage() {
       title: 'Mobile Phone Repair',
       image: '/images/repair.jpg',
       services: [
-        { name: 'Screen Replacement', price: 'Ksh 4,000' },
-        { name: 'Charging Port Repair', price: 'Ksh 2,000' },
+        { name: 'iPhone X Screen Replacement', price: 'Ksh 4,500' },
+        { name: 'iPhone Xs Max Screen Replacement', price: 'Ksh 7,000' },
+        { name: 'iPhone 11 Screen Replacement', price: 'Ksh 6,500' },
+        { name: 'iPhone 11 Pro Screen Replacement', price: 'Ksh 8,500' },
+        { name: 'iPhone 11 Pro Max Screen Replacement', price: 'Ksh 11,000' },
+        { name: 'iPhone 12 Screen Replacement', price: 'Ksh 8,500' },
+        { name: 'iPhone 12 Pro Screen Replacement', price: 'Ksh 9,000' },
+        { name: 'iPhone 13 Screen Replacement', price: 'Ksh 10,000' },
+        { name: 'iPhone 13 Pro Screen Replacement', price: 'Ksh 18,000' },
+        { name: 'iPhone 13 Pro Max Screen Replacement', price: 'Ksh 25,000' },
+        { name: 'iPhone 14 Screen Replacement', price: 'Ksh 10,000' },
+        { name: 'iPhone 14 Pro Screen Replacement', price: 'Ksh 25,000' },
+        { name: 'iPhone 14 Pro Max Screen Replacement', price: 'Ksh 35,000' },
+        { name: 'iPhone 15 Pro Max Screen Replacement', price: 'Ksh 45,000' },
+        { name: 'iPhone 16 Pro Max Screen Replacement', price: 'Ksh 60,000' },
         { name: 'Battery Replacement', price: 'Ksh 3,000' },
-        { name: 'Software Reset', price: 'Ksh 1,500' },
       ],
     },
   ];
@@ -165,7 +173,7 @@ export default function SmartphoneRepairPage() {
         >
           <Box sx={{ width: '100%', height: 400, position: 'relative' }}>
             <video width="100%" height="100%" controls style={{ objectFit: 'cover' }}>
-              <source src="/videos/repair-demo.mp4" type="video/mp4" />
+              <source src="/images/samsung/repair.mp4" type="video/mp4" />
             </video>
           </Box>
 
@@ -208,7 +216,7 @@ export default function SmartphoneRepairPage() {
         </Snackbar>
       </Box>
 
-
+      <Footer />
     </>
   );
 }
