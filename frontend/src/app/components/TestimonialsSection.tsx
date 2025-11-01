@@ -1,3 +1,4 @@
+// 🌸 Updated TestimonialsSection.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -108,7 +109,9 @@ type TestimonialT = {
   created_at: string;
 };
 
-const API_BASE = "http://localhost:8000/api/testimonials/";
+// ✅ Use env variable for API & media
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE + "/testimonials/";
+const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || "http://localhost:8000";
 
 export default function TestimonialsSection() {
   const [testimonials, setTestimonials] = useState<TestimonialT[]>([]);
@@ -117,7 +120,7 @@ export default function TestimonialsSection() {
   const sliderRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  // ✅ Fetch approved testimonials
+  // Fetch approved testimonials
   useEffect(() => {
     const fetchTestimonials = async () => {
       try {
@@ -143,11 +146,10 @@ export default function TestimonialsSection() {
     fetchTestimonials();
   }, []);
 
-  // 🖱️ Scroll functions
   const scrollLeft = () => sliderRef.current?.scrollBy({ left: -300, behavior: "smooth" });
   const scrollRight = () => sliderRef.current?.scrollBy({ left: 300, behavior: "smooth" });
 
-  // 🖱️ Mouse wheel scroll
+  // Mouse wheel scroll
   useEffect(() => {
     const slider = sliderRef.current;
     if (slider) {
@@ -163,7 +165,6 @@ export default function TestimonialsSection() {
   return (
     <SectionBox>
       <ContentContainer>
-        {/* 🌟 Centered and underlined heading */}
         <Typography
           variant="h4"
           sx={{
@@ -178,7 +179,6 @@ export default function TestimonialsSection() {
           What Our Customers Say 💬
         </Typography>
 
-        {/* ➕ Add Testimonial Button */}
         <Fab
           color="secondary"
           size="small"
@@ -220,21 +220,19 @@ export default function TestimonialsSection() {
                       p: 2,
                     }}
                   >
-                    {/* ✅ Image */}
                     {t.image && (
                       <ProductImageBox>
                         <img
                           src={
                             t.image.startsWith("http")
                               ? t.image
-                              : `http://localhost:8000${t.image}`
+                              : `${MEDIA_BASE}${t.image}`
                           }
                           alt={t.product || "Product image"}
                         />
                       </ProductImageBox>
                     )}
 
-                    {/* ✅ Experience text */}
                     <Typography
                       variant="body2"
                       sx={{
@@ -248,7 +246,6 @@ export default function TestimonialsSection() {
                       {t.experience}
                     </Typography>
 
-                    {/* ✅ Name and rating */}
                     <Typography
                       variant="caption"
                       sx={{ color: "#000", fontWeight: 600, mb: 1 }}
@@ -274,7 +271,6 @@ export default function TestimonialsSection() {
               ))}
             </SliderContainer>
 
-            {/* ✅ Navigation Buttons */}
             <NavButton sx={{ left: 16 }} onClick={scrollLeft}>
               <ArrowBackIcon />
             </NavButton>
