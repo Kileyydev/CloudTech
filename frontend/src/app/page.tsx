@@ -18,7 +18,7 @@ export default function Home() {
       <TickerBar />
       <TopNavBar />
       <MainNavBar />
-      <HeroSection /> 
+      <HeroSection />
       <FeaturedProductsSection />
       <TopCategoriesSection />
       <PromoSection />
