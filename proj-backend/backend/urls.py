@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/repairs/', include('repairs.urls')),
     path('api/health', health_check, name='health'),
     path('api/accounts/', include('accounts.urls')),  # email/password login
+    path('api/', include('orders.urls')),
 
 ]
 

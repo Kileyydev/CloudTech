@@ -5,11 +5,13 @@ import MainNavBar from "@/app/components/MainNavBar";
 import HeroSection from "@/app/audio/components/HeroSection";
 import StorageAccessoriesSection from './components/storageaccessories';
 import Footer from "@/app/components/FooterSection";
+import TickerBar from '../components/TickerBar';
 
 
 export default function Home() {
   return (
     <div>
+      <TickerBar/>
       <TopNavBar />
       <MainNavBar />
       <StorageAccessoriesSection />

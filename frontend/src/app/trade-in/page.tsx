@@ -38,6 +38,7 @@ import {
 import TopNavBar from '@/app/components/TopNavBar';
 import MainNavBar from '@/app/components/MainNavBar';
 import FooterSection from '@/app/components/FooterSection';
+import TickerBar from '../components/TickerBar';
 
 // Deduction rules (KSH) – based on average market
 const DEDUCTIONS = {
@@ -123,6 +124,7 @@ export default function TradeInPage() {
 
   return (
     <>
+    <TickerBar/>
       <TopNavBar />
       <MainNavBar />
 

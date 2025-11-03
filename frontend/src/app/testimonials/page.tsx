@@ -17,6 +17,7 @@ import { Send } from '@mui/icons-material';
 import TopNavBar from '../components/TopNavBar';
 import MainNavBar, { navCategories } from '../components/MainNavBar';
 import Footer from '../components/FooterSection';
+import TickerBar from '../components/TickerBar';
 
 const API_ENDPOINT =
   `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '')}/testimonials/` ||
@@ -95,6 +96,7 @@ export default function TestimonialsPage() {
 
   return (
     <>
+    <TickerBar/>
       <TopNavBar />
       <MainNavBar />
 

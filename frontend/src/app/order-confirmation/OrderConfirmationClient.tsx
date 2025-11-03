@@ -12,6 +12,7 @@ import MainNavBar from '../components/MainNavBar';
 import { useCart } from '../components/cartContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import TickerBar from '../components/TickerBar';
 
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(4),
@@ -99,6 +100,7 @@ export default function OrderConfirmationClient() {
 
   return (
     <Box>
+      <TickerBar/>
       <TopNavBar />
       <MainNavBar />
       <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', py: { xs: 4, md: 8 } }}>

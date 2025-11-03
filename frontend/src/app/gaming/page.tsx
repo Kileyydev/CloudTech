@@ -4,12 +4,13 @@ import TopNavBar from "@/app/components/TopNavBar";
 import MainNavBar from "@/app/components/MainNavBar";
 import HeroSection from "@/app/audio/components/HeroSection";
 import GamingAccessoriesSection from './components/gaming';
-import Footer from "@/app/components/FooterSection";
+import TickerBar from '../components/TickerBar';
 
 
 export default function Home() {
   return (
     <div>
+      <TickerBar/>
       <TopNavBar />
       <MainNavBar />
       <GamingAccessoriesSection />

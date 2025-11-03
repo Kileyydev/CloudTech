@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
 import TopNavBar from '../components/TopNavBar';
 import MainNavBar from '../components/MainNavBar';
+import TickerBar from '../components/TickerBar';
 
 type ProductT = {
   id: number;
@@ -306,6 +307,7 @@ const PowerbanksSection = () => {
 
   return (
     <>
+    <TickerBar/>
       <TopNavBar />
       <MainNavBar />
       <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, backgroundColor: '#fff' }}>

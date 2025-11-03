@@ -50,6 +50,7 @@ import MainNavBar from '../components/MainNavBar';
 import { useCart } from '../components/cartContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import TickerBar from '../components/TickerBar';
 
 type CartItem = {
   id: number;
@@ -241,6 +242,7 @@ export default function CartPage() {
 
   return (
     <Box>
+      <TickerBar/>
       <TopNavBar />
       <MainNavBar />
 

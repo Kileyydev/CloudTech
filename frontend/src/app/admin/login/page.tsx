@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation';
 /* ---------------- Navigation ---------------- */
 import TopNavBar from '@/app/components/TopNavBar';
 import MainNavBar from '@/app/components/MainNavBar';
+import TickerBar from '@/app/components/TickerBar';
 
 /* ---------------- API BASE & FETCH HELPER ---------------- */
 const getApiBase = () => {
@@ -124,6 +125,7 @@ export default function AdminLogin() {
 
   return (
     <>
+      <TickerBar/>
       <TopNavBar />
       <MainNavBar />
 

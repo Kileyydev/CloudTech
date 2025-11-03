@@ -1,260 +1,314 @@
-// src/app/orders/[id]/page.tsx
+// src/app/order-confirmation/OrderConfirmationClient.tsx
 'use client';
+
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import {
-  Container, Typography, Box, Paper, Stack, Button, Divider,
-  Stepper, Step, StepLabel, StepIconProps
+  Box,
+  Typography,
+  Paper,
+  Button,
+  Container,
+  Stack,
+  Divider,
+  Alert,
+  Chip,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
-import { Check, Download } from '@mui/icons-material';
+import {
+  CheckCircle,
+  Download,
+  LocalShipping,
+  CreditCard,
+  AttachMoney,
+} from '@mui/icons-material';
+import { styled } from '@mui/material/styles';
+import { useRouter, useSearchParams } from 'next/navigation';
 import TopNavBar from '../../components/TopNavBar';
 import MainNavBar from '../../components/MainNavBar';
+import { useCart } from '../../components/cartContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-const statusFlow = [
-  { key: 'received', label: 'Order Received' },
-  { key: 'processing', label: 'Processing' },
-  { key: 'packing', label: 'Packing' },
-  { key: 'dispatched', label: 'Dispatched' },
-  { key: 'delivered', label: 'Delivered' },
-];
+const StyledPaper = styled(Paper)(({ theme }) => ({
+  padding: theme.spacing(4),
+  borderRadius: 16,
+  boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+  background: 'linear-gradient(145deg, #ffffff, #f8f9fa)',
+}));
 
-const CustomStepIcon = (props: StepIconProps & { completed?: boolean; active?: boolean }) => {
-  const { active, completed } = props;
+const GradientButton = styled(Button)(({ theme }) => ({
+  borderRadius: 12,
+  padding: theme.spacing(1.5, 4),
+  fontWeight: 600,
+  textTransform: 'none',
+  background: 'linear-gradient(45deg, #db1b88, #b1166f)',
+  color: 'white',
+  '&:hover': {
+    background: 'linear-gradient(45deg, #b1166f, #db1b88)',
+  },
+}));
 
-  return (
-    <Box
-      sx={{
-        width: 36,
-        height: 36,
-        borderRadius: '50%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: completed ? '#db1b88' : active ? '#db1b88' : '#e0e0e0',
-        color: completed || active ? 'white' : '#999',
-        border: completed || active ? 'none' : '2px solid #e0e0e0',
-        transition: 'all 0.3s ease',
-        zIndex: 1,
-      }}
-    >
-      {completed ? <Check sx={{ fontSize: 20 }} /> : null}
-    </Box>
-  );
-};
-
-export default function OrderDetailPage() {
-  const { id } = useParams();
+export default function OrderConfirmationClient() {
+  const { cart, clearCart } = useCart();
   const router = useRouter();
-  const [order, setOrder] = useState<any>(null);
+  const searchParams = useSearchParams();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const pdfRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-    const found = orders.find((o: any) => o.id === id);
+  const [orderData, setOrderData] = useState<any>(null);
 
-    if (found && found.items && Array.isArray(found.items) && found.items.length > 0) {
-      setOrder(found);
+  useEffect(() => {
+    const saved = localStorage.getItem('lastOrder');
+    let data;
+
+    if (saved) {
+      data = JSON.parse(saved);
+      setOrderData(data);
+      localStorage.removeItem('lastOrder');
     } else {
-      router.push('/orders');
+      const name = searchParams.get('name') || 'Customer';
+      const phone = searchParams.get('phone') || '';
+      const address = searchParams.get('address') || '';
+      const city = searchParams.get('city') || '';
+      const payment = searchParams.get('payment') || 'M-Pesa';
+      const cashAmount = searchParams.get('cash') || '';
+      const change = searchParams.get('change') || '';
+
+      data = {
+        id: `CT${Date.now().toString().slice(-8)}`,
+        name,
+        phone,
+        address,
+        city,
+        payment,
+        cashAmount: cashAmount ? parseFloat(cashAmount) : 0,
+        change: change ? parseFloat(change) : 0,
+        items: Object.values(cart),
+        subtotal: Object.values(cart).reduce((s: any, i: any) => s + i.price * i.quantity, 0),
+        shipping: Object.values(cart).length > 0 ? 200 : 0,
+        total:
+          Object.values(cart).reduce((s: any, i: any) => s + i.price * i.quantity, 0) +
+          (Object.values(cart).length > 0 ? 200 : 0),
+        status: 'received',
+        date: new Date().toISOString(),
+      };
+
+      setOrderData(data);
     }
-  }, [id, router]);
+
+    // ✅ Save persistently to localStorage (so it appears in /orders)
+    if (data) {
+      const existingOrders = JSON.parse(localStorage.getItem('orders') || '[]');
+      const updatedOrders = [data, ...existingOrders];
+      localStorage.setItem('orders', JSON.stringify(updatedOrders));
+
+      // ✅ Optionally also sync to backend API
+      fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'https://cloudtech-c4ft.onrender.com/api'}/orders/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }).catch((err) => console.error('Order sync failed:', err));
+    }
+
+    clearCart();
+  }, [cart, searchParams, clearCart]);
 
   const generatePDF = async () => {
-    if (!pdfRef.current || !order) return;
+    if (!pdfRef.current) return;
     const canvas = await html2canvas(pdfRef.current);
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF();
     const imgWidth = 190;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
     pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
-    pdf.save(`CloudTech_${order.id}.pdf`);
+    pdf.save(`CloudTech_Order_${orderData?.id}.pdf`);
   };
 
-  if (!order) return null;
-
-  const activeStep = statusFlow.findIndex(s => s.key === order.status);
-  const paymentLabel = order.payment === 'cod' ? 'Cash on Delivery' : 
-                      order.payment === 'paybill' ? 'M-Pesa Paybill' : 'Withdraw Option';
+  if (!orderData) {
+    return (
+      <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', py: 8 }}>
+        <Container maxWidth="sm">
+          <StyledPaper sx={{ textAlign: 'center', p: 6 }}>
+            <Typography variant="h5" color="text.secondary">
+              No order details found.
+            </Typography>
+            <GradientButton sx={{ mt: 3 }} onClick={() => router.push('/')}>
+              Back to Shop
+            </GradientButton>
+          </StyledPaper>
+        </Container>
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ bgcolor: 'white', minHeight: '100vh' }}>
+    <Box>
       <TopNavBar />
       <MainNavBar />
-      <Container maxWidth="md" sx={{ py: 6 }}>
-        <Typography variant="h4" sx={{ mb: 1, fontWeight: 700, color: '#db1b88' }}>
-          Order #{order.id}
-        </Typography>
-        <Typography color="text.secondary" gutterBottom>
-          Placed on {new Date(order.date).toLocaleString()}
-        </Typography>
 
-        <Stack spacing={4} mt={4}>
-          {/* STATUS TIMELINE */}
-          <Paper sx={{ p: 4, borderRadius: 3, bgcolor: 'white' }}>
-            <Typography fontWeight={600} mb={3} textAlign="center" color="#333">
-              Order Status
-            </Typography>
-            <Stepper activeStep={activeStep} alternativeLabel connector={<Box sx={{ flex: 1, height: 2, bgcolor: '#e0e0e0', mx: -1 }} />}>
-              {statusFlow.map((status, index) => (
-                <Step key={status.key} completed={index < activeStep} active={index === activeStep}>
-                  <StepLabel
-                    StepIconComponent={(props) => <CustomStepIcon {...props} completed={index < activeStep} active={index === activeStep} />}
-                    sx={{
-                      '& .MuiStepLabel-label': {
-                        mt: 2,
-                        fontSize: '0.85rem',
-                        color: index <= activeStep ? '#db1b88' : '#999',
-                        fontWeight: index === activeStep ? 600 : 400,
-                      },
-                    }}
-                  >
-                    {status.label}
-                  </StepLabel>
-                </Step>
-              ))}
-            </Stepper>
-          </Paper>
-
-          {/* CUSTOMER INFO */}
-          <Paper sx={{ p: 3, borderRadius: 3, bgcolor: 'white' }}>
-            <Typography fontWeight={600} mb={2} color="#333">Customer Details</Typography>
-            <Stack spacing={1}>
-              <Typography><strong>Name:</strong> {order.name}</Typography>
-              <Typography><strong>Phone:</strong> {order.phone}</Typography>
-              <Typography><strong>Delivery Address:</strong> {order.address}, {order.city}</Typography>
-              {order.postalCode && <Typography><strong>Postal:</strong> {order.postalCode}</Typography>}
-            </Stack>
-          </Paper>
-
-          {/* PAYMENT INFO */}
-          <Paper sx={{ p: 3, borderRadius: 3, bgcolor: 'white' }}>
-            <Typography fontWeight={600} mb={2} color="#333">Payment Details</Typography>
-            <Stack spacing={1}>
-              <Typography><strong>Method:</strong> {paymentLabel}</Typography>
-              {order.payment === 'cod' && order.cashAmount > 0 && (
-                <>
-                  <Typography><strong>Cash Paid:</strong> KES {order.cashAmount.toLocaleString()}</Typography>
-                  {order.change > 0 && <Typography><strong>Change Due:</strong> KES {order.change.toLocaleString()}</Typography>}
-                </>
-              )}
-              {order.mpesaCode && <Typography><strong>M-Pesa Code:</strong> {order.mpesaCode}</Typography>}
-            </Stack>
-          </Paper>
-
-          {/* ITEMS & TOTALS */}
-          <Paper sx={{ p: 3, borderRadius: 3, bgcolor: 'white' }}>
-            <Typography fontWeight={600} mb={2} color="#333">
-              Order Items ({order.items.length} item{order.items.length !== 1 ? 's' : ''})
-            </Typography>
-            
-            {/* ITEMS LIST */}
-            <Stack spacing={1} sx={{ mb: 3 }}>
-              {order.items.map((item: any) => (
-                <Box key={item.id} display="flex" justifyContent="space-between" py={1} sx={{ borderBottom: '1px solid #eee' }}>
-                  <Typography sx={{ fontSize: '0.95rem', fontWeight: 500 }}>
-                    {item.title} × {item.quantity}
-                  </Typography>
-                  <Typography fontWeight={600} sx={{ fontSize: '0.95rem' }}>
-                    KES {(item.price * item.quantity).toLocaleString()}
-                  </Typography>
-                </Box>
-              ))}
-            </Stack>
-
-            {/* TOTALS - 100% FROM localStorage */}
-            <Divider sx={{ my: 2 }} />
-            <Box sx={{ pt: 2 }}>
-              <Box display="flex" justifyContent="space-between" mb={1}>
-                <Typography>Subtotal:</Typography>
-                <Typography>KES {order.subtotal.toLocaleString()}</Typography>
-              </Box>
-              <Box display="flex" justifyContent="space-between" mb={2}>
-                <Typography>Shipping:</Typography>
-                <Typography>KES {order.shipping.toLocaleString()}</Typography>
-              </Box>
-              <Divider />
-              <Box display="flex" justifyContent="space-between" mt={2} sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#db1b88' }}>
-                <Typography>Total:</Typography>
-                <Typography>KES {order.total.toLocaleString()}</Typography>
-              </Box>
+      <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', py: { xs: 4, md: 8 } }}>
+        <Container maxWidth="md">
+          <Stack spacing={4} alignItems="center">
+            <Box textAlign="center">
+              <CheckCircle sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
+              <Typography variant="h3" sx={{ fontWeight: 800, color: '#db1b88', mb: 1 }}>
+                Order Confirmed!
+              </Typography>
+              <Typography variant="h6" color="text.secondary">
+                Order ID: <strong>{orderData.id}</strong>
+              </Typography>
             </Box>
-          </Paper>
 
-          {/* DOWNLOAD BUTTON */}
-          <Button
-            variant="contained"
-            fullWidth
-            startIcon={<Download />}
-            onClick={generatePDF}
-            sx={{
-              background: '#db1b88',
-              '&:hover': { background: '#b1166f' },
-              borderRadius: 3,
-              py: 1.5,
-              fontSize: '1rem',
-              fontWeight: 600,
-            }}
-          >
-            Download Receipt
-          </Button>
-        </Stack>
-      </Container>
+            <StyledPaper sx={{ width: '100%' }}>
+              <Stack spacing={3}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    Customer Details
+                  </Typography>
+                  <Stack spacing={1}>
+                    <Typography><strong>Name:</strong> {orderData.name}</Typography>
+                    <Typography><strong>Phone:</strong> {orderData.phone}</Typography>
+                    <Typography><strong>Delivery:</strong> {orderData.address}, {orderData.city}</Typography>
+                  </Stack>
+                </Box>
 
-      {/* HIDDEN PDF */}
+                <Divider />
+
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    Payment Method
+                  </Typography>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    {orderData.payment === 'cod' ? (
+                      <>
+                        <AttachMoney color="success" />
+                        <Typography>Cash on Delivery</Typography>
+                        {orderData.change > 0 && (
+                          <Chip
+                            label={`Change: KES ${orderData.change.toLocaleString()}`}
+                            color="success"
+                            size="small"
+                          />
+                        )}
+                      </>
+                    ) : orderData.payment === 'paybill' ? (
+                      <>
+                        <CreditCard color="primary" />
+                        <Typography>M-Pesa Paybill</Typography>
+                      </>
+                    ) : (
+                      <>
+                        <LocalShipping color="info" />
+                        <Typography>Withdraw Option</Typography>
+                      </>
+                    )}
+                  </Stack>
+                </Box>
+
+                <Divider />
+
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                    Order Items
+                  </Typography>
+                  {orderData.items.map((item: any) => (
+                    <Box
+                      key={item.id}
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        py: 1,
+                        borderBottom: '1px dashed #ddd',
+                      }}
+                    >
+                      <Typography>
+                        {item.title} × {item.quantity}
+                      </Typography>
+                      <Typography fontWeight={600}>
+                        KES {(item.price * item.quantity).toLocaleString()}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+
+                <Divider />
+
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography>Subtotal:</Typography>
+                    <Typography>KES {orderData.subtotal.toLocaleString()}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography>Shipping:</Typography>
+                    <Typography>KES {orderData.shipping.toLocaleString()}</Typography>
+                  </Box>
+                  <Divider sx={{ my: 1 }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="h6" fontWeight={700}>
+                      Total:
+                    </Typography>
+                    <Typography variant="h6" fontWeight={700} color="#db1b88">
+                      KES {orderData.total.toLocaleString()}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mt={2}>
+                  <GradientButton fullWidth startIcon={<Download />} onClick={generatePDF}>
+                    Download PDF Receipt
+                  </GradientButton>
+                  <Button fullWidth variant="outlined" onClick={() => router.push('/')}>
+                    Continue Shopping
+                  </Button>
+                </Stack>
+
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  You will receive an SMS confirmation shortly. Physical receipt will be provided on delivery.
+                </Alert>
+              </Stack>
+            </StyledPaper>
+          </Stack>
+        </Container>
+      </Box>
+
+      {/* Hidden PDF for Receipt Export */}
       <Box sx={{ position: 'absolute', left: '-9999px' }} ref={pdfRef}>
-        <Box sx={{ p: 8, bgcolor: '#fff', width: 600, fontFamily: 'Arial, sans-serif', color: '#000' }}>
-          <Box textAlign="center" mb={3}>
-            <img src="/cloudtech-logo.png" alt="CloudTech" style={{ height: 70 }} />
-          </Box>
-          <Typography variant="h4" align="center" gutterBottom sx={{ color: '#000', fontWeight: 700 }}>
-            Official Receipt
+        <Box sx={{ p: 6, bgcolor: 'white', width: 600, fontFamily: 'Arial, sans-serif' }}>
+          <Typography variant="h4" align="center" gutterBottom sx={{ color: '#db1b88' }}>
+            CloudTech Order Receipt
           </Typography>
-          <Typography align="center" sx={{ color: '#000' }}>
-            Order ID: {order.id}
+          <Typography align="center" color="text.secondary" gutterBottom>
+            Order ID: {orderData.id}
           </Typography>
-          <Typography align="center" sx={{ color: '#000', fontSize: 12 }}>
-            {new Date(order.date).toLocaleString()}
-          </Typography>
+          <Divider sx={{ my: 3 }} />
 
-          <Divider sx={{ my: 3, borderColor: '#000' }} />
+          <Typography><strong>Customer:</strong> {orderData.name}</Typography>
+          <Typography><strong>Phone:</strong> {orderData.phone}</Typography>
+          <Typography><strong>Delivery:</strong> {orderData.address}, {orderData.city}</Typography>
+          <Typography><strong>Payment Method:</strong> {orderData.payment}</Typography>
 
-          <Typography sx={{ color: '#000' }}><strong>Customer:</strong> {order.name}</Typography>
-          <Typography sx={{ color: '#000' }}><strong>Phone:</strong> {order.phone}</Typography>
-          <Typography sx={{ color: '#000' }}><strong>Delivery:</strong> {order.address}, {order.city}</Typography>
-          <Typography sx={{ color: '#000' }}><strong>Payment:</strong> {paymentLabel}</Typography>
-          {order.change > 0 && <Typography sx={{ color: '#000' }}><strong>Change Due:</strong> KES {order.change.toLocaleString()}</Typography>}
+          <Divider sx={{ my: 3 }} />
 
-          <Divider sx={{ my: 3, borderColor: '#000' }} />
-
-          {order.items.map((item: any) => (
+          {orderData.items.map((item: any) => (
             <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <span style={{ fontSize: '12px' }}>{item.title} × {item.quantity}</span>
-              <span style={{ fontSize: '12px' }}>KES {(item.price * item.quantity).toLocaleString()}</span>
+              <span>{item.title} × {item.quantity}</span>
+              <span>KES {(item.price * item.quantity).toLocaleString()}</span>
             </Box>
           ))}
 
-          <Divider sx={{ my: 2, borderColor: '#000' }} />
-
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, mb: 1 }}>
-            <span>Subtotal:</span>
-            <span>KES {order.subtotal.toLocaleString()}</span>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, mb: 1 }}>
-            <span>Shipping:</span>
-            <span>KES {order.shipping.toLocaleString()}</span>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, mt: 1, fontSize: '14px' }}>
+          <Divider sx={{ my: 2 }} />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
             <span>Total:</span>
-            <span>KES {order.total.toLocaleString()}</span>
+            <span>KES {orderData.total.toLocaleString()}</span>
           </Box>
 
-          <Box textAlign="center" mt={5} sx={{ fontSize: 12, color: '#000' }}>
-            <Typography>Thank you for shopping with</Typography>
-            <Typography fontWeight={700}>CloudTech</Typography>
-            <Typography>Kenya Cinema Building, Moi Avenue, Nairobi</Typography>
-          </Box>
+          <Typography align="center" sx={{ mt: 4, fontSize: 12, color: 'gray' }}>
+            Thank you for shopping with CloudTech!
+            <br />
+            Kenya Cinema Building, Moi Avenue, Nairobi
+          </Typography>
         </Box>
       </Box>
     </Box>

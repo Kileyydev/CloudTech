@@ -35,6 +35,7 @@ ALLOWED_HOSTS = [
     'cloudtech-c4ft.onrender.com',
     'api.cloudtechstore.net',  # if you use a subdomain for API
     'localhost',
+    '127.0.0.1',
 ]
 
 
@@ -62,6 +63,7 @@ INSTALLED_APPS = [
     "repairs",
     "testimonials",
     "django_filters",
+    "orders",
 ]
 
 # --------------------------

@@ -14,6 +14,7 @@ import {
 } from '@mui/icons-material';
 import TopNavBar from '../components/TopNavBar';
 import MainNavBar from '../components/MainNavBar';
+import TickerBar from '../components/TickerBar';
 
 const WarrantyPolicy = () => {
   const theme = useTheme();
@@ -59,6 +60,7 @@ const WarrantyPolicy = () => {
 
   return (
     <>
+    <TickerBar/>
       <TopNavBar />
       <MainNavBar />
 

@@ -32,6 +32,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
 import TopNavBar from '@/app/components/TopNavBar';
 import MainNavBar from '@/app/components/MainNavBar';
+import TickerBar from '@/app/components/TickerBar';
 
 const API_BASE =
   process.env.NODE_ENV === 'development'
@@ -193,6 +194,7 @@ const ProductDetailPage = () => {
   if (loading) {
     return (
       <Box sx={{ bgcolor: '#fff', minHeight: '100vh', width: '100%' }}>
+        <TickerBar/>
         <TopNavBar />
         <MainNavBar />
         <Container maxWidth="lg" sx={{ py: 5 }}>

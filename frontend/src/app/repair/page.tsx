@@ -21,6 +21,7 @@ import TopNavBar from '../components/TopNavBar';
 import MainNavBar from '../components/MainNavBar';
 import Footer from '../components/FooterSection';
 import { useState } from 'react';
+import TickerBar from '../components/TickerBar';
 
 const API_BASE =
   `${process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '')}/repairs/` ||
@@ -121,6 +122,7 @@ export default function SmartphoneRepairPage() {
 
   return (
     <>
+    <TickerBar/>
       <TopNavBar />
       <MainNavBar />
 
@@ -215,8 +217,6 @@ export default function SmartphoneRepairPage() {
           <Alert severity={snackbar.severity}>{snackbar.message}</Alert>
         </Snackbar>
       </Box>
-
-      <Footer />
     </>
   );
 }

@@ -27,7 +27,7 @@ import {
 import dynamic from 'next/dynamic';
 import TopNavBar from '@/app/components/TopNavBar';
 import MainNavBar from '@/app/components/MainNavBar';
-import FooterBottom from '@/app/components/FooterSection';
+import TickerBar from '../components/TickerBar';
 
 const MapComponent = dynamic(() => import('@/app/components/MapComponent'), {
   ssr: false,
@@ -74,6 +74,7 @@ const ContactUsPage = () => {
 
   return (
     <>
+    <TickerBar/>
       <TopNavBar />
       <MainNavBar />
 
