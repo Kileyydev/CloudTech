@@ -1,4 +1,5 @@
-"use client";
+'use client';
+
 import React, { useState } from "react";
 import { Box } from "@mui/material";
 import TopNavBar from "../components/TopNavBar";
@@ -9,9 +10,8 @@ import DashboardSection from "./components/DashboardSection";
 import DiscountsSection from "./components/DiscountSection";
 import TestimonialsAdminPage from "./components/TestimonialsSection";
 import AdminRepairsPage from "./components/RepairSection";
+import OrdersSection from "@/app/admin-dashboard/components/OrdersSection"; // ✅ your new file
 import TickerBar from "../components/TickerBar";
-import OrdersSection from "./components/OrdersSection";
-import OrdersPage from "@/app/admin-dashboard/components/OrdersSection";
 
 export default function AdminDashboardPageComponent() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
@@ -25,9 +25,10 @@ export default function AdminDashboardPageComponent() {
         flexDirection: "column",
       }}
     >
-      <TickerBar/>
+      <TickerBar />
       <TopNavBar />
       <MainNavBar activeSection={activeSection} setActiveSection={setActiveSection} />
+
       <Box sx={{ padding: "16px", flexGrow: 1 }}>
         {activeSection === "dashboard" && <DashboardSection />}
         {activeSection === "products" && <ProductsSection />}
@@ -35,9 +36,7 @@ export default function AdminDashboardPageComponent() {
         {activeSection === "users" && <UsersSection />}
         {activeSection === "testimonials" && <TestimonialsAdminPage />}
         {activeSection === "repairs" && <AdminRepairsPage />}
-
-        {activeSection === "OrdersSection" && <OrdersPage />}
-        
+        {activeSection === "orders" && <OrdersSection />} 
       </Box>
     </Box>
   );

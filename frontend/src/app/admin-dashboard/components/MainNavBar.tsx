@@ -7,6 +7,7 @@ import {
   styled,
   IconButton,
   Button,
+  Badge,
   useTheme,
   useMediaQuery,
 } from "@mui/material";
@@ -19,6 +20,7 @@ import {
   Star as StarIcon,
   People as PeopleIcon,
   Logout as LogoutIcon,
+  ReceiptLong as ReceiptLongIcon, // ✅ new icon for Orders
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
 
@@ -27,17 +29,17 @@ type Props = {
   setActiveSection: React.Dispatch<React.SetStateAction<string>>;
 };
 
-// NAV ITEMS (NO DISCOUNTS, NO CONTACTS)
+// ✅ Navigation items
 const navItems = [
   { text: "Dashboard", icon: <DashboardIcon />, section: "dashboard" },
   { text: "Products", icon: <ShoppingCartIcon />, section: "products" },
-  { text: "Orders", icon: <ShoppingCartIcon />, section: "orders" },
+  { text: "Orders", icon: <ReceiptLongIcon />, section: "orders" },
   { text: "Repairs", icon: <BuildIcon />, section: "repairs" },
   { text: "Testimonials", icon: <StarIcon />, section: "testimonials" },
   { text: "Users", icon: <PeopleIcon />, section: "users" },
 ];
 
-// STYLED COMPONENTS
+// ✅ Styled Components
 const NavContainer = styled(Box)(({ theme }) => ({
   display: "flex",
   flexDirection: "column",
@@ -63,13 +65,9 @@ const NavList = styled(Box)(({ theme }) => ({
   width: "100%",
   transition: "opacity 0.3s ease-in-out, max-height 0.3s ease-in-out",
   overflow: "hidden",
-  opacity: 1,
-  maxHeight: "1000px",
   [theme.breakpoints.up("lg")]: {
     flexDirection: "row",
     justifyContent: "center",
-    opacity: 1,
-    maxHeight: "none",
     width: "auto",
   },
 }));
@@ -88,7 +86,7 @@ const NavButton = styled(Button)<{ active: boolean }>(({ theme, active }) => ({
   color: active ? "#DC1A8A" : "#000000",
   backgroundColor: active ? "rgba(220, 26, 138, 0.08)" : "transparent",
   border: "1px solid rgba(0, 0, 0, 0.1)",
-  transition: "all 0.2s ease-in-out",
+  transition: "all 0.25s ease-in-out",
   width: "100%",
   "& .nav-text": {
     position: "relative",
@@ -101,6 +99,7 @@ const NavButton = styled(Button)<{ active: boolean }>(({ theme, active }) => ({
       height: "3px",
       backgroundColor: "#DC1A8A",
       transition: "width 0.3s ease-in-out",
+      borderRadius: "2px",
     },
   },
   "&:hover": {
@@ -109,13 +108,6 @@ const NavButton = styled(Button)<{ active: boolean }>(({ theme, active }) => ({
     "& .nav-text::after": {
       width: "100%",
     },
-  },
-  [theme.breakpoints.up("sm")]: {
-    padding: theme.spacing(1.2, 2.5),
-    margin: theme.spacing(0.5, 0),
-  },
-  [theme.breakpoints.up("md")]: {
-    padding: theme.spacing(1.4, 3),
   },
   [theme.breakpoints.up("lg")]: {
     width: "auto",
@@ -171,12 +163,15 @@ const LogoutButton = styled(Button)(({ theme }) => ({
   },
 }));
 
-// MAIN COMPONENT
+// ✅ Main Component
 const MainNavBar: React.FC<Props> = ({ activeSection, setActiveSection }) => {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
   const [isOpen, setIsOpen] = useState(true);
   const router = useRouter();
+
+  // Placeholder for pending orders count
+  const pendingOrders = 3; // later replace this with API data
 
   const toggleMenu = () => setIsOpen((prev) => !prev);
 
@@ -195,7 +190,7 @@ const MainNavBar: React.FC<Props> = ({ activeSection, setActiveSection }) => {
         </ToggleButton>
       )}
 
-      {/* Nav Items */}
+      {/* Navigation Buttons */}
       <NavList
         sx={{
           opacity: isDesktop || isOpen ? 1 : 0,
@@ -206,8 +201,28 @@ const MainNavBar: React.FC<Props> = ({ activeSection, setActiveSection }) => {
           <NavButton
             key={item.section}
             active={activeSection === item.section}
-            startIcon={item.icon}
             onClick={() => setActiveSection(item.section)}
+            startIcon={
+              item.text === "Orders" ? (
+                <Badge
+                  badgeContent={pendingOrders}
+                  color="secondary"
+                  sx={{
+                    "& .MuiBadge-badge": {
+                      backgroundColor: "#DC1A8A",
+                      color: "#fff",
+                      fontSize: "0.7rem",
+                      minWidth: "18px",
+                      height: "18px",
+                    },
+                  }}
+                >
+                  {item.icon}
+                </Badge>
+              ) : (
+                item.icon
+              )
+            }
           >
             <Typography className="nav-text" sx={{ ml: 1 }}>
               {item.text}
@@ -215,7 +230,7 @@ const MainNavBar: React.FC<Props> = ({ activeSection, setActiveSection }) => {
           </NavButton>
         ))}
 
-        {/* Logout Button */}
+        {/* Logout Button (Mobile) */}
         <LogoutButton
           startIcon={<LogoutIcon />}
           onClick={handleLogout}
@@ -225,7 +240,7 @@ const MainNavBar: React.FC<Props> = ({ activeSection, setActiveSection }) => {
         </LogoutButton>
       </NavList>
 
-      {/* Desktop Logout */}
+      {/* Logout Button (Desktop) */}
       {isDesktop && (
         <LogoutButton startIcon={<LogoutIcon />} onClick={handleLogout}>
           Logout
