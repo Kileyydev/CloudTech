@@ -88,12 +88,6 @@ const ContactUsPage = () => {
         <Container maxWidth="lg">
           {/* Header */}
           <Box textAlign="center" mb={6}>
-            <Typography
-              variant="h3"
-              sx={{ fontWeight: 700, color: '#db1b88', mb: 2 }}
-            >
-              Contact Us
-            </Typography>
             <Typography variant="h6" color="text.secondary">
               We are here to help! Reach out for repairs, trade-ins, or inquiries.
             </Typography>

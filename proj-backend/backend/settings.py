@@ -63,7 +63,8 @@ INSTALLED_APPS = [
     "repairs",
     "testimonials",
     "django_filters",
-    "orders",
+    "purchases",
+  
 ]
 
 # --------------------------

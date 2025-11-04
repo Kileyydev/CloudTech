@@ -3,37 +3,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import {
-  Box,
-  Typography,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  TextField,
-  Button,
-  Divider,
-  Paper,
-  FormControl,
-  FormLabel,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
-  Collapse,
-  Alert,
-  CircularProgress,
-  Snackbar,
-  Card,
-  CardMedia,
-  CardContent,
-  Container,
-  InputAdornment,
-  useTheme,
-  useMediaQuery,
-  Stack,
-  Skeleton,
+  Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  IconButton, TextField, Button, Divider, Paper, FormControl, FormLabel, RadioGroup,
+  FormControlLabel, Radio, Collapse, Alert, CircularProgress, Snackbar, Card,
+  CardMedia, CardContent, Container, InputAdornment, useTheme, useMediaQuery,
+  Stack, Skeleton
 } from '@mui/material';
 import { Add, Remove, Delete, CreditCard, AttachMoney } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
@@ -41,13 +15,30 @@ import TopNavBar from '../components/TopNavBar';
 import MainNavBar from '../components/MainNavBar';
 import { useCart } from '../components/cartContext';
 import TickerBar from '../components/TickerBar';
+import axios from 'axios';
 
-const API_BASE = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:8000/api'
-  : 'https://cloudtech-c4ft.onrender.com/api';
-const MEDIA_BASE = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:8000'
-  : 'https://cloudtech-c4ft.onrender.com';
+const API_BASE =
+  process.env.NODE_ENV === 'development'
+    ? 'http://localhost:8000/api'
+    : 'https://cloudtech-c4ft.onrender.com/api';
+const MEDIA_BASE =
+  process.env.NODE_ENV === 'development'
+    ? 'http://localhost:8000'
+    : 'https://cloudtech-c4ft.onrender.com';
+
+// M-PESA VERIFICATION (demo)
+async function verifyMpesaTransaction(
+  code: string,
+  amount: number,
+  phone: string
+): Promise<{ ok: boolean; message: string }> {
+  await new Promise((r) => setTimeout(r, 1500));
+  const demoCodes = ['ABC123XYZ', 'MP25KLMN9P', 'QRX7TUV8W'];
+  if (demoCodes.includes(code.toUpperCase())) {
+    return { ok: true, message: 'Payment confirmed!' };
+  }
+  return { ok: false, message: 'Invalid M-Pesa code. Try ABC123XYZ' };
+}
 
 type ProductT = {
   id: number;
@@ -58,21 +49,47 @@ type ProductT = {
   stock: number;
 };
 
+type CartItem = {
+  id: number;
+  title: string;
+  price: number;
+  quantity: number;
+  stock: number;
+  cover_image?: string;
+};
+
+// Unique Order ID
+const generateUniqueOrderId = (): string => {
+  const now = Date.now();
+  const perf = performance.now();
+  const timestamp = now.toString(36).toUpperCase();
+  const nano = perf.toString(36).replace('.', '').slice(-5).toUpperCase();
+  const rand1 = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const rand2 = Math.random().toString(36).substring(2, 5).toUpperCase();
+  return `CT${timestamp}-${rand1}${nano}${rand2}`;
+};
+
 export default function CartPage() {
-  const { cart, updateQuantity, removeFromCart, clearCart } = useCart();
+  const { cart, updateQuantity, removeFromCart, clearCart, addToCart } = useCart();
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [checkoutDetails, setCheckoutDetails] = useState({
-    name: '', phone: '', address: '', city: '', mpesaCode: '', cashAmount: '',
+    name: '',
+    phone: '',
+    address: '',
+    city: '',
+    mpesaCode: '',
+    cashAmount: '',
   });
   const [paymentMethod, setPaymentMethod] = useState<'paybill' | 'withdraw' | 'cod' | ''>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+  const [snackbar, setSnackbar] = useState({
+    open: false, message: '', severity: 'success' as 'success' | 'error'
+  });
 
-  // Trending Products
   const [trending, setTrending] = useState<ProductT[]>([]);
   const [loadingTrending, setLoadingTrending] = useState(true);
   const hasFetched = useRef(false);
@@ -107,7 +124,7 @@ export default function CartPage() {
     setSnackbar({ open: true, message: msg, severity: type });
   const hide = () => setSnackbar(p => ({ ...p, open: false }));
 
-  const handleChange = (f: string, v: string) => {
+  const handleChange = (f: keyof typeof checkoutDetails, v: string) => {
     setCheckoutDetails(p => ({ ...p, [f]: v }));
     setError('');
   };
@@ -121,7 +138,7 @@ export default function CartPage() {
       setError('Select payment method');
       return false;
     }
-    if (paymentMethod === 'withdraw' && !checkoutDetails.mpesaCode) {
+    if ((paymentMethod === 'paybill' || paymentMethod === 'withdraw') && !checkoutDetails.mpesaCode) {
       setError('Enter M-Pesa code');
       return false;
     }
@@ -132,14 +149,7 @@ export default function CartPage() {
     return true;
   };
 
-  // FAKE M-PESA CONFIRMATION
-  const confirmMpesa = async (code: string): Promise<boolean> => {
-    await new Promise(r => setTimeout(r, 1800));
-    const validCodes = ['ABC123XYZ', 'MP25KLMN9P', 'QRX7TUV8W'];
-    return validCodes.includes(code.toUpperCase());
-  };
-
-  // BULLETPROOF CHECKOUT
+  // ✅ Final Checkout sending data to Django purchases API
   const handleCheckout = async () => {
     if (Object.values(cart).length === 0) return show('Cart empty', 'error');
     if (!validate()) return;
@@ -149,13 +159,13 @@ export default function CartPage() {
 
     try {
       let paymentOk = true;
+      let paymentMessage = '';
 
-      if (paymentMethod === 'withdraw') {
-        const ok = await confirmMpesa(checkoutDetails.mpesaCode);
-        if (!ok) {
-          setError('Invalid M-Pesa code. Try ABC123XYZ');
-          paymentOk = false;
-        }
+      if (paymentMethod === 'paybill' || paymentMethod === 'withdraw') {
+        const { ok, message } = await verifyMpesaTransaction(checkoutDetails.mpesaCode, total, checkoutDetails.phone);
+        paymentOk = ok;
+        paymentMessage = message;
+        if (!ok) setError(message);
       }
 
       if (!paymentOk) {
@@ -163,62 +173,70 @@ export default function CartPage() {
         return;
       }
 
-      // GENERATE UNIQUE ORDER ID
-      const orderId = `CT${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substr(2, 3).toUpperCase()}`;
+      const orderId = generateUniqueOrderId();
 
-      // BUILD ORDER
-      const order = {
-        id: orderId,
-        date: new Date().toISOString(),
-        name: checkoutDetails.name.trim(),
-        phone: checkoutDetails.phone.trim(),
-        address: checkoutDetails.address.trim(),
-        city: checkoutDetails.city.trim(),
-        payment: paymentMethod,
-        mpesaCode: checkoutDetails.mpesaCode || '',
-        cashAmount: cashPaid,
-        change,
-        items: Object.values(cart),
-        subtotal,
-        shipping,
-        total,
-        status: 'confirmed' as const,
-      };
+ const round = (num: number) => Number(num.toFixed(2));
 
-      // SAVE TO USER ORDERS
-      const userOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-      const updatedUserOrders = [order, ...userOrders.filter((o: any) => o.id !== orderId)];
-      localStorage.setItem('orders', JSON.stringify(updatedUserOrders));
+const order = {
+  id: orderId,
+  name: checkoutDetails.name.trim(),
+  phone: checkoutDetails.phone.trim(),
+  address: checkoutDetails.address.trim(),
+  city: checkoutDetails.city.trim(),
+  payment: paymentMethod,
+  mpesa_code: checkoutDetails.mpesaCode || '',
+  cash_amount: round(cashPaid),
+  change: round(change),
+  subtotal: round(subtotal),
+  shipping: round(shipping),
+  total: round(total),
+  items: Object.values(cart).map((item) => ({
+    product_id: item.id,
+    title: item.title,
+    price: round(item.price),
+    quantity: item.quantity,
+  })),
+};
 
-      // SAVE TO ADMIN
-      const adminOrders = JSON.parse(localStorage.getItem('adminOrders') || '[]');
-      const updatedAdminOrders = [order, ...adminOrders.filter((o: any) => o.id !== orderId)];
-      localStorage.setItem('adminOrders', JSON.stringify(updatedAdminOrders));
 
-      // CLEAR CART
+      // 🧠 Send to backend purchases API
+      try {
+        const token = localStorage.getItem('token'); // only if using auth
+        const res = await axios.post(`${API_BASE}/purchases/`, order, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Token ${token}` } : {}),
+          },
+        });
+        console.log('✅ Order sent:', res.data);
+        show('Order placed successfully!');
+      } catch (err: any) {
+        console.error(err);
+        show('Failed to send order to server', 'error');
+      }
+
       clearCart();
 
-      // REDIRECT WITH ALL DATA
       const params = new URLSearchParams({
         name: order.name,
         phone: order.phone,
         address: order.address,
         city: order.city,
         payment: order.payment,
-        cash: order.cashAmount.toString(),
+        cash: order.cash_amount.toString(),
         change: order.change.toString(),
       });
-
       router.push(`/order-confirmation?${params.toString()}`);
-      show('Order confirmed! Redirecting...', 'success');
-    } catch (err) {
-      console.error(err);
-      show('Order failed. Try again.', 'error');
+      show(paymentMessage || 'Order confirmed! Redirecting…', 'success');
+    } catch (e) {
+      console.error(e);
+      show('Something went wrong', 'error');
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // TRENDING UI
   const W = 218;
   const H = 350;
 
@@ -237,43 +255,51 @@ export default function CartPage() {
     const src = p.cover_image?.startsWith('http') ? p.cover_image : `${MEDIA_BASE}${p.cover_image}`;
     const final = p.discount ? p.price * (1 - p.discount / 100) : p.price;
 
+    const handleAdd = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      addToCart({
+        id: p.id,
+        title: p.title,
+        price: final,
+        quantity: 1,
+        stock: p.stock,
+        cover_image: p.cover_image,
+      } as CartItem);
+      show(`${p.title} added to cart!`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     return (
       <Card key={p.id} sx={{
-        width: W,
-        height: H,
-        bgcolor: '#fff',
-        borderRadius: 0,
-        boxShadow: '0 3px 6px rgba(0,0,0,0.08)',
-        overflow: 'hidden',
-        flex: `0 0 ${W}px`,
-        position: 'relative',
+        width: W, height: H, bgcolor: '#fff', borderRadius: 0,
+        boxShadow: '0 3px 6px rgba(0,0,0,0.08)', overflow: 'hidden', flex: `0 0 ${W}px`
       }}>
-        <Box
-          onClick={() => router.push(`/product/${p.id}`)}
-          sx={{ width: '100%', height: H * 0.56, cursor: 'pointer', overflow: 'hidden' }}
-        >
-          <CardMedia
-            component="img"
-            image={src || '/images/fallback.jpg'}
-            alt={p.title}
-            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
+        <Box onClick={() => router.push(`/product/${p.id}`)} sx={{
+          width: '100%', height: H * 0.56, cursor: 'pointer', overflow: 'hidden'
+        }}>
+          <CardMedia component="img" image={src || '/images/fallback.jpg'} alt={p.title}
+            sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </Box>
-
-        <CardContent sx={{ p: 1.5, height: H * 0.44, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        <CardContent sx={{
+          p: 1.5, height: H * 0.44, display: 'flex',
+          flexDirection: 'column', justifyContent: 'space-between'
+        }}>
           <Box>
-            <Typography sx={{ fontWeight: 600, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <Typography sx={{
+              fontWeight: 600, fontSize: '0.95rem', whiteSpace: 'nowrap',
+              overflow: 'hidden', textOverflow: 'ellipsis'
+            }}>
               {p.title}
             </Typography>
             <Box sx={{ mt: 0.8, display: 'flex', alignItems: 'center', gap: 0.5 }}>
               {p.discount ? (
                 <>
-                  <Typography sx={{ textDecoration: 'line-through', color: '#999', fontSize: '0.75rem' }}>
-                    KES {p.price.toLocaleString()}
-                  </Typography>
-                  <Typography sx={{ fontWeight: 700, color: '#e91e63', fontSize: '1rem' }}>
-                    KES {final.toLocaleString()}
-                  </Typography>
+                  <Typography sx={{
+                    textDecoration: 'line-through', color: '#999', fontSize: '0.75rem'
+                  }}>KES {p.price.toLocaleString()}</Typography>
+                  <Typography sx={{
+                    fontWeight: 700, color: '#e91e63', fontSize: '1rem'
+                  }}>KES {final.toLocaleString()}</Typography>
                 </>
               ) : (
                 <Typography sx={{ fontWeight: 700, color: '#222', fontSize: '1rem' }}>
@@ -282,14 +308,11 @@ export default function CartPage() {
               )}
             </Box>
           </Box>
-
-          <Button
-            fullWidth
-            variant="contained"
-            startIcon={<Add />}
-            onClick={(e) => { e.stopPropagation(); }}
-            sx={{ bgcolor: '#e91e63', color: '#fff', textTransform: 'none', mt: 1.5, borderRadius: 0, fontSize: '0.88rem', py: 0.9 }}
-          >
+          <Button fullWidth variant="contained" startIcon={<Add />} onClick={handleAdd}
+            sx={{
+              bgcolor: '#e91e63', color: '#fff', textTransform: 'none',
+              mt: 1.5, borderRadius: 0, fontSize: '0.88rem', py: 0.9
+            }}>
             Add
           </Button>
         </CardContent>
@@ -305,17 +328,14 @@ export default function CartPage() {
 
       <Box sx={{ bgcolor: '#fff', minHeight: '100vh', py: { xs: 3, md: 6 } }}>
         <Container maxWidth="lg">
-          <Typography variant="h4" align="center" sx={{ mb: 4, fontWeight: 800, color: '#e91e63' }}>
-            Your Cart
-          </Typography>
-
           <Stack direction={{ xs: 'column', lg: 'row' }} spacing={4}>
-            {/* CART TABLE */}
+            {/* CART */}
             <Box sx={{ flex: 1 }}>
               {Object.values(cart).length === 0 ? (
                 <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 0 }}>
                   <Typography variant="h6" color="text.secondary">Cart empty</Typography>
-                  <Button variant="contained" sx={{ mt: 2, bgcolor: '#e91e63', borderRadius: 0 }} onClick={() => router.push('/')}>
+                  <Button variant="contained" sx={{ mt: 2, bgcolor: '#e91e63', borderRadius: 0 }}
+                    onClick={() => router.push('/')}>
                     Shop Now
                   </Button>
                 </Paper>
@@ -338,15 +358,9 @@ export default function CartPage() {
                             <TableCell>{item.title}</TableCell>
                             <TableCell align="center">
                               <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
-                                <IconButton size="small" onClick={() => updateQuantity(item.id, -1)}>
-                                  <Remove />
-                                </IconButton>
-                                <Typography sx={{ minWidth: 32, textAlign: 'center', fontWeight: 600 }}>
-                                  {item.quantity}
-                                </Typography>
-                                <IconButton size="small" onClick={() => updateQuantity(item.id, 1)}>
-                                  <Add />
-                                </IconButton>
+                                <IconButton size="small" onClick={() => updateQuantity(item.id, -1)}><Remove /></IconButton>
+                                <Typography sx={{ minWidth: 32, textAlign: 'center', fontWeight: 600 }}>{item.quantity}</Typography>
+                                <IconButton size="small" onClick={() => updateQuantity(item.id, 1)}><Add /></IconButton>
                               </Box>
                             </TableCell>
                             <TableCell align="right">KES {item.price.toLocaleString()}</TableCell>
@@ -354,9 +368,7 @@ export default function CartPage() {
                               KES {(item.price * item.quantity).toLocaleString()}
                             </TableCell>
                             <TableCell align="center">
-                              <IconButton color="error" onClick={() => removeFromCart(item.id)}>
-                                <Delete />
-                              </IconButton>
+                              <IconButton color="error" onClick={() => removeFromCart(item.id)}><Delete /></IconButton>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -376,21 +388,16 @@ export default function CartPage() {
                     <Divider sx={{ my: 1 }} />
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
                       <Typography variant="h6">Total</Typography>
-                      <Typography variant="h6" color="#e91e63">
-                        KES {total.toLocaleString()}
-                      </Typography>
+                      <Typography variant="h6" color="#e91e63">KES {total.toLocaleString()}</Typography>
                     </Box>
                   </Box>
                 </Paper>
               )}
             </Box>
 
-            {/* CHECKOUT */}
+            {/* CHECKOUT FORM */}
             <Box sx={{ flex: { lg: 0.9 } }}>
-              <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: '#e91e63' }}>
-                Checkout
-              </Typography>
-
+              <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: '#e91e63' }}>Checkout</Typography>
               <Paper sx={{ p: 3, borderRadius: 0 }}>
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -414,66 +421,50 @@ export default function CartPage() {
                       <strong>Paybill:</strong> 247247<br />
                       <strong>Account:</strong> 0722244482<br />
                       <strong>Amount:</strong> KES {total.toLocaleString()}
+                      <TextField fullWidth size="small" label="M-Pesa Code *" placeholder="e.g. ABC123XYZ"
+                        value={checkoutDetails.mpesaCode}
+                        onChange={e => handleChange('mpesaCode', e.target.value)} sx={{ mt: 1 }} />
                     </Alert>
                   </Collapse>
 
                   <Collapse in={paymentMethod === 'withdraw'}>
                     <Alert severity="info">
                       <strong>Agent:</strong> 2065355 | <strong>Store:</strong> 2061522<br />
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="M-Pesa Code *"
-                        placeholder="e.g. ABC123XYZ"
+                      <TextField fullWidth size="small" label="M-Pesa Code *" placeholder="e.g. ABC123XYZ"
                         value={checkoutDetails.mpesaCode}
-                        onChange={e => handleChange('mpesaCode', e.target.value)}
-                        sx={{ mt: 1 }}
-                      />
+                        onChange={e => handleChange('mpesaCode', e.target.value)} sx={{ mt: 1 }} />
                     </Alert>
                   </Collapse>
 
                   <Collapse in={paymentMethod === 'cod'}>
                     <Alert severity="success">
                       <AttachMoney sx={{ mr: 0.5 }} /> Cash on Delivery
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Cash Amount"
-                        type="number"
+                      <TextField fullWidth size="small" label="Cash Amount" type="number"
                         value={checkoutDetails.cashAmount}
                         onChange={e => handleChange('cashAmount', e.target.value)}
                         InputProps={{ startAdornment: <InputAdornment position="start">KES</InputAdornment> }}
-                        sx={{ mt: 1 }}
-                      />
-                      {change > 0 && <Typography sx={{ mt: 1, fontWeight: 600 }}>Change: KES {change.toLocaleString()}</Typography>}
+                        sx={{ mt: 1 }} />
+                      {change > 0 && <Typography sx={{ mt: 1, fontWeight: 600 }}>
+                        Change: KES {change.toLocaleString()}
+                      </Typography>}
                     </Alert>
                   </Collapse>
 
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    onClick={handleCheckout}
-                    disabled={isProcessing}
+                  <Button fullWidth variant="contained" onClick={handleCheckout} disabled={isProcessing}
                     startIcon={isProcessing ? <CircularProgress size={20} /> : <CreditCard />}
-                    sx={{ bgcolor: '#e91e63', borderRadius: 0, py: 1.5, fontWeight: 700 }}
-                  >
-                    {isProcessing ? 'Confirming...' : 'Place Order'}
+                    sx={{ bgcolor: '#e91e63', borderRadius: 0, py: 1.5, fontWeight: 700 }}>
+                    {isProcessing ? 'Confirming…' : 'Place Order'}
                   </Button>
                 </Stack>
               </Paper>
             </Box>
           </Stack>
 
-          {/* OTHERS ARE BUYING */}
+          {/* TRENDING */}
           <Box sx={{ mt: 8 }}>
-            <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: '#e91e63' }}>
-              Others Are Buying
-            </Typography>
-
+            <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: '#e91e63' }}>Others Are Buying</Typography>
             <Box sx={{
-              maxWidth: '1350px',
-              mx: 'auto',
-              px: { xs: 1, md: 1.5 },
+              maxWidth: '1350px', mx: 'auto', px: { xs: 1, md: 1.5 },
               ...(isMobile
                 ? { display: 'flex', overflowX: 'auto', gap: 0.8, pb: 2, '&::-webkit-scrollbar': { display: 'none' }, scrollSnapType: 'x mandatory' }
                 : { display: 'grid', gap: 0.8, gridTemplateColumns: 'repeat(5, 1fr)' }
@@ -489,9 +480,7 @@ export default function CartPage() {
       </Box>
 
       <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={hide}>
-        <Alert onClose={hide} severity={snackbar.severity}>
-          {snackbar.message}
-        </Alert>
+        <Alert onClose={hide} severity={snackbar.severity}>{snackbar.message}</Alert>
       </Snackbar>
     </Box>
   );

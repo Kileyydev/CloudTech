@@ -98,7 +98,7 @@ export default function SmartphoneRepairPage() {
     },
     {
       title: 'Mobile Phone Repair',
-      image: '/images/repair.jpg',
+      image: '/images/repairs.jpg',
       services: [
         { name: 'iPhone X Screen Replacement', price: 'Ksh 4,500' },
         { name: 'iPhone Xs Max Screen Replacement', price: 'Ksh 7,000' },

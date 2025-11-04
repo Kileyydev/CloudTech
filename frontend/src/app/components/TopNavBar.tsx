@@ -132,7 +132,7 @@ const TopNavBar = () => {
           { text: 'Repair', icon: <BuildIcon />, href: '/repair' },
           { text: 'Feedback', icon: <FeedbackIcon />, href: '/testimonials' },
           { text: 'Trade-in', icon: <TradeInIcon />, href: '/trade-in' },
-          { text: 'Orders', icon: <ReceiptLongIcon />, href: orderCount ? `/orders/${getLatestOrderId()}` : '/orders', badge: orderCount },
+          { text: 'Orders', icon: <ReceiptLongIcon />, href: orderCount ? `/orders` : '/orders', badge: orderCount },
           { text: 'Cart', icon: <ShoppingCartIcon />, href: '/cart', badge: cartItemCount },
         ].map(item => (
           <ListItem key={item.text} disablePadding>
@@ -186,7 +186,7 @@ const TopNavBar = () => {
               <ActionButton><TradeInIcon sx={{ color: '#DC1A8A' }} /><ActionText>Trade-in</ActionText></ActionButton>
             </Link>
 
-            <Link href={orderCount ? `/orders/${getLatestOrderId()}` : '/orders'} style={{ textDecoration: 'none' }}>
+            <Link href={orderCount ? `/orders` : '/orders'} style={{ textDecoration: 'none' }}>
               <ActionButton>
                 <Badge badgeContent={orderCount} color="error" invisible={!orderCount}>
                   <ReceiptLongIcon sx={{ color: '#DC1A8A' }} />
