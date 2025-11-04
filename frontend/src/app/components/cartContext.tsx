@@ -9,6 +9,7 @@ type CartItem = {
   price: number;
   quantity: number;
   stock: number;
+  cover_image?: string;
 };
 
 type CartContextType = {

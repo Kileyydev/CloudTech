@@ -1,17 +1,14 @@
+from rest_framework import generics, status
 from rest_framework.response import Response
-from rest_framework import status, generics
 from .models import Order
 from .serializers import OrderSerializer
 
-
+# ✅ List all orders or create new order
 class OrderListCreateView(generics.ListCreateAPIView):
     queryset = Order.objects.all().order_by('-date')
     serializer_class = OrderSerializer
 
     def get_queryset(self):
-        """
-        Filters orders by device_id for anonymous tracking.
-        """
         queryset = super().get_queryset()
         device_id = self.request.query_params.get('device_id')
         if device_id:
@@ -21,8 +18,19 @@ class OrderListCreateView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()  # ✅ anonymous orders only
+            serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            print("🔥 Serializer Errors:", serializer.errors)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# ✅ Retrieve, update, partial update, delete a single order
+class OrderDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Order.objects.all()
+    serializer_class = OrderSerializer
+    lookup_field = 'id'  # Matches <str:id> in URLs
+
+    def patch(self, request, *args, **kwargs):
+        # Partial update (like updating status)
+        return self.partial_update(request, *args, **kwargs)
+
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
