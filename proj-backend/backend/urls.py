@@ -17,14 +17,15 @@ urlpatterns = [
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
-    path('api/', include('products.urls')),
+   # path('api/', include('products.urls')),
     path('api/', include('contact.urls')),
     path('api/', include('testimonials.urls')),
     path('api/repairs/', include('repairs.urls')),
     path('api/health', health_check, name='health'),
     path('api/accounts/', include('accounts.urls')),
     path('api/purchases/', include('purchases.urls')),
-    path('api/products/', include('products.urls')),
+    #path('api/products/', include('products.urls')),
+    path('api/products/', include('products.urls')),  # ← THIS ONE ONLY
 ]
 
 if settings.DEBUG:
