@@ -33,7 +33,8 @@ type UserT = {
   is_superuser?: boolean;
 };
 
-const API_USERS = process.env.NEXT_PUBLIC_API_BASE + "/auth/users/";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE + "/accounts";
+const API_USERS = `${API_BASE}/users/`;
 
 const UsersSection: React.FC = () => {
   const router = useRouter();
