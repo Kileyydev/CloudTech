@@ -24,6 +24,9 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import TickerBar from '../components/TickerBar';
 
+/* -------------------------------------------------------------------------- */
+/*                               Styling Helpers                              */
+/* -------------------------------------------------------------------------- */
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(4),
   boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
@@ -39,60 +42,138 @@ const GradientButton = styled(Button)(({ theme }) => ({
   '&:hover': { background: 'linear-gradient(45deg, #b1166f, #db1b88)' },
 }));
 
+/* -------------------------------------------------------------------------- */
+/*                         Safe Number / Formatting Helpers                    */
+/* -------------------------------------------------------------------------- */
+const toNum = (val: any): number => {
+  const n = parseFloat(String(val));
+  return isNaN(n) ? 0 : n;
+};
+
+const formatPrice = (val: any): string => toNum(val).toLocaleString();
+
+/* -------------------------------------------------------------------------- */
+/*                                 Types                                      */
+/* -------------------------------------------------------------------------- */
+type OrderItem = {
+  product_id: number;
+  title: string;
+  price: number;
+  quantity: number;
+};
+
+type Order = {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
+  payment: 'paybill' | 'withdraw' | 'cod';
+  mpesa_code?: string;
+  cash_amount: number;
+  change: number;
+  subtotal: number;
+  shipping: number;
+  total: number;
+  items: OrderItem[];
+  date?: string;
+};
+
+/* -------------------------------------------------------------------------- */
+/*                           Main Component                                   */
+/* -------------------------------------------------------------------------- */
 export default function OrderConfirmationClient() {
   const { clearCart } = useCart();
   const router = useRouter();
   const searchParams = useSearchParams();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const pdfRef = useRef<HTMLDivElement>(null);
-  const [orderData, setOrderData] = useState<any>(null);
 
+  const pdfRef = useRef<HTMLDivElement>(null);
+  const [orderData, setOrderData] = useState<Order | null>(null);
+
+  /* ---------------------------------------------------------------------- */
+  /*  Load order from localStorage + validate URL params (run once)          */
+  /* ---------------------------------------------------------------------- */
   useEffect(() => {
-    const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-    const latestOrder = orders[0];
+    // 1. Grab latest order from localStorage
+    let latestOrder: Order | null = null;
+    try {
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      latestOrder = orders[0] ?? null;
+    } catch {
+      latestOrder = null;
+    }
 
     if (!latestOrder) {
-      router.push('/');
+      router.replace('/');
       return;
     }
 
-    // ✅ Wait until searchParams are ready
+    // 2. Pull URL params
     const name = searchParams.get('name');
     const phone = searchParams.get('phone');
     const address = searchParams.get('address');
     const city = searchParams.get('city');
 
-    if (!name || !phone || !address || !city) return; // delay validation until available
-
-    // Validate URL params against latest order
+    // 3. Security check – URL must match stored order
     if (
       latestOrder.name !== name ||
       latestOrder.phone !== phone ||
       latestOrder.address !== address ||
       latestOrder.city !== city
     ) {
-      router.push('/');
+      router.replace('/');
       return;
     }
 
-    setOrderData(latestOrder);
+    // 4. Sanitize numbers (in case backend sent strings)
+    const sanitized: Order = {
+      ...latestOrder,
+      cash_amount: toNum(latestOrder.cash_amount),
+      change: toNum(latestOrder.change),
+      subtotal: toNum(latestOrder.subtotal),
+      shipping: toNum(latestOrder.shipping),
+      total: toNum(latestOrder.total),
+      items: latestOrder.items.map((i) => ({
+        ...i,
+        price: toNum(i.price),
+      })),
+    };
 
-    // Clear cart safely once after load
-    setTimeout(() => clearCart(), 300);
-  }, [searchParams, clearCart, router]); // ✅ added dependencies
+    setOrderData(sanitized);
 
+    // 5. Clear cart after a tiny delay (UI stays responsive)
+    const timer = setTimeout(() => clearCart(), 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run only on mount
+
+  /* ---------------------------------------------------------------------- */
+  /*                              PDF Generation                              */
+  /* ---------------------------------------------------------------------- */
   const generatePDF = async () => {
     if (!pdfRef.current || !orderData) return;
-    const canvas = await html2canvas(pdfRef.current);
+
+    const canvas = await html2canvas(pdfRef.current, { scale: 2 });
     const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF();
-    const imgWidth = 190;
+
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const imgWidth = 190; // mm
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
     pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
     pdf.save(`CloudTech_${orderData.id}.pdf`);
   };
 
+  /* ---------------------------------------------------------------------- */
+  /*                              Render – No Order                             */
+  /* ---------------------------------------------------------------------- */
   if (!orderData) {
     return (
       <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', py: 8 }}>
@@ -110,6 +191,9 @@ export default function OrderConfirmationClient() {
     );
   }
 
+  /* ---------------------------------------------------------------------- */
+  /*                              Main UI                                      */
+  /* ---------------------------------------------------------------------- */
   return (
     <Box>
       <TickerBar />
@@ -119,6 +203,7 @@ export default function OrderConfirmationClient() {
       <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', py: { xs: 4, md: 8 } }}>
         <Container maxWidth="md">
           <Stack spacing={4} alignItems="center">
+            {/* Header */}
             <Box textAlign="center">
               <CheckCircle sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
               <Typography variant="h3" sx={{ fontWeight: 800, color: '#db1b88', mb: 1 }}>
@@ -129,9 +214,10 @@ export default function OrderConfirmationClient() {
               </Typography>
             </Box>
 
+            {/* Details Card */}
             <StyledPaper sx={{ width: '100%' }}>
               <Stack spacing={3}>
-                {/* Customer Details */}
+                {/* Customer */}
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                     Customer Details
@@ -139,13 +225,14 @@ export default function OrderConfirmationClient() {
                   <Stack spacing={1}>
                     <Typography><strong>Name:</strong> {orderData.name}</Typography>
                     <Typography><strong>Phone:</strong> {orderData.phone}</Typography>
-                    <Typography><strong>Delivery:</strong> {orderData.address}, {orderData.city}</Typography>
+                    <Typography>
+                      <strong>Delivery:</strong> {orderData.address}, {orderData.city}
+                    </Typography>
                   </Stack>
                 </Box>
-
                 <Divider />
 
-                {/* Payment Details */}
+                {/* Payment */}
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                     Payment Method
@@ -156,7 +243,7 @@ export default function OrderConfirmationClient() {
                         <Typography>Cash on Delivery</Typography>
                         {orderData.change > 0 && (
                           <Chip
-                            label={`Change: KES ${orderData.change.toLocaleString()}`}
+                            label={`Change: KES ${formatPrice(orderData.change)}`}
                             color="success"
                             size="small"
                           />
@@ -169,17 +256,16 @@ export default function OrderConfirmationClient() {
                     )}
                   </Stack>
                 </Box>
-
                 <Divider />
 
-                {/* Order Items */}
+                {/* Items */}
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
                     Order Items
                   </Typography>
-                  {orderData.items.map((item: any) => (
+                  {orderData.items.map((item) => (
                     <Box
-                      key={item.id}
+                      key={item.product_id}
                       sx={{
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -191,23 +277,22 @@ export default function OrderConfirmationClient() {
                         {item.title} × {item.quantity}
                       </Typography>
                       <Typography fontWeight={600}>
-                        KES {(item.price * item.quantity).toLocaleString()}
+                        KES {formatPrice(item.price * item.quantity)}
                       </Typography>
                     </Box>
                   ))}
                 </Box>
-
                 <Divider />
 
                 {/* Totals */}
                 <Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography>Subtotal:</Typography>
-                    <Typography>KES {orderData.subtotal.toLocaleString()}</Typography>
+                    <Typography>KES {formatPrice(orderData.subtotal)}</Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography>Shipping:</Typography>
-                    <Typography>KES {orderData.shipping.toLocaleString()}</Typography>
+                    <Typography>KES {formatPrice(orderData.shipping)}</Typography>
                   </Box>
                   <Divider sx={{ my: 1 }} />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -215,12 +300,12 @@ export default function OrderConfirmationClient() {
                       Total:
                     </Typography>
                     <Typography variant="h6" fontWeight={700} color="#db1b88">
-                      KES {orderData.total.toLocaleString()}
+                      KES {formatPrice(orderData.total)}
                     </Typography>
                   </Box>
                 </Box>
 
-                {/* Buttons */}
+                {/* Action Buttons */}
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mt={2}>
                   <GradientButton fullWidth startIcon={<Download />} onClick={generatePDF}>
                     Download PDF Receipt
@@ -235,9 +320,96 @@ export default function OrderConfirmationClient() {
         </Container>
       </Box>
 
-      {/* Hidden PDF Template */}
+      {/* --------------------------------------------------------------- */}
+      {/*                     Hidden PDF Template (for jsPDF)            */}
+      {/* --------------------------------------------------------------- */}
       <Box sx={{ position: 'absolute', left: '-9999px' }} ref={pdfRef}>
-        {/* ... your PDF template remains unchanged ... */}
+        <Box
+          sx={{
+            p: 8,
+            bgcolor: '#fff',
+            width: 600,
+            fontFamily: 'Arial, Helvetica, sans-serif',
+            color: '#000',
+          }}
+        >
+          {/* Logo */}
+          <Box textAlign="center" mb={3}>
+            <img src="/logo.jpeg" alt="CloudTech" style={{ height: 70 }} />
+          </Box>
+
+          <Typography variant="h4" align="center" gutterBottom sx={{ fontWeight: 700 }}>
+            Official Receipt
+          </Typography>
+
+          <Typography align="center" sx={{ mb: 2 }}>
+            Order ID: {orderData.id}
+          </Typography>
+
+          <Typography align="center" sx={{ fontSize: 12, mb: 3 }}>
+            {new Date(orderData.date ?? Date.now()).toLocaleString()}
+          </Typography>
+
+          <Divider sx={{ my: 3, borderColor: '#000' }} />
+
+          <Typography><strong>Customer:</strong> {orderData.name}</Typography>
+          <Typography><strong>Phone:</strong> {orderData.phone}</Typography>
+          <Typography>
+            <strong>Delivery:</strong> {orderData.address}, {orderData.city}
+          </Typography>
+          <Typography>
+            <strong>Payment:</strong>{' '}
+            {orderData.payment === 'cod' ? 'Cash on Delivery' : orderData.payment.toUpperCase()}
+          </Typography>
+          {orderData.change > 0 && (
+            <Typography>
+              <strong>Change Due:</strong> KES {formatPrice(orderData.change)}
+            </Typography>
+          )}
+
+          <Divider sx={{ my: 3, borderColor: '#000' }} />
+
+          {/* Items */}
+          {orderData.items.map((item) => (
+            <Box key={item.product_id} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+              <span>
+                {item.title} × {item.quantity}
+              </span>
+              <span>KES {formatPrice(item.price * item.quantity)}</span>
+            </Box>
+          ))}
+
+          <Divider sx={{ my: 2, borderColor: '#000' }} />
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+            <span>Subtotal:</span>
+            <span>KES {formatPrice(orderData.subtotal)}</span>
+          </Box>
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+            <span>Shipping:</span>
+            <span>KES {formatPrice(orderData.shipping)}</span>
+          </Box>
+
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontWeight: 700,
+              mt: 1,
+              fontSize: '1.2rem',
+            }}
+          >
+            <span>Total:</span>
+            <span>KES {formatPrice(orderData.total)}</span>
+          </Box>
+
+          <Box textAlign="center" mt={5} sx={{ fontSize: 12 }}>
+            <Typography>Thank you for shopping with</Typography>
+            <Typography fontWeight={700}>CloudTech</Typography>
+            <Typography>Kenya Cinema Building, Moi Avenue, Nairobi</Typography>
+          </Box>
+        </Box>
       </Box>
     </Box>
   );
