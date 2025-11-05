@@ -167,7 +167,14 @@ CLOUDINARY_STORAGE = {
 }
 
 DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
-MEDIA_URL = "/"  # Cloudinary serves directly
+MEDIA_URL = "/media/"  # Cloudinary serves directly
+
+if DEBUG:
+    # In dev, Django serves media → return full URL
+    from django.conf.urls.static import static
+else:
+    # In prod, Cloudinary returns full URL
+    pass
 
 # ===================================================================
 # STATIC FILES (WhiteNoise)
@@ -180,7 +187,7 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 # ===================================================================
 # FALLBACK LOCAL MEDIA (for dev or seeded files)
 # ===================================================================
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = BASE_DIR / "media/"
 
 # ===================================================================
 # EMAIL (SendGrid)

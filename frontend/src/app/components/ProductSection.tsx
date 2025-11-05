@@ -5,7 +5,6 @@ import {
   Box,
   Typography,
   Card,
-  CardMedia,
   CardContent,
   IconButton,
   Button,
@@ -39,12 +38,11 @@ const API_FEATURED = `${
     : 'https://cloudtech-c4ft.onrender.com/api'
 }/products/?is_featured=true`;
 
-// Keep MEDIA_BASE for fallback (if needed in future)
-const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_URL || 
-  (process.env.NODE_ENV === 'development'
-    ? 'http://localhost:8000'
-    : 'https://cloudtech-c4ft.onrender.com/media'
-  );
+// MEDIA_BASE — NEVER USED NOW (Django sends full URLs)
+const MEDIA_BASE = 
+  typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://localhost:8000/'
+    : 'https://cloudtech-c4ft.onrender.com/';
 
 const ProductSection = () => {
   const theme = useTheme();
@@ -67,12 +65,12 @@ const ProductSection = () => {
 
   const hasFetched = useRef(false);
 
-  // ——— DEBUG: Log MEDIA_BASE ———
+  // ——— DEBUG: Log MEDIA_BASE (optional) ———
   useEffect(() => {
     console.log('%c[MEDIA_BASE DEBUG]', 'color: purple; font-weight: bold', {
       NODE_ENV: process.env.NODE_ENV,
-      NEXT_PUBLIC_MEDIA_URL: process.env.NEXT_PUBLIC_MEDIA_URL,
-      MEDIA_BASE: MEDIA_BASE,
+      hostname: typeof window !== 'undefined' ? window.location.hostname : 'server',
+      MEDIA_BASE,
     });
   }, []);
 
@@ -150,23 +148,23 @@ const ProductSection = () => {
 
   const cartCount = Object.values(cart).reduce((s, i) => s + (i.quantity || 0), 0);
 
-  // ——— IMAGE URL BUILDER (SMART: FULL URL OR FALLBACK) ———
+  // ——— IMAGE URL BUILDER: FULL URL FROM API (NO MORE LOGIC!) ———
   const getImageUrl = (path?: string): string => {
     if (!path) {
       console.warn('%c[Image] No path provided', 'color: yellow');
       return '/images/fallback.jpg';
     }
 
-    // If Django already gave us a full URL → USE IT
+    // CASE 1: Full URL from Django (Cloudinary or localhost with request.build_absolute_uri)
     if (path.startsWith('http')) {
-      console.log('%c[Image] Using full URL from API', 'color: green', path);
+      console.log('%c[Image] Full URL from API', 'color: green', path);
       return path;
     }
 
-    // Fallback: Build from MEDIA_BASE (for old data or dev)
+    // CASE 2: Fallback (should NEVER happen now)
     const base = MEDIA_BASE.replace(/\/$/, '');
-    const cleanPath = path.replace(/^\/+/, '');
-    const built = `${base}/${cleanPath}`;
+    const clean = path.replace(/^\/+/, '');
+    const built = `${base}/${clean}`;
     console.log('%c[Image] Built URL (fallback)', 'color: orange', { path, built });
     return built;
   };
@@ -190,7 +188,6 @@ const ProductSection = () => {
     const src = getImageUrl(p.cover_image);
     const inCart = cart[p.id];
 
-    // DEBUG: Log every image URL being used
     console.log('%c[Product Image] Loading:', 'color: cyan; font-weight: bold', {
       productId: p.id,
       title: p.title,
@@ -236,16 +233,28 @@ const ProductSection = () => {
           <Favorite sx={{ color: wishlist.has(p.id) ? '#e91e63' : '#888', fontSize: 20 }} />
         </Box>
 
-        {/* Image with LOUD ERROR LOGGING + FIXED (unoptimized + priority) */}
+        {/* RAW IMG */}
         <Box
           onClick={() => router.push(`/product/${p.id}`)}
           sx={{ width: '100%', height: CARD_H * 0.56, cursor: 'pointer', overflow: 'hidden' }}
         >
-          <CardMedia
-            component="img"
-            image={src}
+          <img
+            src={src}
             alt={p.title}
             loading="eager"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transition: 'transform 0.3s ease-in-out',
+              display: 'block',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLImageElement).style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLImageElement).style.transform = 'scale(1.0)';
+            }}
             onLoad={() => {
               console.log('%c[Product Image] LOADED', 'color: green; font-weight: bold', p.title, src);
             }}
@@ -255,21 +264,13 @@ const ProductSection = () => {
                 title: p.title,
                 attempted_url: src,
                 cover_image_db_value: p.cover_image,
-                MEDIA_BASE: MEDIA_BASE,
               });
               e.currentTarget.src = '/images/fallback.jpg';
-            }}
-            sx={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              transition: 'transform 0.3s',
-              '&:hover': { transform: 'scale(1.05)' },
             }}
           />
         </Box>
 
-        {/* Rest of card */}
+        {/* Content */}
         <CardContent sx={{ p: 1.5, height: CARD_H * 0.44, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <Box>
             <Typography

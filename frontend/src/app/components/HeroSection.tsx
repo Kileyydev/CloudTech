@@ -7,9 +7,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 const SLIDES = [
-  '/images/gaming-headphone.jpg',
+  '/images/headphone1.jpg',
   '/images/laptop.jpg',
-  '/images/galaxy.jpg',
+  '/images/ecosystem1.jpg',
 ];
 
 const HeroWrapper = styled(Box)({
@@ -101,6 +101,8 @@ export default function HeroSection() {
             fontSize: { xs: '1rem', md: '1.35rem' },
             letterSpacing: '0.2em',
             color: '#000',
+            bgcolor: '#fff',
+            padding: '4px 12px',
             textTransform: 'uppercase',
             mb: 4,
           }}

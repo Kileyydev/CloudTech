@@ -20,7 +20,7 @@ from .serializers import (
 
 
 # ----------------------------------------
-# ✅ Custom permission
+# Custom permission
 # ----------------------------------------
 class IsAdminOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -30,10 +30,9 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 
 
 # ----------------------------------------
-# ✅ Product ViewSet (with caching)
+# Product ViewSet (with caching)
 # ----------------------------------------
-@method_decorator(cache_page(60 * 5), name='list')  # cache list responses for 5 min
-@method_decorator(cache_page(60 * 5), name='list')
+@method_decorator(cache_page(60 * 5), name='list')  # ← ONLY ONE!
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.prefetch_related(
         'variants', 'images', 'tags', 'categories'
@@ -84,7 +83,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
 
 # ----------------------------------------
-# ✅ ProductVariant ViewSet
+# ProductVariant ViewSet
 # ----------------------------------------
 class ProductVariantViewSet(viewsets.ModelViewSet):
     queryset = ProductVariant.objects.select_related('product').all()
@@ -97,7 +96,7 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
 
 
 # ----------------------------------------
-# ✅ Category ViewSet
+# Category ViewSet
 # ----------------------------------------
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
@@ -106,7 +105,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 # ----------------------------------------
-# ✅ Brand ViewSet
+# Brand ViewSet
 # ----------------------------------------
 class BrandViewSet(viewsets.ModelViewSet):
     queryset = Brand.objects.all()

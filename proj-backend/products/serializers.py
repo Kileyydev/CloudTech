@@ -1,6 +1,5 @@
 # products/serializers.py
 from rest_framework import serializers
-from django.conf import settings
 from django.utils.text import slugify
 from .models import Category, Brand, Tag, Product, ProductVariant, ProductImage
 
@@ -27,7 +26,7 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT IMAGE (WITH FULL URL)
+# PRODUCT IMAGE (CLOUDINARY + LOCAL: FULL URL)
 # ===================================================================
 class ProductImageSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
@@ -42,9 +41,7 @@ class ProductImageSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request:
             return request.build_absolute_uri(obj.image.url)
-        # Fallback for non-request contexts
-        base_url = getattr(settings, 'SITE_URL', 'https://cloudtech-c4ft.onrender.com')
-        return f"{base_url}{obj.image.url}"
+        return obj.image.url  # Cloudinary already full
 
 
 # ===================================================================
@@ -60,7 +57,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT LIST (READ-ONLY)
+# PRODUCT LIST (READ-ONLY) — FULL URLS
 # ===================================================================
 class ProductListSerializer(serializers.ModelSerializer):
     brand = BrandSerializer(read_only=True)
@@ -84,8 +81,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request:
             return request.build_absolute_uri(obj.cover_image.url)
-        base_url = getattr(settings, 'SITE_URL', 'https://cloudtech-c4ft.onrender.com')
-        return f"{base_url}{obj.cover_image.url}"
+        return obj.cover_image.url  # Cloudinary already full
 
 
 # ===================================================================

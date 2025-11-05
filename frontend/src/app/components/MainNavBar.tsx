@@ -16,6 +16,7 @@ export const navCategories = [
   'Storage',
   'PowerBank',
   'Content Creator Kit',
+  'Projectors',
 ];
 
 const Divider = styled(Box)(({ theme }) => ({
@@ -176,6 +177,7 @@ const MainNavBar = () => {
     { href: '/storage', label: 'Storage' },
     { href: '/powerbank', label: 'PowerBank' },
     { href: '/content-creator-kit', label: 'Content Creator Kit' },
+    { href : '/projectors', label: 'Projectors' },
   ];
 
   return (

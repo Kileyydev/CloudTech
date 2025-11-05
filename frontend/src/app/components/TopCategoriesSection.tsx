@@ -133,16 +133,16 @@ const CategoriesWrapper = styled(Box)(({ theme }) => ({
 
 const TopCategoriesSection = () => {
   const categories = [
-    { name: 'Storage', image: '/images/headphones.jpg' },
-    { name: 'Mobile Phones',  image: '/images/iphone17.webp' },
-    { name: 'Mobile Accessories',  image: '/images/cables.png' },
-    { name: 'Laptops',  image: '/images/mac.jpg' },
-    { name: 'Audio',  image: '/images/oraimo.webp' },
+    { name: 'Storage', image: '/images/storage.jpg' },
+    { name: 'Mobile Phones',  image: '/images/iphone1.jpg' },
+    { name: 'Mobile Accessories',  image: '/images/cable2.jpg' },
+    { name: 'Laptops',  image: '/images/laptop1.jpg' },
+    { name: 'Audio',  image: '/images/headphone.jpg' },
     { name: 'Gaming Console', image: '/images/ps5.png' },
-    { name: 'Projectors',  image: '/images/watch.webp' },
-    { name: 'iPads',  image: '/images/iPad.webp' },
+    { name: 'Projectors',  image: '/images/projector.jpg' },
+    { name: 'iPads',  image: '/images/ipad1.jpg' },
     { name: 'Power Banks',  image: '/images/powerbank.jpg' },
-    { name: 'Content Creator Kits',  image: '/images/smartwatch.jpg' },
+    { name: 'Content Creator Kits',  image: '/images/osmo1.jpg' },
   ];
 
   return (

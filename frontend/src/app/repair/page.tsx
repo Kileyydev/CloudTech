@@ -88,7 +88,7 @@ export default function SmartphoneRepairPage() {
   const repairCategories = [
     {
       title: 'Personal Computer Repair',
-      image: '/images/repair.jpg',
+      image: '/images/repair1.jpg',
       services: [
         { name: 'Screen Replacement', price: 'Ksh 8,000' },
         { name: 'Charging Port Repair', price: 'Ksh 3,500' },
