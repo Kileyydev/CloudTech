@@ -29,5 +29,7 @@ urlpatterns = [
 
 ]
 
-# Serve media files
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# SERVE MEDIA IN DEV + FORCE IN PRODUCTION
+if settings.DEBUG or True:  # ← Force on Render
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
