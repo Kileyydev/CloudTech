@@ -32,10 +32,6 @@ const StyledCard = styled(Card)(({ theme }) => ({
   transition: "all 0.3s ease",
   background: "#fff",
   boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
-  "&:hover": {
-    transform: "translateY(-8px)",
-    boxShadow: "0 16px 32px rgba(220, 26, 138, 0.15)",
-  },
 }));
 
 const DiscountBadge = styled(Box)(({ theme }) => ({
@@ -61,12 +57,11 @@ const StyledButton = styled(Button)(({ theme }) => ({
   "&.primary": {
     background: "linear-gradient(135deg, #DC1A8A, #B31774)",
     color: "#fff",
-    "&:hover": { background: "linear-gradient(135deg, #B31774, #9a165c)" },
   },
   "&.danger": {
     background: "#f44336",
     color: "#fff",
-    "&:hover": { background: "#d32f2f" },
+    
   },
 }));
 
@@ -77,10 +72,6 @@ const ImageUpload = styled(Box)(({ theme }) => ({
   cursor: "pointer",
   transition: "all 0.2s",
   background: alpha("#DC1A8A", 0.02),
-  "&:hover": {
-    borderColor: "#DC1A8A",
-    background: alpha("#DC1A8A", 0.05),
-  },
   "& input": { display: "none" },
 }));
 
@@ -95,10 +86,7 @@ const GalleryPreview = styled(Box)(({ theme }) => ({
     objectFit: "cover",
     border: `2px solid ${alpha("#DC1A8A", 0.2)}`,
     transition: "all 0.2s",
-    "&:hover": {
-      transform: "scale(1.05)",
-      borderColor: "#DC1A8A",
-    },
+
   },
 }));
 

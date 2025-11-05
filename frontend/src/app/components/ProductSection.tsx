@@ -17,26 +17,28 @@ import {
 import { Favorite, ShoppingCart, Add, Remove } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { useCart } from './cartContext';
+import { getProductImageSrc } from '@/app/utils/image';
 
+// ——— TYPES ———
 type ProductT = {
-  id: number;
+  id: number; // ← CHANGED TO number
   title: string;
   price: number;
   description: string;
   cover_image?: string;
-  images?: string[];
+  images?: { image: string; alt_text?: string; is_primary?: boolean }[];
   stock: number;
+  discount?: number;
+  final_price?: number;
+  is_active?: boolean;
+  is_featured?: boolean;
 };
 
 // ——— CONFIG ———
 const CACHE_KEY = 'featured_products_cache';
 const CACHE_TIME = 15 * 60 * 1000;
 
-const API_FEATURED = `${
-  process.env.NODE_ENV === 'development'
-    ? 'http://localhost:8000/api'
-    : 'https://cloudtech-c4ft.onrender.com/api'
-}/products/?is_featured=true`;
+const API_FEATURED = `${process.env.NEXT_PUBLIC_API_BASE}/products/?is_featured=true`;
 
 const ProductSection = () => {
   const theme = useTheme();
@@ -45,7 +47,7 @@ const ProductSection = () => {
   const { cart, addToCart, updateQuantity } = useCart();
 
   const [products, setProducts] = useState<ProductT[]>([]);
-  const [wishlist, setWishlist] = useState<Set<number>>(new Set());
+  const [wishlist, setWishlist] = useState<Set<number>>(new Set()); // ← number
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -101,7 +103,10 @@ const ProductSection = () => {
   // ——— LOAD WISHLIST ———
   useEffect(() => {
     const stored = localStorage.getItem('wishlist');
-    if (stored) setWishlist(new Set(JSON.parse(stored)));
+    if (stored) {
+      const ids = JSON.parse(stored);
+      setWishlist(new Set(ids.filter((id: any) => typeof id === 'number')));
+    }
   }, []);
 
   // ——— UTILS ———
@@ -133,12 +138,6 @@ const ProductSection = () => {
 
   const cartCount = Object.values(cart).reduce((s, i) => s + (i.quantity || 0), 0);
 
-  // ——— IMAGE URL ———
-  const getImageUrl = (path?: string): string => {
-    if (!path) return '/images/fallback.jpg';
-    return path;
-  };
-
   // ——— CARD DIMENSIONS ———
   const CARD_W = 218;
   const CARD_H = 350;
@@ -154,12 +153,11 @@ const ProductSection = () => {
     </Card>
   );
 
-  // ——— PRODUCT CARD (NO HOOKS INSIDE!) ———
+  // ——— PRODUCT CARD ———
   const productCard = (p: ProductT) => {
-    const src = getImageUrl(p.cover_image);
-    const inCart = cart[p.id];
+    const src = getProductImageSrc(p);
+    const inCart = cart[p.id]; // ← Now safe: p.id is number
 
-    // Log outside render — no useEffect!
     console.log('%c[Product Image] Loading:', 'color: cyan; font-weight: bold', p.id, p.title, src);
 
     return (
@@ -200,7 +198,7 @@ const ProductSection = () => {
           <Favorite sx={{ color: wishlist.has(p.id) ? '#e91e63' : '#888', fontSize: 20 }} />
         </Box>
 
-        {/* Image - EAGER + PRIORITY */}
+        {/* Image */}
         <Box
           onClick={() => router.push(`/product/${p.id}`)}
           sx={{ width: '100%', height: CARD_H * 0.56, cursor: 'pointer', overflow: 'hidden' }}
@@ -265,37 +263,53 @@ const ProductSection = () => {
             >
               {p.description}
             </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#222', mt: 1, fontSize: '1.05rem' }}>
-              KES {p.price.toLocaleString()}
-            </Typography>
+
+            {/* Price */}
+            <Box sx={{ mt: 1 }}>
+              {p.discount && p.discount > 0 ? (
+                <>
+                  <Typography sx={{ textDecoration: 'line-through', color: '#999', fontSize: '0.85rem' }}>
+                    KES {p.price.toLocaleString()}
+                  </Typography>
+                  <Typography sx={{ fontWeight: 700, color: '#e91e63', fontSize: '1.05rem' }}>
+                    KES {(p.final_price ?? p.price).toLocaleString()}
+                  </Typography>
+                </>
+              ) : (
+                <Typography sx={{ fontWeight: 700, color: '#222', fontSize: '1.05rem' }}>
+                  KES {p.price.toLocaleString()}
+                </Typography>
+              )}
+            </Box>
           </Box>
 
+          {/* Cart Controls */}
           {inCart ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, mt: 1.2 }}>
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    sub(p.id);
-                  }}
-                  sx={{ color: '#e91e63', border: '1.5px solid #e91e63', width: 32, height: 32 }}
-                >
-                  <Remove fontSize="small" />
-                </IconButton>
-                <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', minWidth: 28, textAlign: 'center' }}>
-                  {inCart.quantity}
-                </Typography>
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    add(p);
-                  }}
-                  disabled={inCart.quantity >= p.stock}
-                  sx={{ color: '#e91e63', border: '1.5px solid #e91e63', width: 32, height: 32 }}
-                >
-                  <Add fontSize="small" />
-                </IconButton>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  sub(p.id);
+                }}
+                sx={{ color: '#e91e63', border: '1.5px solid #e91e63', width: 32, height: 32 }}
+              >
+                <Remove fontSize="small" />
+              </IconButton>
+              <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', minWidth: 28, textAlign: 'center' }}>
+                {inCart.quantity}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  add(p);
+                }}
+                disabled={inCart.quantity >= p.stock}
+                sx={{ color: '#e91e63', border: '1.5px solid #e91e63', width: 32, height: 32 }}
+              >
+                <Add fontSize="small" />
+              </IconButton>
             </Box>
           ) : (
             <Button
@@ -382,7 +396,7 @@ const ProductSection = () => {
               <Box key={i}>{skeleton()}</Box>
             ))
           : products
-              .filter((p) => p.stock > 0)
+              .filter((p) => p.stock > 0 && p.is_active !== false)
               .map(productCard)}
       </Box>
 
