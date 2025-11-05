@@ -1,6 +1,8 @@
+# products/models.py
 from django.db import models
 from django.utils.text import slugify
 import uuid
+from cloudinary.models import CloudinaryField  # ← CRITICAL
 
 
 class Category(models.Model):
@@ -35,14 +37,21 @@ class Brand(models.Model):
 
 class Tag(models.Model):
     name = models.CharField(max_length=60, unique=True)
+    slug = models.SlugField(max_length=80, unique=True, blank=True)
 
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
 
 class Product(models.Model):
     """
-    Represents a general product (e.g., 'iPhone 14').
+    Represents a general product (e.g., 'iPhone 16 Pro Max').
+    Images stored in Cloudinary → full HTTPS URLs.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255)
@@ -53,8 +62,8 @@ class Product(models.Model):
     brand = models.ForeignKey('Brand', on_delete=models.SET_NULL, null=True, related_name='products')
     tags = models.ManyToManyField('Tag', blank=True, related_name='products')
 
-    # ✅ Cloudinary automatically stores this
-    cover_image = models.ImageField(upload_to='products/covers/', null=True, blank=True)
+    # CLOUDINARY: Full HTTPS URL
+    cover_image = CloudinaryField('image', blank=True, null=True)
 
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     stock = models.PositiveIntegerField(default=0)
@@ -83,14 +92,14 @@ class Product(models.Model):
             base = slugify(self.title)[:240]
             slug = base
             i = 1
-            while Product.objects.filter(slug=slug).exists():
+            while Product.objects.filter(slug=slug).exclude(pk=self.pk).exists():
                 slug = f"{base}-{i}"
                 i += 1
             self.slug = slug
 
         # Auto calculate final price
         if self.discount and self.discount > 0:
-            self.final_price = self.price - (self.price * self.discount / 100)
+            self.final_price = round(self.price * (1 - self.discount / 100), 2)
         else:
             self.final_price = self.price
 
@@ -99,7 +108,7 @@ class Product(models.Model):
 
 class ProductVariant(models.Model):
     """
-    Represents specific configurations (e.g., color, storage).
+    Specific configurations (color, storage, etc.).
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
@@ -125,16 +134,15 @@ class ProductVariant(models.Model):
 
 class ProductImage(models.Model):
     """
-    Holds gallery images for each product (besides cover).
-    Cloudinary will handle hosting automatically.
+    Gallery images. Stored in Cloudinary → full HTTPS URLs.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='productimage_set')
     variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name='images', null=True, blank=True)
-    
-    # ✅ This is now stored and served directly by Cloudinary
-    image = models.ImageField(upload_to='products/images/')
-    
+
+    # CLOUDINARY: Full HTTPS URL
+    image = CloudinaryField('image')
+
     alt_text = models.CharField(max_length=255, blank=True)
     is_primary = models.BooleanField(default=False)
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -147,7 +155,8 @@ class ProductImage(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        # Automatically sync cover image if primary
-        if self.is_primary and self.product.cover_image != self.image:
-            self.product.cover_image = self.image
-            self.product.save()
+        # Sync primary image to product cover
+        if self.is_primary:
+            if self.product.cover_image != self.image:
+                self.product.cover_image = self.image
+                self.product.save(update_fields=['cover_image'])

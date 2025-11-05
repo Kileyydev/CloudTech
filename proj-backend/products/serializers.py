@@ -26,7 +26,7 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT IMAGE (CLOUDINARY + LOCAL: FULL URL)
+# PRODUCT IMAGE — CLOUDINARY FULL URL
 # ===================================================================
 class ProductImageSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
@@ -38,9 +38,7 @@ class ProductImageSerializer(serializers.ModelSerializer):
     def get_image(self, obj):
         if not obj.image:
             return None
-        request = self.context.get('request')
-        if request:
-            return request.build_absolute_uri(obj.image.url)
+        # CloudinaryField returns full HTTPS URL: https://res.cloudinary.com/...
         return obj.image.url
 
 
@@ -57,7 +55,7 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT LIST (READ-ONLY) — FULL URLS
+# PRODUCT LIST (READ-ONLY) — FULL CLOUDINARY URLS
 # ===================================================================
 class ProductListSerializer(serializers.ModelSerializer):
     brand = BrandSerializer(read_only=True)
@@ -78,14 +76,12 @@ class ProductListSerializer(serializers.ModelSerializer):
     def get_cover_image(self, obj):
         if not obj.cover_image:
             return None
-        request = self.context.get('request')
-        if request:
-            return request.build_absolute_uri(obj.cover_image.url)
-        return obj.cover_image.url  # Cloudinary: https://res.cloudinary.com/...
+        # CloudinaryField: returns https://res.cloudinary.com/... directly
+        return obj.cover_image.url
 
 
 # ===================================================================
-# PRODUCT CREATE / UPDATE
+# PRODUCT CREATE / UPDATE — ACCEPTS FILES, SAVES TO CLOUDINARY
 # ===================================================================
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     # Write-only fields
@@ -129,8 +125,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         gallery_files = validated_data.pop('gallery', [])
 
         # Auto-generate slug
-        if 'slug' not in validated_data:
-            validated_data['slug'] = slugify(validated_data['title'])
+        validated_data['slug'] = slugify(validated_data.get('title', ''))
 
         product = Product.objects.create(**validated_data)
         product.categories.set(category_ids)
@@ -140,7 +135,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
             product.tags.add(tag)
 
-        # Cover image
+        # Cover image → saved to Cloudinary via CloudinaryField
         if cover_file:
             product.cover_image = cover_file
 

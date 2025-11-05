@@ -35,7 +35,6 @@ ALLOWED_HOSTS = [
 # INSTALLED APPS
 # ===================================================================
 INSTALLED_APPS = [
-    # Django core
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -43,7 +42,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    # Third-party
     "rest_framework",
     "rest_framework_simplejwt",
     "corsheaders",
@@ -51,7 +49,6 @@ INSTALLED_APPS = [
     "cloudinary",
     "cloudinary_storage",
 
-    # Local apps
     "products",
     "accounts",
     "contact",
@@ -61,12 +58,12 @@ INSTALLED_APPS = [
 ]
 
 # ===================================================================
-# MIDDLEWARE (ORDER IS CRITICAL!)
+# MIDDLEWARE
 # ===================================================================
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
-    "corsheaders.middleware.CorsMiddleware",           # ← Must be high
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -102,7 +99,10 @@ WSGI_APPLICATION = "backend.wsgi.application"
 # DATABASE
 # ===================================================================
 DATABASES = {
-    "default": env.db("DATABASE_URL", default="postgresql://neondb_owner:npg_i6HWNMPIJfb7@ep-holy-silence-adqn8djl-pooler.c-2.us-east-1.aws.neon.tech:5432/neondb?sslmode=require")
+    "default": env.db(
+        "DATABASE_URL",
+        default="postgresql://neondb_owner:npg_i6HWNMPIJfb7@ep-holy-silence-adqn8djl-pooler.c-2.us-east-1.aws.neon.tech:5432/neondb?sslmode=require"
+    )
 }
 
 # ===================================================================
@@ -113,12 +113,8 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",
-    ],
-    "DEFAULT_FILTER_BACKENDS": [
-        "django_filters.rest_framework.DjangoFilterBackend",
-    ],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
 }
 
 SIMPLE_JWT = {
@@ -144,7 +140,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://www.cloudtechstore.net",
     "https://cloudtech-c4ft.onrender.com",
     "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "http://127.0.1:3000",
 ]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
@@ -158,7 +154,7 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 CSRF_TRUSTED_ORIGINS = CORS_ALLOWED_ORIGINS
 
 # ===================================================================
-# CLOUDINARY (PRIMARY STORAGE)
+# CLOUDINARY — FULLY ENABLED
 # ===================================================================
 CLOUDINARY_STORAGE = {
     "CLOUD_NAME": env("CLOUDINARY_CLOUD_NAME"),
@@ -166,15 +162,11 @@ CLOUDINARY_STORAGE = {
     "API_SECRET": env("CLOUDINARY_API_SECRET"),
 }
 
+# ALWAYS USE CLOUDINARY — NO LOCAL MEDIA
 DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
-MEDIA_URL = "/media/"  # Cloudinary serves directly
 
-if DEBUG:
-    # In dev, Django serves media → return full URL
-    from django.conf.urls.static import static
-else:
-    # In prod, Cloudinary returns full URL
-    pass
+# NO MEDIA_URL, NO MEDIA_ROOT — CLOUDINARY SERVES DIRECTLY
+# REMOVED: MEDIA_URL, MEDIA_ROOT
 
 # ===================================================================
 # STATIC FILES (WhiteNoise)
@@ -183,11 +175,6 @@ STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-# ===================================================================
-# FALLBACK LOCAL MEDIA (for dev or seeded files)
-# ===================================================================
-MEDIA_ROOT = BASE_DIR / "media/"
 
 # ===================================================================
 # EMAIL (SendGrid)
@@ -201,7 +188,7 @@ EMAIL_HOST_PASSWORD = env("SENDGRID_API_KEY")
 DEFAULT_FROM_EMAIL = env("EMAIL_FROM", default="no-reply@cloudtechstore.net")
 
 # ===================================================================
-# PASSWORD VALIDATION
+# PASSWORD & INTERNATIONALIZATION
 # ===================================================================
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -210,9 +197,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# ===================================================================
-# INTERNATIONALIZATION
-# ===================================================================
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Africa/Nairobi"
 USE_I18N = True
@@ -221,5 +205,4 @@ USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 APPEND_SLASH = True
 
-# settings.py
 SITE_URL = env("SITE_URL", default="https://cloudtech-c4ft.onrender.com")
