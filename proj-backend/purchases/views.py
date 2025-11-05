@@ -1,36 +1,83 @@
-from rest_framework import generics, status
+# purchases/views.py
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from .models import Order
 from .serializers import OrderSerializer
 
-# ✅ List all orders or create new order
+
+# 1. LIST + CREATE ORDERS (SECURE FILTERING)
 class OrderListCreateView(generics.ListCreateAPIView):
-    queryset = Order.objects.all().order_by('-date')
     serializer_class = OrderSerializer
+    permission_classes = [permissions.AllowAny]  # Allow guest CREATE only
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        """
+        GUEST: Filter by device_id
+        LOGGED IN: Filter by user
+        """
+        queryset = Order.objects.all().order_by('-date')
+        user = self.request.user
+
+        # LOGGED IN → show only their orders
+        if user.is_authenticated:
+            return queryset.filter(user=user)
+
+        # GUEST → show only device_id
         device_id = self.request.query_params.get('device_id')
         if device_id:
-            queryset = queryset.filter(device_id=device_id)
-        return queryset
+            return queryset.filter(device_id=device_id)
+
+        # NO ACCESS IF NO ID
+        return queryset.none()
 
     def create(self, request, *args, **kwargs):
+        """
+        Create order — serializer handles ID, device_id, user
+        """
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# ✅ Retrieve, update, partial update, delete a single order
+
+# 2. ADMIN: RETRIEVE, UPDATE, DELETE BY ID
 class OrderDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
-    lookup_field = 'id'  # Matches <str:id> in URLs
+    lookup_field = 'id'
+    permission_classes = [permissions.IsAuthenticated]  # Only logged-in
+
+    def get_queryset(self):
+        """
+        Admin can see all, but restrict non-admin to own orders
+        """
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return Order.objects.all()
+        return Order.objects.filter(user=user)
 
     def patch(self, request, *args, **kwargs):
-        # Partial update (like updating status)
         return self.partial_update(request, *args, **kwargs)
 
     def delete(self, request, *args, **kwargs):
         return self.destroy(request, *args, **kwargs)
+
+
+# 3. PUBLIC: FETCH SINGLE ORDER (NO LOGIN)
+class OrderPublicDetailView(generics.RetrieveAPIView):
+    queryset = Order.objects.all()
+    serializer_class = OrderSerializer
+    lookup_field = 'id'
+    permission_classes = [permissions.AllowAny]
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Order not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )

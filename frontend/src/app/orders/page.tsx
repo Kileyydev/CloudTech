@@ -1,234 +1,281 @@
+// src/app/orders/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  Container,
-  Stepper,
-  Step,
-  StepLabel,
-  Stack,
-  Divider,
-  Button,
-  Chip,
-  Skeleton,
-  Alert,
+  Box, Container, Paper, Typography, Button, Stack, CircularProgress,
+  Alert, Card, CardContent, Chip, useTheme, useMediaQuery
 } from '@mui/material';
-import { styled } from '@mui/material/styles';
+import { Print, CheckCircle, Inventory, AccessTime, LocalShipping, DoneAll } from '@mui/icons-material';
+import { useRouter } from 'next/navigation';
 import TopNavBar from '../components/TopNavBar';
 import MainNavBar from '../components/MainNavBar';
 import TickerBar from '../components/TickerBar';
-import { useRouter } from 'next/navigation';
-import { getDeviceId } from '@/app/utils/device';
+import { useCart } from '../components/cartContext';
+import axios from 'axios';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://cloudtech-c4ft.onrender.com/api';
+const API_BASE = process.env.NODE_ENV === 'development'
+  ? 'http://localhost:8000/api'
+  : 'https://cloudtech-c4ft.onrender.com/api';
 
-const StyledPaper = styled(Paper)(({ theme }) => ({
-  padding: theme.spacing(4),
-  boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
-  background: 'linear-gradient(145deg, #ffffff, #f8f9fa)',
-  borderRadius: 12,
-}));
+interface OrderItem {
+  product_id: string;
+  title: string;
+  price: number;
+  quantity: number;
+}
 
-const GradientButton = styled(Button)(({ theme }) => ({
-  padding: theme.spacing(1.5, 4),
-  fontWeight: 600,
-  textTransform: 'none',
-  background: 'linear-gradient(45deg, #db1b88, #b1166f)',
-  color: 'white',
-  '&:hover': { background: 'linear-gradient(45deg, #b1166f, #db1b88)' },
-}));
+interface OrderData {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  city: string;
+  payment: string;
+  cash_amount: number;
+  change: number;
+  subtotal: number;
+  shipping: number;
+  total: number;
+  status: string;
+  date: string;
+  items: OrderItem[];
+}
 
-const steps = ['Received', 'Processing', 'Packing', 'Dispatched', 'Delivered'];
+const STATUS_STEPS = [
+  { key: 'confirmed', label: 'Confirmed', icon: <CheckCircle />, color: '#e91e63' },
+  { key: 'received', label: 'Received', icon: <Inventory />, color: '#ff9800' },
+  { key: 'processing', label: 'Processing', icon: <AccessTime />, color: '#2196f3' },
+  { key: 'packaging', label: 'Packaging', icon: <Inventory />, color: '#9c27b0' },
+  { key: 'dispatched', label: 'Dispatched', icon: <LocalShipping />, color: '#4caf50' },
+  { key: 'delivered', label: 'Delivered', icon: <DoneAll />, color: '#2e7d32' },
+];
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
+  // GET deviceId FROM CART CONTEXT
+  const { deviceId } = useCart();
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   useEffect(() => {
-    const loadOrders = async () => {
-      setLoading(true);
-      setError('');
-
+    const fetchOrders = async () => {
       try {
-        const deviceId = getDeviceId();
-        if (!deviceId) {
-          setError('No device ID found. Please place an order first.');
-          setOrders([]);
-          setLoading(false);
-          return;
+        setLoading(true);
+        setError('');
+
+        const params: any = {};
+        const headers: any = {};
+
+        // GUEST: Use device_id
+        if (deviceId && !token) {
+          params.device_id = deviceId;
+        }
+        // LOGGED IN: Send token → Django filters by user
+        if (token) {
+          headers.Authorization = `Token ${token}`;
         }
 
-        // Backend fetch
-        let fetchedOrders: any[] = [];
-        try {
-          const res = await fetch(`${API_BASE}/orders/?device_id=${deviceId}`, { cache: 'no-store' });
-          if (res.ok) {
-            const data = await res.json();
-            fetchedOrders = Array.isArray(data) ? data : data.results || [];
-          }
-        } catch (err) {
-          console.warn('Backend offline, using local orders');
-        }
-
-        // LocalStorage fallback
-        const localOrders = JSON.parse(localStorage.getItem('orders') || '[]');
-        const userLocalOrders = localOrders.filter((o: any) => o.device_id === deviceId);
-
-        // Merge & dedupe
-        const allOrders = [...fetchedOrders];
-        userLocalOrders.forEach((local: any) => {
-          if (!allOrders.find(o => o.id === local.id)) {
-            allOrders.push(local);
-          }
+        const res = await axios.get(`${API_BASE}/purchases/`, {
+          params,
+          headers,
         });
 
-        // Sort newest first
-        allOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setOrders(allOrders);
+        const data = Array.isArray(res.data) ? res.data : res.data.results || [];
+        setOrders(data);
       } catch (err: any) {
-        console.error(err);
-        setError('Failed to load orders. Try again later.');
+        console.error('Failed to load orders:', err);
+        setError('Could not load orders. Try again later.');
       } finally {
         setLoading(false);
       }
     };
 
-    loadOrders();
-  }, []);
+    fetchOrders();
+  }, [deviceId, token]);
+
+  const handleViewOrder = (orderId: string) => {
+    router.push(`/order-confirmation?orderId=${orderId}`);
+  };
+
+  const handlePrint = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.print();
+  };
+
+  const getStatusStep = (status: string) => {
+    return STATUS_STEPS.findIndex(s => s.key === status);
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString('en-KE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   if (loading) {
     return (
-      <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', py: 8 }}>
-        <TickerBar />
-        <TopNavBar />
-        <MainNavBar />
-        <Container maxWidth="md">
-          <StyledPaper sx={{ p: 6, textAlign: 'center' }}>
-            <Typography variant="h5" color="text.secondary" mb={3}>
-              Loading your orders...
-            </Typography>
-            <Stack spacing={3}>
-              {[1, 2, 3].map(i => (
-                <Skeleton key={i} variant="rectangular" height={180} sx={{ borderRadius: 3 }} />
-              ))}
-            </Stack>
-          </StyledPaper>
-        </Container>
-      </Box>
-    );
-  }
-
-  if (error || orders.length === 0) {
-    return (
-      <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', py: 8 }}>
-        <TickerBar />
-        <TopNavBar />
-        <MainNavBar />
-        <Container maxWidth="sm">
-          <StyledPaper sx={{ p: 6, textAlign: 'center' }}>
-            {error ? (
-              <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>
-            ) : (
-              <Typography variant="h5" color="text.secondary" mb={2}>No orders yet</Typography>
-            )}
-            <GradientButton onClick={() => router.push('/')}>Start Shopping</GradientButton>
-          </StyledPaper>
+      <Box sx={{ minHeight: '100vh', bgcolor: '#f9f9f9' }}>
+        <TickerBar /><TopNavBar /><MainNavBar />
+        <Container sx={{ py: 6, textAlign: 'center' }}>
+          <CircularProgress size={60} />
+          <Typography sx={{ mt: 2 }}>Loading your orders...</Typography>
         </Container>
       </Box>
     );
   }
 
   return (
-    <Box>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#f9f9f9' }}>
       <TickerBar />
       <TopNavBar />
       <MainNavBar />
-      <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', py: { xs: 4, md: 8 } }}>
-        <Container maxWidth="md">
-          <Typography variant="h4" sx={{ mb: 4, fontWeight: 800, color: '#db1b88', textAlign: 'center' }}>
-            My Orders
-          </Typography>
-          <Stack spacing={4}>
+
+      <Container maxWidth="lg" sx={{ py: { xs: 3, md: 6 } }}>
+        <Typography variant="h4" sx={{ mb: 4, fontWeight: 700, color: '#e91e63', textAlign: 'center' }}>
+          My Orders
+        </Typography>
+
+        {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+
+        {orders.length === 0 ? (
+          <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 0 }}>
+            <Typography variant="h6" color="text.secondary">
+              {deviceId || token ? 'No orders found' : 'Sign in or place an order'}
+            </Typography>
+            <Button
+              variant="contained"
+              sx={{ mt: 2, bgcolor: '#e91e63', borderRadius: 0 }}
+              onClick={() => router.push('/')}
+            >
+              Start Shopping
+            </Button>
+          </Paper>
+        ) : (
+          <Stack spacing={3}>
             {orders.map((order) => {
-              const stepIndex = steps.indexOf(order.status || 'Received');
-              const activeStep = stepIndex >= 0 ? stepIndex : 0;
+              const currentStep = getStatusStep(order.status);
+              const step = STATUS_STEPS[currentStep] || STATUS_STEPS[0];
 
               return (
-                <StyledPaper key={order.id}>
-                  <Stack spacing={3}>
-                    {/* Header */}
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Card
+                  key={order.id}
+                  sx={{
+                    borderRadius: 0,
+                    boxShadow: '0 3px 10px rgba(0,0,0,0.1)',
+                    cursor: 'pointer',
+                    transition: '0.2s',
+                    '&:hover': { boxShadow: '0 6px 20px rgba(0,0,0,0.15)' }
+                  }}
+                  onClick={() => handleViewOrder(order.id)}
+                >
+                  <CardContent sx={{ p: { xs: 2, md: 3 } }}>
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      justifyContent="space-between"
+                      alignItems={{ xs: 'flex-start', sm: 'center' }}
+                      spacing={2}
+                    >
                       <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }}>Order {order.id}</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                          Order #{order.id}
+                        </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {new Date(order.date).toLocaleDateString()} at{' '}
-                          {new Date(order.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {formatDate(order.date)}
                         </Typography>
                       </Box>
-                      <Chip
-                        label={`KES ${Number(order.total ?? 0).toLocaleString()}`}
-                        color="secondary"
-                        size="medium"
-                        sx={{ fontWeight: 600 }}
-                      />
+
+                      <Box textAlign={{ xs: 'left', sm: 'right' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#e91e63' }}>
+                          KES {order.total.toLocaleString()}
+                        </Typography>
+                        <Chip
+                          label={step.label}
+                          icon={step.icon}
+                          size="small"
+                          sx={{
+                            mt: 0.5,
+                            bgcolor: `${step.color}20`,
+                            color: step.color,
+                            fontWeight: 600
+                          }}
+                        />
+                      </Box>
+                    </Stack>
+
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {order.items.length} item{order.items.length > 1 ? 's' : ''}
+                        {' • '}
+                        {order.payment === 'cod' ? 'Cash on Delivery' : 'M-Pesa'}
+                      </Typography>
                     </Box>
 
-                    <Divider />
-
-                    {/* Delivery */}
-                    <Box>
-                      <Typography fontWeight={600} gutterBottom>Delivery</Typography>
-                      <Typography variant="body2">{order.name} • {order.phone}</Typography>
-                      <Typography variant="body2" color="text.secondary">{order.address}, {order.city}</Typography>
-                    </Box>
-
-                    <Divider />
-
-                    {/* Status */}
-                    <Box>
-                      <Typography fontWeight={600} gutterBottom>Status</Typography>
-                      <Stepper activeStep={activeStep} alternativeLabel>
-                        {steps.map((label) => (
-                          <Step key={label}>
-                            <StepLabel StepIconProps={{ sx: { color: activeStep >= steps.indexOf(label) ? '#db1b88' : '#ccc' } }}>
-                              {label}
-                            </StepLabel>
-                          </Step>
-                        ))}
-                      </Stepper>
-                    </Box>
-
-                    <Divider />
-
-                    {/* Items */}
-                    <Box>
-                      <Typography fontWeight={600} gutterBottom>Items ({order.items.length})</Typography>
-                      {order.items.slice(0, 2).map((item: any, i: number) => (
-                        <Box key={item.lineItemId || i} sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
-                          <Typography variant="body2">{item.title} × {Number(item.quantity)}</Typography>
-                          <Typography variant="body2" fontWeight={500}>
-                            KES {(Number(item.price ?? 0) * Number(item.quantity ?? 0)).toLocaleString()}
-                          </Typography>
+                    {/* Progress Bar */}
+                    <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {STATUS_STEPS.map((s, i) => (
+                        <Box key={i} sx={{ flex: 1, position: 'relative' }}>
+                          {i > 0 && (
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                top: '50%',
+                                left: 0,
+                                right: 0,
+                                height: 4,
+                                bgcolor: i <= currentStep ? s.color : '#eee',
+                                transform: 'translateY(-50%)',
+                                zIndex: 1
+                              }}
+                            />
+                          )}
+                          <Box
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: '50%',
+                              bgcolor: i <= currentStep ? s.color : '#eee',
+                              color: 'white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '1rem',
+                              zIndex: 2,
+                              mx: 'auto'
+                            }}
+                          >
+                            {s.icon}
+                          </Box>
                         </Box>
                       ))}
-                      {order.items.length > 2 && (
-                        <Typography variant="caption" color="text.secondary">+ {order.items.length - 2} more...</Typography>
-                      )}
                     </Box>
 
-                    <GradientButton fullWidth onClick={() => router.push(`/orders/${order.id}`)}>View Full Receipt</GradientButton>
-                  </Stack>
-                </StyledPaper>
+                    <Box sx={{ mt: 2, textAlign: 'right' }}>
+                      <Button
+                        size="small"
+                        startIcon={<Print />}
+                        onClick={handlePrint}
+                        sx={{ color: '#666' }}
+                      >
+                        Print
+                      </Button>
+                    </Box>
+                  </CardContent>
+                </Card>
               );
             })}
           </Stack>
-        </Container>
-      </Box>
+        )}
+      </Container>
     </Box>
   );
 }

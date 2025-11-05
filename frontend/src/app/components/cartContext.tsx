@@ -1,4 +1,4 @@
-// cartContext.tsx
+// src/app/components/cartContext.tsx
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
@@ -14,17 +14,20 @@ type CartItem = {
 
 type CartContextType = {
   cart: Record<number, CartItem>;
-  addToCart: (item: CartItem) => boolean; // Return boolean for success/failure
-  updateQuantity: (id: number, delta: number) => boolean; // Return boolean for success/failure
+  addToCart: (item: CartItem) => boolean;
+  updateQuantity: (id: number, delta: number) => boolean;
   removeFromCart: (id: number) => void;
   clearCart: () => void;
+  deviceId: string; // ← EXPOSE TO FRONTEND
 };
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<Record<number, CartItem>>({});
+  const [deviceId, setDeviceId] = useState<string>('');
 
+  // === 1. LOAD CART + GENERATE DEVICE ID ===
   useEffect(() => {
     const loadCart = () => {
       try {
@@ -47,6 +50,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 price: Number(item.price),
                 quantity: Math.max(1, Math.min(Number(item.quantity), Number(item.stock) || 999)),
                 stock: Number(item.stock) || 999,
+                cover_image: item.cover_image,
               };
             }
           });
@@ -59,16 +63,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    loadCart();
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === 'cart') {
-        loadCart();
+    const generateDeviceId = () => {
+      let id = localStorage.getItem('device_id');
+      if (!id) {
+        id = `DEV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem('device_id', id);
       }
+      setDeviceId(id);
     };
+
+    loadCart();
+    generateDeviceId();
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'cart') loadCart();
+      if (event.key === 'device_id') setDeviceId(event.newValue || '');
+    };
+
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
+  // === 2. SAVE CART ON CHANGE ===
   useEffect(() => {
     try {
       if (Object.keys(cart).length > 0) {
@@ -81,27 +97,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [cart]);
 
+  // === 3. CART ACTIONS ===
   const addToCart = (item: CartItem): boolean => {
-    if (item.quantity <= 0 || item.quantity > item.stock) {
-      console.log('Invalid addToCart attempt:', item);
-      return false;
-    }
+    if (item.quantity <= 0 || item.quantity > item.stock) return false;
+
     setCart((prev) => {
       const newCart = { ...prev };
       if (newCart[item.id]) {
         const newQuantity = newCart[item.id].quantity + item.quantity;
-        if (newQuantity > item.stock) {
-          console.log('Stock limit reached:', item);
-          return prev;
-        }
-        newCart[item.id] = {
-          ...newCart[item.id],
-          quantity: newQuantity,
-        };
+        if (newQuantity > item.stock) return prev;
+        newCart[item.id] = { ...newCart[item.id], quantity: newQuantity };
       } else {
         newCart[item.id] = { ...item };
       }
-      console.log('Cart updated:', newCart);
       return newCart;
     });
     return true;
@@ -112,23 +120,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setCart((prev) => {
       const newCart = { ...prev };
       const item = newCart[id];
-      if (!item) {
-        console.log('Item not found for update:', id);
-        return newCart;
-      }
+      if (!item) return newCart;
+
       const newQuantity = item.quantity + delta;
       if (newQuantity <= 0) {
         delete newCart[id];
         success = true;
         return newCart;
       }
-      if (newQuantity > item.stock) {
-        console.log('Stock limit reached for update:', item);
-        return prev;
-      }
+      if (newQuantity > item.stock) return prev;
+
       newCart[id] = { ...item, quantity: newQuantity };
       success = true;
-      console.log('Cart updated:', newCart);
       return newCart;
     });
     return success;
@@ -138,18 +141,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setCart((prev) => {
       const newCart = { ...prev };
       delete newCart[id];
-      console.log('Item removed, new cart:', newCart);
       return newCart;
     });
   };
 
   const clearCart = () => {
     setCart({});
-    console.log('Cart cleared');
   };
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, updateQuantity, removeFromCart, clearCart }}>
+    <CartContext.Provider
+      value={{
+        cart,
+        addToCart,
+        updateQuantity,
+        removeFromCart,
+        clearCart,
+        deviceId, // ← EXPOSE IT
+      }}
+    >
       {children}
     </CartContext.Provider>
   );

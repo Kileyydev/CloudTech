@@ -43,7 +43,7 @@ async function verifyMpesaTransaction(
 type ProductT = {
   id: number;
   title: string;
-  price: number | string; // Allow string from API
+  price: number | string;
   discount?: number;
   cover_image?: string;
   stock: number;
@@ -56,17 +56,6 @@ type CartItem = {
   quantity: number;
   stock: number;
   cover_image?: string;
-};
-
-// Unique Order ID
-const generateUniqueOrderId = (): string => {
-  const now = Date.now();
-  const perf = performance.now();
-  const timestamp = now.toString(36).toUpperCase();
-  const nano = perf.toString(36).replace('.', '').slice(-5).toUpperCase();
-  const rand1 = Math.random().toString(36).substring(2, 8).toUpperCase();
-  const rand2 = Math.random().toString(36).substring(2, 5).toUpperCase();
-  return `CT${timestamp}-${rand1}${nano}${rand2}`;
 };
 
 // Safe number formatting
@@ -85,7 +74,7 @@ const formatPrice = (val: any): string => {
 };
 
 export default function CartPage() {
-  const { cart, updateQuantity, removeFromCart, clearCart, addToCart } = useCart();
+  const { cart, updateQuantity, removeFromCart, clearCart, addToCart, deviceId } = useCart();
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -109,7 +98,7 @@ export default function CartPage() {
   const [loadingTrending, setLoadingTrending] = useState(true);
   const hasFetched = useRef(false);
 
-  // Sanitize cart items: ensure price is number
+  // Sanitize cart items
   const safeCart = Object.values(cart).map(item => ({
     ...item,
     price: toNum(item.price),
@@ -131,7 +120,6 @@ export default function CartPage() {
         const res = await fetch(`${API_BASE}/products/?ordering=-sold`);
         const data = await res.json();
         const list = (Array.isArray(data) ? data : data.results || []).slice(0, 10);
-        // Sanitize trending prices
         const sanitized = list.map((p: any) => ({
           ...p,
           price: toNum(p.price),
@@ -177,7 +165,7 @@ export default function CartPage() {
     return true;
   };
 
-  // Final Checkout
+  // FINAL CHECKOUT — INSTANT + BACKGROUND SAVE
   const handleCheckout = async () => {
     if (safeCart.length === 0) return show('Cart empty', 'error');
     if (!validate()) return;
@@ -193,18 +181,17 @@ export default function CartPage() {
         const { ok, message } = await verifyMpesaTransaction(checkoutDetails.mpesaCode, total, checkoutDetails.phone);
         paymentOk = ok;
         paymentMessage = message;
-        if (!ok) setError(message);
+        if (!ok) {
+          setError(message);
+          setIsProcessing(false);
+          return;
+        }
       }
 
-      if (!paymentOk) {
-        setIsProcessing(false);
-        return;
-      }
-
-      const orderId = generateUniqueOrderId();
-
-      const order = {
-        id: orderId,
+      // === 1. BUILD ORDER DATA FOR INSTANT DISPLAY ===
+      const tempOrderId = `TEMP-${Date.now()}`;
+      const orderData = {
+        id: tempOrderId,
         name: checkoutDetails.name.trim(),
         phone: checkoutDetails.phone.trim(),
         address: checkoutDetails.address.trim(),
@@ -216,43 +203,60 @@ export default function CartPage() {
         subtotal: round(subtotal),
         shipping: round(shipping),
         total: round(total),
+        status: 'confirmed',
+        date: new Date().toISOString(),
         items: safeCart.map((item) => ({
-          product_id: item.id,
+          product_id: item.id.toString(),
           title: item.title,
           price: round(item.price),
           quantity: item.quantity,
         })),
       };
 
-      // Send to backend
-      try {
-        const token = localStorage.getItem('token');
-        const res = await axios.post(`${API_BASE}/purchases/`, order, {
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Token ${token}` } : {}),
-          },
-        });
-        console.log('Order sent:', res.data);
-        show('Order placed successfully!');
-      } catch (err: any) {
-        console.error('Order failed:', err);
-        show('Failed to send order to server', 'error');
-      }
+      // === 2. SAVE TO LOCAL STORAGE FOR INSTANT PAGE ===
+      localStorage.setItem('pending_order', JSON.stringify(orderData));
 
-      clearCart();
+      // === 3. SEND TO BACKEND IN BACKGROUND ===
+      const payload = {
+        name: orderData.name,
+        phone: orderData.phone,
+        address: orderData.address,
+        city: orderData.city,
+        payment: orderData.payment,
+        mpesa_code: orderData.mpesa_code,
+        cash_amount: orderData.cash_amount,
+        change: orderData.change,
+        subtotal: orderData.subtotal,
+        shipping: orderData.shipping,
+        total: orderData.total,
+        items: orderData.items,
+      };
 
-      const params = new URLSearchParams({
-        name: order.name,
-        phone: order.phone,
-        address: order.address,
-        city: order.city,
-        payment: order.payment,
-        cash: order.cash_amount.toString(),
-        change: order.change.toString(),
+      // SEND device_id IN HEADER
+      const token = localStorage.getItem('token');
+      axios.post(`${API_BASE}/purchases/`, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Device-ID': deviceId,  // ← HERE IT IS, POOKIE!
+          ...(token ? { Authorization: `Token ${token}` } : {}),
+        },
+      })
+      .then(res => {
+        const realOrderId = res.data.id;
+        const realOrder = { ...orderData, id: realOrderId };
+        localStorage.setItem('pending_order', JSON.stringify(realOrder));
+        router.replace(`/order-confirmation?orderId=${realOrderId}`);
+      })
+      .catch(err => {
+        console.error('Background save failed:', err);
+        // Still show confirmation
       });
-      router.push(`/order-confirmation?${params.toString()}`);
-      show(paymentMessage || 'Order confirmed! Redirecting…', 'success');
+
+      // === 4. INSTANT REDIRECT + CLEAR CART ===
+      clearCart();
+      router.push('/order-confirmation?temp=1');
+      show(paymentMessage || 'Order placed! Confirming...', 'success');
+
     } catch (e) {
       console.error(e);
       show('Something went wrong', 'error');
@@ -465,7 +469,7 @@ export default function CartPage() {
 
                   <Collapse in={paymentMethod === 'cod'}>
                     <Alert severity="success">
-                      <AttachMoney sx={{ mr: 0.5 }} /> Cash on Delivery
+                      Cash on Delivery
                       <TextField fullWidth size="small" label="Cash Amount" type="number"
                         value={checkoutDetails.cashAmount}
                         onChange={e => handleChange('cashAmount', e.target.value)}
@@ -480,7 +484,7 @@ export default function CartPage() {
                   <Button fullWidth variant="contained" onClick={handleCheckout} disabled={isProcessing}
                     startIcon={isProcessing ? <CircularProgress size={20} /> : <CreditCard />}
                     sx={{ bgcolor: '#e91e63', borderRadius: 0, py: 1.5, fontWeight: 700 }}>
-                    {isProcessing ? 'Confirming…' : 'Place Order'}
+                    {isProcessing ? 'Placing Order…' : 'Place Order'}
                   </Button>
                 </Stack>
               </Paper>

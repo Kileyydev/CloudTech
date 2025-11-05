@@ -200,6 +200,14 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     "Content-Type",
     "Authorization",
     "X-CSRFToken",
+    'x-csrftoken',
+    'x-requested-with',
+    'x-device-id',
+    'accept',
+    'accept-encoding',
+    'dnt',
+    'origin',
+    'user-agent',
 ]
 
 CORS_ALLOW_METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"]

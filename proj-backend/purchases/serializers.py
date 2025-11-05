@@ -1,3 +1,4 @@
+# purchases/serializers.py
 from rest_framework import serializers
 from .models import Order, OrderItem
 import time
@@ -15,44 +16,45 @@ class OrderItemSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = ['product_id', 'title', 'price', 'quantity']
 
+
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True)
 
     class Meta:
         model = Order
         fields = [
-            'id', 'device_id', 'name', 'phone', 'address', 'city', 'payment',
-            'mpesa_code', 'cash_amount', 'change', 'subtotal', 'shipping',
-            'total', 'status', 'date', 'items'
+            'id', 'user', 'device_id', 'name', 'phone', 'address', 'city',
+            'payment', 'mpesa_code', 'cash_amount', 'change',
+            'subtotal', 'shipping', 'total', 'status', 'date', 'items'
         ]
-        read_only_fields = ['id', 'date']
+        read_only_fields = ['id', 'user', 'date']  # device_id is writable via header
 
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
+        request = self.context.get('request')
 
-        # Generate unique ID if not provided
-        if not validated_data.get('id'):
-            validated_data['id'] = generate_unique_order_id()
+        # === 1. GENERATE UNIQUE ORDER ID ===
+        validated_data['id'] = generate_unique_order_id()
 
+        # === 2. SAVE device_id FROM HEADER (X-Device-ID) ===
+        if request:
+            device_id = request.META.get('HTTP_X_DEVICE_ID', '').strip()
+            if device_id:
+                validated_data['device_id'] = device_id
+
+        # === 3. SET USER IF LOGGED IN ===
+        if request and request.user.is_authenticated:
+            validated_data['user'] = request.user
+
+        # === 4. DEFAULT VALUES ===
+        validated_data.setdefault('status', 'confirmed')
+        validated_data.setdefault('shipping', 200)
+
+        # === 5. CREATE ORDER ===
         order = Order.objects.create(**validated_data)
 
-        # Create order items
+        # === 6. CREATE ORDER ITEMS ===
         for item_data in items_data:
             OrderItem.objects.create(order=order, **item_data)
 
         return order
-
-    def update(self, instance, validated_data):
-        items_data = validated_data.pop('items', None)
-
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-
-        if items_data is not None:
-            # Delete old items and recreate
-            instance.items.all().delete()
-            for item_data in items_data:
-                OrderItem.objects.create(order=instance, **item_data)
-
-        return instance
