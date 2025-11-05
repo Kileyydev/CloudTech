@@ -158,3 +158,17 @@ class ProductImageViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['product__id', 'variant__id', 'is_primary']
+    
+    # products/views.py
+from rest_framework import viewsets
+from .models import Color
+from .serializers import ColorSerializer
+
+class ColorViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API endpoint for listing colors.
+    GET /api/products/colors/ → List all colors
+    """
+    queryset = Color.objects.all().order_by('name')
+    serializer_class = ColorSerializer
+    permission_classes = [IsAdminOrReadOnly]  # or AllowAny if public

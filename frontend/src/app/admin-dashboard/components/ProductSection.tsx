@@ -151,7 +151,7 @@ const ProductAdminPage: React.FC = () => {
     }
   }, [price, discount]);
 
-  // === FETCH ALL DATA: PRODUCTS, CATEGORIES, BRANDS, COLORS ===
+  // === FETCH ALL DATA ===
   const fetchData = async () => {
     if (!token) return;
     setLoading(true);
@@ -263,9 +263,10 @@ const ProductAdminPage: React.FC = () => {
     }
   };
 
-  // Edit
+  // Edit — FIXED: Force string ID
   const startEdit = (p: Product) => {
-    setEditId(p.id);
+    const id = String(p.id); // ← THIS FIXES UUID ISSUE
+    setEditId(id);
     setTitle(p.title || "");
     setDescription(p.description || "");
     setPrice(p.price || "");
@@ -638,7 +639,7 @@ const ProductAdminPage: React.FC = () => {
                       <StyledButton size="small" startIcon={<Edit />} onClick={() => startEdit(p)}>
                         Edit
                       </StyledButton>
-                      <StyledButton size="small" className="danger" startIcon={<Delete />} onClick={() => confirmDel(p.id)}>
+                      <StyledButton size="small" className="danger" startIcon={<Delete />} onClick={() => confirmDel(String(p.id))}>
                         Delete
                       </StyledButton>
                     </Box>
