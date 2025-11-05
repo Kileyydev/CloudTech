@@ -1,12 +1,14 @@
 # products/serializers.py
 from rest_framework import serializers
-from django.utils.text import slugify
-from .models import Category, Brand, Tag, Product, ProductVariant, ProductImage
+from .models import Category, Brand, Tag, Product, ProductVariant, ProductImage, Color
 
 
-# ===================================================================
-# BASIC SERIALIZERS
-# ===================================================================
+class ColorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Color
+        fields = ['id', 'name', 'hex_code']
+
+
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
@@ -25,9 +27,6 @@ class TagSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'slug']
 
 
-# ===================================================================
-# PRODUCT IMAGE — CLOUDINARY FULL URL
-# ===================================================================
 class ProductImageSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
 
@@ -36,163 +35,91 @@ class ProductImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'image', 'alt_text', 'is_primary']
 
     def get_image(self, obj):
-        if not obj.image:
-            return None
-        # CloudinaryField returns full HTTPS URL: https://res.cloudinary.com/...
-        return obj.image.url
+        return obj.image.url if obj.image else None
 
 
-# ===================================================================
-# PRODUCT VARIANT
-# ===================================================================
 class ProductVariantSerializer(serializers.ModelSerializer):
+    color = ColorSerializer(read_only=True)
+    color_id = serializers.PrimaryKeyRelatedField(queryset=Color.objects.all(), source='color', write_only=True, required=False)
+
     class Meta:
         model = ProductVariant
-        fields = [
-            'id', 'sku', 'color', 'storage', 'ram', 'processor',
-            'size', 'price', 'compare_at_price', 'stock', 'is_active'
-        ]
+        fields = ['id', 'sku', 'color', 'color_id', 'storage', 'ram', 'condition', 'price', 'stock', 'is_active']
 
 
-# ===================================================================
-# PRODUCT LIST (READ-ONLY) — FULL CLOUDINARY URLS
-# ===================================================================
 class ProductListSerializer(serializers.ModelSerializer):
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
-    tags = serializers.SlugRelatedField(many=True, read_only=True, slug_field='name')
-    images = ProductImageSerializer(many=True, read_only=True, source='productimage_set')
+    color = ColorSerializer(read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True, source='images')
     cover_image = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
-            'id', 'title', 'slug', 'description', 'brand', 'categories', 'tags',
+            'id', 'title', 'slug', 'description', 'brand', 'categories',
             'cover_image', 'images', 'price', 'stock', 'discount', 'final_price',
-            'is_active', 'is_featured', 'colors', 'storage_options',
-            'condition_options', 'features', 'created_at'
+            'storage_gb', 'ram_gb', 'color', 'condition', 'is_active', 'is_featured'
         ]
 
     def get_cover_image(self, obj):
-        if not obj.cover_image:
-            return None
-        # CloudinaryField: returns https://res.cloudinary.com/... directly
-        return obj.cover_image.url
+        return obj.cover_image.url if obj.cover_image else None
 
 
-# ===================================================================
-# PRODUCT CREATE / UPDATE — ACCEPTS FILES, SAVES TO CLOUDINARY
-# ===================================================================
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
-    # Write-only fields
-    brand_id = serializers.PrimaryKeyRelatedField(
-        queryset=Brand.objects.all(), source='brand', write_only=True
-    )
-    category_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(), many=True, write_only=True
-    )
-    tag_names = serializers.ListField(
-        child=serializers.CharField(max_length=60), write_only=True, required=False
-    )
-    cover_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
-    gallery = serializers.ListField(
-        child=serializers.ImageField(), write_only=True, required=False
-    )
+    brand_id = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all(), source='brand', write_only=True)
+    category_ids = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), many=True, write_only=True)
+    color_id = serializers.PrimaryKeyRelatedField(queryset=Color.objects.all(), source='color', write_only=True, required=False)
+    cover_image = serializers.ImageField(write_only=True, required=False)
+    gallery = serializers.ListField(child=serializers.ImageField(), write_only=True, required=False)
 
-    # Read-only fields
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
-    images = ProductImageSerializer(many=True, read_only=True, source='productimage_set')
+    color = ColorSerializer(read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True, source='images')
 
     class Meta:
         model = Product
         fields = [
             'id', 'title', 'description', 'price', 'stock', 'discount',
-            'final_price', 'is_active', 'is_featured', 'colors',
-            'storage_options', 'condition_options', 'features',
-            'brand', 'brand_id', 'categories', 'category_ids',
-            'tag_names', 'cover_image', 'gallery', 'images'
+            'storage_gb', 'ram_gb', 'color', 'color_id', 'condition',
+            'is_active', 'is_featured', 'brand', 'brand_id',
+            'categories', 'category_ids', 'cover_image', 'gallery', 'images'
         ]
-        read_only_fields = ['final_price', 'id', 'slug']
 
-    # ===================================================================
-    # CREATE
-    # ===================================================================
     def create(self, validated_data):
         category_ids = validated_data.pop('category_ids', [])
-        tag_names = validated_data.pop('tag_names', [])
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery', [])
-
-        # Auto-generate slug
-        validated_data['slug'] = slugify(validated_data.get('title', ''))
 
         product = Product.objects.create(**validated_data)
         product.categories.set(category_ids)
 
-        # Handle tags
-        for name in tag_names:
-            tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
-            product.tags.add(tag)
-
-        # Cover image → saved to Cloudinary via CloudinaryField
         if cover_file:
             product.cover_image = cover_file
+            product.save()
 
-        # Gallery images
         for img_file in gallery_files:
-            ProductImage.objects.create(product=product, image=img_file)
+            ProductImage.objects.create(product=product, image=img_file, is_primary=False)
 
-        product.final_price = self._calc_final_price(product)
-        product.save()
         return product
 
-    # ===================================================================
-    # UPDATE
-    # ===================================================================
     def update(self, instance, validated_data):
         category_ids = validated_data.pop('category_ids', None)
-        tag_names = validated_data.pop('tag_names', None)
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery', None)
 
-        # Update basic fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        # Update slug if title changed
-        if 'title' in validated_data:
-            instance.slug = slugify(validated_data['title'])
-
-        # Categories
         if category_ids is not None:
             instance.categories.set(category_ids)
-
-        # Tags
-        if tag_names is not None:
-            instance.tags.clear()
-            for name in tag_names:
-                tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
-                instance.tags.add(tag)
-
-        # Cover image
         if cover_file is not None:
             instance.cover_image = cover_file
-
-        # Gallery
         if gallery_files is not None:
-            instance.productimage_set.all().delete()
-            for img_file in gallery_files:
-                ProductImage.objects.create(product=instance, image=img_file)
+            instance.images.all().delete()
+            for img in gallery_files:
+                ProductImage.objects.create(product=instance, image=img)
 
-        instance.final_price = self._calc_final_price(instance)
         instance.save()
         return instance
-
-    # ===================================================================
-    # HELPERS
-    # ===================================================================
-    def _calc_final_price(self, obj):
-        if obj.discount and obj.discount > 0:
-            return round(obj.price * (1 - obj.discount / 100), 2)
-        return obj.price

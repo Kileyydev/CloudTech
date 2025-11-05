@@ -16,8 +16,12 @@ import type { Product } from "@/app/types/products";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE + "/products/";
 const API_CATEGORIES = process.env.NEXT_PUBLIC_API_BASE + "/categories/";
 const API_BRANDS = process.env.NEXT_PUBLIC_API_BASE + "/brands/";
+const API_COLORS = process.env.NEXT_PUBLIC_API_BASE + "/products/colors/";
 const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || process.env.NEXT_PUBLIC_API_BASE;
 
+// === STORAGE & RAM OPTIONS ===
+const storageOptions = [64, 128, 256, 512, 1024, 2048];
+const ramOptions = [2, 4, 6, 8, 12, 16, 24, 32, 64, 128, 256];
 
 // === STYLED COMPONENTS ===
 const StyledPaper = styled(Paper)(({ theme }) => ({
@@ -61,7 +65,6 @@ const StyledButton = styled(Button)(({ theme }) => ({
   "&.danger": {
     background: "#f44336",
     color: "#fff",
-    
   },
 }));
 
@@ -86,7 +89,6 @@ const GalleryPreview = styled(Box)(({ theme }) => ({
     objectFit: "cover",
     border: `2px solid ${alpha("#DC1A8A", 0.2)}`,
     transition: "all 0.2s",
-
   },
 }));
 
@@ -101,6 +103,7 @@ const ProductAdminPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [brands, setBrands] = useState<{ id: number; name: string }[]>([]);
+  const [colors, setColors] = useState<{ id: number; name: string; hex_code: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -115,6 +118,10 @@ const ProductAdminPage: React.FC = () => {
   const [finalPrice, setFinalPrice] = useState<number | "">("");
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [brandId, setBrandId] = useState<string>("");
+  const [storageGB, setStorageGB] = useState<string>("");
+  const [ramGB, setRamGB] = useState<string>("");
+  const [colorId, setColorId] = useState<string>("");
+  const [condition, setCondition] = useState<"new" | "ex_dubai" | "">("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
@@ -149,16 +156,21 @@ const ProductAdminPage: React.FC = () => {
     if (!token) return;
     setLoading(true);
     try {
-      const [pRes, cRes, bRes] = await Promise.all([
+      const [pRes, cRes, bRes, colRes] = await Promise.all([
         fetch(API_BASE, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(API_CATEGORIES, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(API_BRANDS, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(API_BRANDS, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(API_COLORS, { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
-      const [pJson, cJson, bJson] = await Promise.all([pRes.json(), cRes.json(), bRes.json()]);
+      const [pJson, cJson, bJson, colJson] = await Promise.all([
+        pRes.json(), cRes.json(), bRes.json(), colRes.json()
+      ]);
+
       setProducts(Array.isArray(pJson) ? pJson : pJson.results || []);
       setCategories(Array.isArray(cJson) ? cJson : cJson.results || []);
       setBrands(Array.isArray(bJson) ? bJson : bJson.results || []);
+      setColors(Array.isArray(colJson) ? colJson : colJson.results || []);
     } catch (err) {
       setSnack({ open: true, msg: "Failed to load", sev: "error" });
     } finally {
@@ -186,6 +198,7 @@ const ProductAdminPage: React.FC = () => {
   const resetForm = () => {
     setEditId(null); setTitle(""); setDescription(""); setPrice(""); setStock("");
     setDiscount(0); setFinalPrice(""); setSelectedCats([]); setBrandId("");
+    setStorageGB(""); setRamGB(""); setColorId(""); setCondition("");
     setCoverFile(null); setCoverPreview(null); setGalleryFiles([]); setGalleryPreviews([]);
     setIsActive(true); setIsFeatured(false);
   };
@@ -207,6 +220,10 @@ const ProductAdminPage: React.FC = () => {
     form.append("is_featured", String(isFeatured));
     selectedCats.forEach(c => form.append("category_ids", c));
     form.append("brand_id", brandId);
+    if (storageGB) form.append("storage_gb", storageGB);
+    if (ramGB) form.append("ram_gb", ramGB);
+    if (colorId) form.append("color_id", colorId);
+    if (condition) form.append("condition", condition);
     if (coverFile) form.append("cover_image", coverFile);
     galleryFiles.forEach(f => form.append("gallery", f));
 
@@ -246,6 +263,10 @@ const ProductAdminPage: React.FC = () => {
     setFinalPrice(p.final_price || "");
     setBrandId(p.brand?.id?.toString() || "");
     setSelectedCats(p.categories?.map(c => String(c.id)) || []);
+    setStorageGB(p.storage_gb?.toString() || "");
+    setRamGB(p.ram_gb?.toString() || "");
+    setColorId(p.color?.id?.toString() || "");
+    setCondition(p.condition || "");
     setIsActive(p.is_active ?? true);
     setIsFeatured(p.is_featured ?? false);
 
@@ -356,7 +377,6 @@ const ProductAdminPage: React.FC = () => {
                 rows={4}
                 fullWidth
                 variant="outlined"
-                
               />
 
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
@@ -365,20 +385,17 @@ const ProductAdminPage: React.FC = () => {
                   type="number"
                   value={price}
                   onChange={e => setPrice(Number(e.target.value) || "")}
-                  
                 />
                 <TextField
                   label="Discount %"
                   type="number"
                   value={discount}
                   onChange={e => setDiscount(Number(e.target.value) || 0)}
-                  
                 />
                 <TextField
                   label="Final Price"
                   value={finalPrice}
                   disabled
-                
                 />
               </Stack>
 
@@ -388,8 +405,59 @@ const ProductAdminPage: React.FC = () => {
                 value={stock}
                 onChange={e => setStock(Number(e.target.value) || "")}
                 fullWidth
-                
               />
+
+              {/* STORAGE & RAM */}
+              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Storage (GB)</InputLabel>
+                  <Select value={storageGB} onChange={e => setStorageGB(e.target.value)}>
+                    <MenuItem value="">None</MenuItem>
+                    {storageOptions.map(gb => (
+                      <MenuItem key={gb} value={gb}>
+                        {gb >= 1024 ? `${gb / 1024}TB` : `${gb}GB`}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth>
+                  <InputLabel>RAM (GB)</InputLabel>
+                  <Select value={ramGB} onChange={e => setRamGB(e.target.value)}>
+                    <MenuItem value="">None</MenuItem>
+                    {ramOptions.map(ram => (
+                      <MenuItem key={ram} value={ram}>{ram}GB</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Stack>
+
+              {/* COLOR & CONDITION */}
+              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                <FormControl fullWidth>
+                  <InputLabel>Color</InputLabel>
+                  <Select value={colorId} onChange={e => setColorId(e.target.value)}>
+                    <MenuItem value="">None</MenuItem>
+                    {colors.map(c => (
+                      <MenuItem key={c.id} value={c.id}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Box sx={{ width: 16, height: 16, bgcolor: c.hex_code, borderRadius: "50%", border: "1px solid #ccc" }} />
+                          {c.name}
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth>
+                  <InputLabel>Condition</InputLabel>
+                  <Select value={condition} onChange={e => setCondition(e.target.value as any)}>
+                    <MenuItem value="">None</MenuItem>
+                    <MenuItem value="new">New</MenuItem>
+                    <MenuItem value="ex_dubai">Ex-Dubai</MenuItem>
+                  </Select>
+                </FormControl>
+              </Stack>
 
               <FormControl fullWidth>
                 <InputLabel>Categories</InputLabel>
@@ -405,7 +473,6 @@ const ProductAdminPage: React.FC = () => {
                       })}
                     </Box>
                   )}
-                
                 >
                   {categories.map(c => (
                     <MenuItem key={c.id} value={String(c.id)}>
@@ -418,11 +485,7 @@ const ProductAdminPage: React.FC = () => {
 
               <FormControl fullWidth>
                 <InputLabel>Brand *</InputLabel>
-                <Select
-                  value={brandId}
-                  onChange={e => setBrandId(e.target.value)}
-                  
-                >
+                <Select value={brandId} onChange={e => setBrandId(e.target.value)}>
                   <MenuItem value="">None</MenuItem>
                   {brands.map(b => (
                     <MenuItem key={b.id} value={String(b.id)}>{b.name}</MenuItem>
@@ -537,6 +600,12 @@ const ProductAdminPage: React.FC = () => {
                     <Typography variant="h6" noWrap sx={{ fontWeight: 700, color: "#222" }}>
                       {p.title}
                     </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                      {p.storage_gb && `${p.storage_gb >= 1024 ? `${p.storage_gb / 1024}TB` : `${p.storage_gb}GB`}`}
+                      {p.ram_gb && ` • ${p.ram_gb}GB RAM`}
+                      {p.color && ` • ${p.color.name}`}
+                      {p.condition && ` • ${p.condition === 'ex_dubai' ? 'Ex-Dubai' : 'New'}`}
+                    </Typography>
                     <Typography variant="body2" sx={{ color: "#666", mb: 1.5, height: 40, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                       {p.description}
                     </Typography>
@@ -586,6 +655,7 @@ const ProductAdminPage: React.FC = () => {
                   <TableRow sx={{ bgcolor: alpha("#DC1A8A", 0.05) }}>
                     <TableCell><strong>Image</strong></TableCell>
                     <TableCell><strong>Title</strong></TableCell>
+                    <TableCell><strong>Specs</strong></TableCell>
                     <TableCell><strong>Original</strong></TableCell>
                     <TableCell><strong>Discount %</strong></TableCell>
                     <TableCell><strong>Final Price</strong></TableCell>
@@ -600,6 +670,12 @@ const ProductAdminPage: React.FC = () => {
                         <img src={getProductImageSrc(p)} width={60} height={60} style={{ objectFit: "cover", border: "2px solid #eee" }} />
                       </TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>{p.title}</TableCell>
+                      <TableCell sx={{ fontSize: "0.8rem" }}>
+                        {p.storage_gb && `${p.storage_gb >= 1024 ? `${p.storage_gb / 1024}TB` : `${p.storage_gb}GB`}`}
+                        {p.ram_gb && ` • ${p.ram_gb}GB`}
+                        {p.color && ` • ${p.color.name}`}
+                        {p.condition && ` • ${p.condition === 'ex_dubai' ? 'Ex-Dubai' : 'New'}`}
+                      </TableCell>
                       <TableCell>
                         <Typography sx={{ textDecoration: "line-through", color: "#999" }}>
                           KES {p.price?.toLocaleString()}
@@ -611,7 +687,6 @@ const ProductAdminPage: React.FC = () => {
                           size="small"
                           value={p.discount ?? 0}
                           onChange={e => setProducts(prev => prev.map(x => x.id === p.id ? { ...x, discount: Number(e.target.value) } : x))}
-                          
                         />
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: "#DC1A8A" }}>
@@ -638,13 +713,13 @@ const ProductAdminPage: React.FC = () => {
       )}
 
       {/* DELETE DIALOG */}
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} >
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle sx={{ fontWeight: 700 }}>Confirm Delete</DialogTitle>
         <DialogContent>
           <Typography>This action cannot be undone. Are you sure?</Typography>
         </DialogContent>
         <DialogActions sx={{ p: 3, gap: 1 }}>
-          <Button onClick={() => setConfirmOpen(false)} >Cancel</Button>
+          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
           <StyledButton className="danger" onClick={doDelete} variant="contained">
             Delete
           </StyledButton>
@@ -663,7 +738,6 @@ const ProductAdminPage: React.FC = () => {
           severity={snack.sev}
           sx={{
             width: "100%",
-           
             fontWeight: 600,
             boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
             ...(snack.sev === "success" && { bgcolor: "#4caf50", color: "#fff" }),
