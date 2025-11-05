@@ -77,7 +77,7 @@ export default function AdminRepairsPage() {
   };
 
   // ✅ WhatsApp chat link
-  const whatsappNumber = "0708835355";
+  const whatsappNumber = "0722244482";
   const chatWhatsApp = (customerName: string, customerPhone: string) => {
     const message = `Hi ${customerName}, this is CloudTech Support. Regarding your repair request, please reply to this message.`;
     const phone = customerPhone.replace(/^\+?0/, "254"); // convert to full Kenyan format if needed

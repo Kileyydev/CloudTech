@@ -13,11 +13,14 @@ import { Edit, Delete, AddPhotoAlternate, Image as ImageIcon } from "@mui/icons-
 import { getProductImageSrc } from "@/app/utils/image";
 import type { Product } from "@/app/types/products";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE + "/products/";
-const API_CATEGORIES = process.env.NEXT_PUBLIC_API_BASE + "/categories/";
-const API_BRANDS = process.env.NEXT_PUBLIC_API_BASE + "/brands/";
-const API_COLORS = process.env.NEXT_PUBLIC_API_BASE + "/products/colors/";
-const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || process.env.NEXT_PUBLIC_API_BASE;
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE; // e.g. http://localhost:8000
+
+const API_PRODUCTS = `${API_BASE}/api/products/products/`;
+const API_CATEGORIES = `${API_BASE}/api/products/categories/`;
+const API_BRANDS = `${API_BASE}/api/products/brands/`;
+const API_COLORS = `${API_BASE}/api/products/colors/`;
+
+const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || API_BASE;
 
 // === STORAGE & RAM OPTIONS ===
 const storageOptions = [64, 128, 256, 512, 1024, 2048];
@@ -153,11 +156,11 @@ const ProductAdminPage: React.FC = () => {
 
   // === FETCH ALL DATA ===
   const fetchData = async () => {
-    if (!token) return;
+    if (!token || !API_BASE) return;
     setLoading(true);
     try {
       const [pRes, cRes, bRes, colRes] = await Promise.all([
-        fetch(API_BASE, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(API_PRODUCTS, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(API_CATEGORIES, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(API_BRANDS, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(API_COLORS, { headers: { Authorization: `Bearer ${token}` } })
@@ -239,7 +242,7 @@ const ProductAdminPage: React.FC = () => {
 
     setSaving(true);
     try {
-      const url = editId ? `${API_BASE}${editId}/` : API_BASE;
+      const url = editId ? `${API_BASE}${editId}/` : API_PRODUCTS;
       const method = editId ? "PATCH" : "POST";
       const res = await fetch(url, {
         method,
