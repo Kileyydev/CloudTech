@@ -96,58 +96,63 @@ export default function OrderConfirmationClient() {
   /*  Load order from localStorage + validate URL params (run once)          */
   /* ---------------------------------------------------------------------- */
   useEffect(() => {
-    // 1. Grab latest order from localStorage
-    let latestOrder: Order | null = null;
     try {
-      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
-      latestOrder = orders[0] ?? null;
-    } catch {
-      latestOrder = null;
-    }
+      // 1. Grab latest order from localStorage
+      const orders: Order[] = JSON.parse(localStorage.getItem('orders') || '[]');
+      const latestOrder = orders[0] ?? null;
 
-    if (!latestOrder) {
+      if (!latestOrder) {
+        console.error('No orders found in localStorage.');
+        router.replace('/');
+        return;
+      }
+
+      // 2. Pull URL params
+      const name = searchParams.get('name');
+      const phone = searchParams.get('phone');
+      const address = searchParams.get('address');
+      const city = searchParams.get('city');
+
+      // 3. Security check – URL must match stored order
+      if (
+        latestOrder.name !== name ||
+        latestOrder.phone !== phone ||
+        latestOrder.address !== address ||
+        latestOrder.city !== city
+      ) {
+        console.error('URL parameters do not match the latest order:', {
+          latestOrder,
+          urlParams: { name, phone, address, city },
+        });
+        router.replace('/');
+        return;
+      }
+
+      // 4. Sanitize numbers (in case backend sent strings)
+      const sanitized: Order = {
+        ...latestOrder,
+        cash_amount: toNum(latestOrder.cash_amount),
+        change: toNum(latestOrder.change),
+        subtotal: toNum(latestOrder.subtotal),
+        shipping: toNum(latestOrder.shipping),
+        total: toNum(latestOrder.total),
+        items: latestOrder.items.map((i) => ({
+          ...i,
+          price: toNum(i.price),
+        })),
+      };
+
+      setOrderData(sanitized);
+
+      // 5. Clear cart after a tiny delay (UI stays responsive)
+      const timer = setTimeout(() => clearCart(), 300);
+      return () => clearTimeout(timer);
+    } catch (err) {
+      console.error('Error parsing order from localStorage:', err);
       router.replace('/');
-      return;
     }
-
-    // 2. Pull URL params
-    const name = searchParams.get('name');
-    const phone = searchParams.get('phone');
-    const address = searchParams.get('address');
-    const city = searchParams.get('city');
-
-    // 3. Security check – URL must match stored order
-    if (
-      latestOrder.name !== name ||
-      latestOrder.phone !== phone ||
-      latestOrder.address !== address ||
-      latestOrder.city !== city
-    ) {
-      router.replace('/');
-      return;
-    }
-
-    // 4. Sanitize numbers (in case backend sent strings)
-    const sanitized: Order = {
-      ...latestOrder,
-      cash_amount: toNum(latestOrder.cash_amount),
-      change: toNum(latestOrder.change),
-      subtotal: toNum(latestOrder.subtotal),
-      shipping: toNum(latestOrder.shipping),
-      total: toNum(latestOrder.total),
-      items: latestOrder.items.map((i) => ({
-        ...i,
-        price: toNum(i.price),
-      })),
-    };
-
-    setOrderData(sanitized);
-
-    // 5. Clear cart after a tiny delay (UI stays responsive)
-    const timer = setTimeout(() => clearCart(), 300);
-    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // run only on mount
+  }, []);
 
   /* ---------------------------------------------------------------------- */
   /*                              PDF Generation                              */
@@ -155,20 +160,24 @@ export default function OrderConfirmationClient() {
   const generatePDF = async () => {
     if (!pdfRef.current || !orderData) return;
 
-    const canvas = await html2canvas(pdfRef.current, { scale: 2 });
-    const imgData = canvas.toDataURL('image/png');
+    try {
+      const canvas = await html2canvas(pdfRef.current, { scale: 2 });
+      const imgData = canvas.toDataURL('image/png');
 
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-    });
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
 
-    const imgWidth = 190; // mm
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const imgWidth = 190; // mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
-    pdf.save(`CloudTech_${orderData.id}.pdf`);
+      pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+      pdf.save(`CloudTech_${orderData.id}.pdf`);
+    } catch (err) {
+      console.error('PDF generation failed:', err);
+    }
   };
 
   /* ---------------------------------------------------------------------- */
@@ -320,9 +329,7 @@ export default function OrderConfirmationClient() {
         </Container>
       </Box>
 
-      {/* --------------------------------------------------------------- */}
-      {/*                     Hidden PDF Template (for jsPDF)            */}
-      {/* --------------------------------------------------------------- */}
+      {/* Hidden PDF Template */}
       <Box sx={{ position: 'absolute', left: '-9999px' }} ref={pdfRef}>
         <Box
           sx={{
@@ -369,7 +376,6 @@ export default function OrderConfirmationClient() {
 
           <Divider sx={{ my: 3, borderColor: '#000' }} />
 
-          {/* Items */}
           {orderData.items.map((item) => (
             <Box key={item.product_id} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
               <span>
