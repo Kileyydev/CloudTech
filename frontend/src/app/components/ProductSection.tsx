@@ -133,13 +133,13 @@ const ProductSection = () => {
 
   const cartCount = Object.values(cart).reduce((s, i) => s + (i.quantity || 0), 0);
 
-  // ——— SIMPLIFIED getImageUrl — FULL URL FROM DJANGO ———
+  // ——— SIMPLIFIED & ROBUST getImageUrl ———
   const getImageUrl = (path?: string): string => {
     if (!path) {
       console.warn('%c[Image] No path provided', 'color: yellow');
       return '/images/fallback.jpg';
     }
-    return path; // Already a full URL from Django (Cloudinary or build_absolute_uri)
+    return path; // Full URL from Django
   };
 
   // ——— CARD DIMENSIONS ———
@@ -157,16 +157,20 @@ const ProductSection = () => {
     </Card>
   );
 
+  // ——— productCard — FIXED LOGGING & IMAGE LOADING ———
   const productCard = (p: ProductT) => {
     const src = getImageUrl(p.cover_image);
     const inCart = cart[p.id];
 
-    console.log('%c[Product Image] Loading:', 'color: cyan; font-weight: bold', {
-      productId: p.id,
-      title: p.title,
-      cover_image_from_db: p.cover_image,
-      final_url: src,
-    });
+    // Log immediately when component mounts (accurate values)
+    useEffect(() => {
+      console.log('%c[Product Image] Loading:', 'color: cyan; font-weight: bold', {
+        id: p.id,
+        title: p.title,
+        cover_image: p.cover_image,
+        src,
+      });
+    }, [p.id, p.title, p.cover_image, src]);
 
     return (
       <Card
@@ -206,7 +210,7 @@ const ProductSection = () => {
           <Favorite sx={{ color: wishlist.has(p.id) ? '#e91e63' : '#888', fontSize: 20 }} />
         </Box>
 
-        {/* Image */}
+        {/* Image - EAGER + HIGH PRIORITY */}
         <Box
           onClick={() => router.push(`/product/${p.id}`)}
           sx={{ width: '100%', height: CARD_H * 0.56, cursor: 'pointer', overflow: 'hidden' }}
@@ -215,6 +219,8 @@ const ProductSection = () => {
             src={src}
             alt={p.title}
             loading="eager"
+            fetchPriority="high"
+            crossOrigin="anonymous"
             style={{
               width: '100%',
               height: '100%',
@@ -232,13 +238,14 @@ const ProductSection = () => {
               console.log('%c[Product Image] LOADED', 'color: green; font-weight: bold', p.title, src);
             }}
             onError={(e) => {
+              const target = e.currentTarget;
+              target.src = '/images/fallback.jpg';
               console.error('%c[Product Image] FAILED TO LOAD', 'color: red; font-weight: bold', {
-                productId: p.id,
+                id: p.id,
                 title: p.title,
                 attempted_url: src,
-                cover_image_db_value: p.cover_image,
+                fallback_used: '/images/fallback.jpg',
               });
-              e.currentTarget.src = '/images/fallback.jpg';
             }}
           />
         </Box>
