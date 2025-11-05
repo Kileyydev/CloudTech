@@ -15,10 +15,10 @@ import type { Product } from "@/app/types/products";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE; // e.g. http://localhost:8000
 
-const API_PRODUCTS = `${API_BASE}/api/products/products/`;
-const API_CATEGORIES = `${API_BASE}/api/products/categories/`;
-const API_BRANDS = `${API_BASE}/api/products/brands/`;
-const API_COLORS = `${API_BASE}/api/products/colors/`;
+const API_PRODUCTS = `${API_BASE}/products/products/`;
+const API_CATEGORIES = `${API_BASE}/products/categories/`;
+const API_BRANDS = `${API_BASE}/products/brands/`;
+const API_COLORS = `${API_BASE}/products/colors/`;
 
 const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || API_BASE;
 
