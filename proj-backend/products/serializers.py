@@ -1,7 +1,11 @@
 # products/serializers.py
 from rest_framework import serializers
 from .models import Category, Brand, Tag, Product, ProductVariant, ProductImage, Color
+from cloudinary.uploader import upload
+from cloudinary import CloudinaryImage
+import logging
 
+logger = logging.getLogger(__name__)
 
 class ColorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -69,9 +73,13 @@ class ProductListSerializer(serializers.ModelSerializer):
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     brand_id = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all(), source='brand', write_only=True)
     category_ids = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), many=True, write_only=True)
-    color_id = serializers.PrimaryKeyRelatedField(queryset=Color.objects.all(), source='color', write_only=True, required=False)
-    cover_image = serializers.ImageField(write_only=True, required=False)
-    gallery = serializers.ListField(child=serializers.ImageField(), write_only=True, required=False)
+    color_id = serializers.PrimaryKeyRelatedField(queryset=Color.objects.all(), source='color', write_only=True, required=False, allow_null=True)
+    
+    # FIXED: Use FileField for Cloudinary
+    cover_image = serializers.FileField(write_only=True, required=False, allow_null=True)
+    gallery = serializers.ListField(
+        child=serializers.FileField(), write_only=True, required=False, allow_empty=True
+    )
 
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
@@ -92,16 +100,39 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery', [])
 
+        logger.info(f"Creating product with data: {validated_data}")
+        logger.info(f"Cover file: {cover_file}")
+        logger.info(f"Gallery files: {len(gallery_files)}")
+
         product = Product.objects.create(**validated_data)
         product.categories.set(category_ids)
 
+        # === UPLOAD COVER TO CLOUDINARY ===
         if cover_file:
-            product.cover_image = cover_file
-            product.save()
+            try:
+                upload_result = upload(cover_file, folder="products/cover")
+                product.cover_image = upload_result['public_id']
+                logger.info(f"Cover uploaded: {upload_result['public_id']}")
+            except Exception as e:
+                logger.error(f"Cover upload failed: {e}")
+                raise serializers.ValidationError({"cover_image": "Upload failed"})
 
+        # === UPLOAD GALLERY ===
         for img_file in gallery_files:
-            ProductImage.objects.create(product=product, image=img_file, is_primary=False)
+            try:
+                upload_result = upload(img_file, folder="products/gallery")
+                ProductImage.objects.create(
+                    product=product,
+                    image=upload_result['public_id'],
+                    is_primary=False
+                )
+                logger.info(f"Gallery image uploaded: {upload_result['public_id']}")
+            except Exception as e:
+                logger.error(f"Gallery upload failed: {e}")
+                # Don't fail entire product
+                continue
 
+        product.save()
         return product
 
     def update(self, instance, validated_data):
@@ -114,12 +145,28 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         if category_ids is not None:
             instance.categories.set(category_ids)
+
         if cover_file is not None:
-            instance.cover_image = cover_file
+            try:
+                upload_result = upload(cover_file, folder="products/cover")
+                instance.cover_image = upload_result['public_id']
+            except Exception as e:
+                logger.error(f"Cover update failed: {e}")
+                raise serializers.ValidationError({"cover_image": "Upload failed"})
+
         if gallery_files is not None:
             instance.images.all().delete()
-            for img in gallery_files:
-                ProductImage.objects.create(product=instance, image=img)
+            for img_file in gallery_files:
+                try:
+                    upload_result = upload(img_file, folder="products/gallery")
+                    ProductImage.objects.create(
+                        product=instance,
+                        image=upload_result['public_id'],
+                        is_primary=False
+                    )
+                except Exception as e:
+                    logger.error(f"Gallery update failed: {e}")
+                    continue
 
         instance.save()
         return instance

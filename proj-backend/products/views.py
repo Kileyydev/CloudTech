@@ -32,16 +32,16 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 
 
 # ===================================================================
-# COLOR VIEWSET — READ-ONLY FOR FRONTEND
+# COLOR VIEWSET — PUBLIC READ
 # ===================================================================
 class ColorViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    List all colors: GET /products/colors/
-    Admin can add via Django Admin
+    List all colors: GET /api/products/colors/
+    Public access
     """
     queryset = Color.objects.all().order_by('name')
     serializer_class = ColorSerializer
-    permission_classes = [permissions.IsAuthenticated]  # Optional: only logged-in
+    permission_classes = [permissions.AllowAny]  # FIXED: PUBLIC
     filter_backends = [filters.SearchFilter]
     search_fields = ['name']
 
@@ -69,7 +69,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         # Build cache key
         category_slug = self.request.query_params.get('category')
         is_featured = self.request.query_params.get('is_featured') == 'true'
-        cache_key = f"products_v2_{category_slug or 'all'}_featured_{is_featured}"
+        cache_key = f"products_v3_{category_slug or 'all'}_featured_{is_featured}"
 
         # Try cache first
         cached_qs = cache.get(cache_key)
@@ -135,6 +135,7 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Category.objects.all().order_by('name')
     serializer_class = CategorySerializer
+    permission_classes = [permissions.AllowAny]  # Public
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'slug']
 
@@ -145,12 +146,13 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
 class BrandViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Brand.objects.all().order_by('name')
     serializer_class = BrandSerializer
+    permission_classes = [permissions.AllowAny]  # Public
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'slug']
 
 
 # ===================================================================
-# PRODUCT IMAGE VIEWSET (Optional: for direct management)
+# PRODUCT IMAGE VIEWSET (Optional)
 # ===================================================================
 class ProductImageViewSet(viewsets.ModelViewSet):
     queryset = ProductImage.objects.select_related('product', 'variant').all()
@@ -158,17 +160,3 @@ class ProductImageViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['product__id', 'variant__id', 'is_primary']
-    
-    # products/views.py
-from rest_framework import viewsets
-from .models import Color
-from .serializers import ColorSerializer
-
-class ColorViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    API endpoint for listing colors.
-    GET /api/products/colors/ → List all colors
-    """
-    queryset = Color.objects.all().order_by('name')
-    serializer_class = ColorSerializer
-    permission_classes = [IsAdminOrReadOnly]  # or AllowAny if public

@@ -35,7 +35,7 @@ class Color(models.Model):
         return self.name
 
 
-# ================== EXISTING MODELS (UPGRADED) ==================
+# ================== CATEGORY ==================
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=120, unique=True, blank=True)
@@ -53,6 +53,7 @@ class Category(models.Model):
         super().save(*args, **kwargs)
 
 
+# ================== BRAND ==================
 class Brand(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=120, unique=True, blank=True)
@@ -66,6 +67,7 @@ class Brand(models.Model):
         super().save(*args, **kwargs)
 
 
+# ================== TAG ==================
 class Tag(models.Model):
     name = models.CharField(max_length=60, unique=True)
     slug = models.SlugField(max_length=80, unique=True, blank=True)
@@ -79,6 +81,7 @@ class Tag(models.Model):
         super().save(*args, **kwargs)
 
 
+# ================== PRODUCT ==================
 class Product(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255)
@@ -86,7 +89,7 @@ class Product(models.Model):
     description = models.TextField(blank=True)
 
     categories = models.ManyToManyField('Category', related_name='products', blank=True)
-    brand = models.ForeignKey('Brand', on_delete=models.SET_NULL, null=True, related_name='products')
+    brand = models.ForeignKey('Brand', on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     tags = models.ManyToManyField('Tag', blank=True, related_name='products')
 
     cover_image = CloudinaryField('image', blank=True, null=True)
@@ -114,6 +117,7 @@ class Product(models.Model):
         return self.title
 
     def save(self, *args, **kwargs):
+        # Generate slug
         if not self.slug:
             base = slugify(self.title)[:240]
             slug = base
@@ -123,6 +127,7 @@ class Product(models.Model):
                 i += 1
             self.slug = slug
 
+        # Calculate final_price
         if self.discount and self.discount > 0:
             self.final_price = round(self.price * (1 - self.discount / 100), 2)
         else:
@@ -131,6 +136,7 @@ class Product(models.Model):
         super().save(*args, **kwargs)
 
 
+# ================== PRODUCT VARIANT ==================
 class ProductVariant(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
@@ -152,6 +158,7 @@ class ProductVariant(models.Model):
         return f"{self.product.title} — {self.sku}"
 
 
+# ================== PRODUCT IMAGE ==================
 class ProductImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')

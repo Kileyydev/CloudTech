@@ -6,17 +6,19 @@ from .views import (
     ProductVariantViewSet,
     CategoryViewSet,
     BrandViewSet,
-    ColorViewSet,        # ← CHANGE THIS
+    ColorViewSet,
     ProductImageViewSet
 )
 
 router = DefaultRouter()
-router.register(r'products', ProductViewSet, basename='products')
-router.register(r'variants', ProductVariantViewSet, basename='variants')
-router.register(r'categories', CategoryViewSet, basename='categories')
-router.register(r'brands', BrandViewSet, basename='brands')
-router.register(r'colors', ColorViewSet, basename='colors')  # ← AND THIS
-router.register(r'images', ProductImageViewSet, basename='images')
+
+# CLEAN PATHS
+router.register(r'products', ProductViewSet, basename='product')
+router.register(r'variants', ProductVariantViewSet, basename='variant')
+router.register(r'categories', CategoryViewSet, basename='category')
+router.register(r'brands', BrandViewSet, basename='brand')
+router.register(r'colors', ColorViewSet, basename='color')
+router.register(r'images', ProductImageViewSet, basename='image')
 
 urlpatterns = [
     path('', include(router.urls)),
