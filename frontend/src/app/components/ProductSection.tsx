@@ -39,7 +39,7 @@ const API_FEATURED = `${
     : 'https://cloudtech-c4ft.onrender.com/api'
 }/products/?is_featured=true`;
 
-// Use env var first, fallback to hardcoded
+// Keep MEDIA_BASE for fallback (if needed in future)
 const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_URL || 
   (process.env.NODE_ENV === 'development'
     ? 'http://localhost:8000'
@@ -67,7 +67,7 @@ const ProductSection = () => {
 
   const hasFetched = useRef(false);
 
-  // ——— DEBUG: Log MEDIA_BASE after it's declared ———
+  // ——— DEBUG: Log MEDIA_BASE ———
   useEffect(() => {
     console.log('%c[MEDIA_BASE DEBUG]', 'color: purple; font-weight: bold', {
       NODE_ENV: process.env.NODE_ENV,
@@ -150,14 +150,25 @@ const ProductSection = () => {
 
   const cartCount = Object.values(cart).reduce((s, i) => s + (i.quantity || 0), 0);
 
-  // ——— IMAGE URL BUILDER (SAFE) ———
+  // ——— IMAGE URL BUILDER (SMART: FULL URL OR FALLBACK) ———
   const getImageUrl = (path?: string): string => {
-    if (!path) return '/images/fallback.jpg';
-    if (path.startsWith('http')) return path;
+    if (!path) {
+      console.warn('%c[Image] No path provided', 'color: yellow');
+      return '/images/fallback.jpg';
+    }
 
+    // If Django already gave us a full URL → USE IT
+    if (path.startsWith('http')) {
+      console.log('%c[Image] Using full URL from API', 'color: green', path);
+      return path;
+    }
+
+    // Fallback: Build from MEDIA_BASE (for old data or dev)
     const base = MEDIA_BASE.replace(/\/$/, '');
     const cleanPath = path.replace(/^\/+/, '');
-    return `${base}/${cleanPath}`;
+    const built = `${base}/${cleanPath}`;
+    console.log('%c[Image] Built URL (fallback)', 'color: orange', { path, built });
+    return built;
   };
 
   // ——— CARD DIMENSIONS ———
@@ -225,7 +236,7 @@ const ProductSection = () => {
           <Favorite sx={{ color: wishlist.has(p.id) ? '#e91e63' : '#888', fontSize: 20 }} />
         </Box>
 
-        {/* Image with LOUD ERROR LOGGING */}
+        {/* Image with LOUD ERROR LOGGING + unoptimized */}
         <Box
           onClick={() => router.push(`/product/${p.id}`)}
           sx={{ width: '100%', height: CARD_H * 0.56, cursor: 'pointer', overflow: 'hidden' }}
@@ -234,6 +245,7 @@ const ProductSection = () => {
             component="img"
             image={src}
             alt={p.title}
+            loading="eager"
             onLoad={() => {
               console.log('%c[Product Image] LOADED', 'color: green; font-weight: bold', p.title, src);
             }}

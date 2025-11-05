@@ -213,3 +213,6 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 APPEND_SLASH = True
+
+# settings.py
+SITE_URL = env("SITE_URL", default="https://cloudtech-c4ft.onrender.com")
