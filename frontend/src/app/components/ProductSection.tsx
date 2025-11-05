@@ -133,13 +133,10 @@ const ProductSection = () => {
 
   const cartCount = Object.values(cart).reduce((s, i) => s + (i.quantity || 0), 0);
 
-  // ——— SIMPLIFIED & ROBUST getImageUrl ———
+  // ——— IMAGE URL ———
   const getImageUrl = (path?: string): string => {
-    if (!path) {
-      console.warn('%c[Image] No path provided', 'color: yellow');
-      return '/images/fallback.jpg';
-    }
-    return path; // Full URL from Django
+    if (!path) return '/images/fallback.jpg';
+    return path;
   };
 
   // ——— CARD DIMENSIONS ———
@@ -157,20 +154,13 @@ const ProductSection = () => {
     </Card>
   );
 
-  // ——— productCard — FIXED LOGGING & IMAGE LOADING ———
+  // ——— PRODUCT CARD (NO HOOKS INSIDE!) ———
   const productCard = (p: ProductT) => {
     const src = getImageUrl(p.cover_image);
     const inCart = cart[p.id];
 
-    // Log immediately when component mounts (accurate values)
-    useEffect(() => {
-      console.log('%c[Product Image] Loading:', 'color: cyan; font-weight: bold', {
-        id: p.id,
-        title: p.title,
-        cover_image: p.cover_image,
-        src,
-      });
-    }, [p.id, p.title, p.cover_image, src]);
+    // Log outside render — no useEffect!
+    console.log('%c[Product Image] Loading:', 'color: cyan; font-weight: bold', p.id, p.title, src);
 
     return (
       <Card
@@ -210,7 +200,7 @@ const ProductSection = () => {
           <Favorite sx={{ color: wishlist.has(p.id) ? '#e91e63' : '#888', fontSize: 20 }} />
         </Box>
 
-        {/* Image - EAGER + HIGH PRIORITY */}
+        {/* Image - EAGER + PRIORITY */}
         <Box
           onClick={() => router.push(`/product/${p.id}`)}
           sx={{ width: '100%', height: CARD_H * 0.56, cursor: 'pointer', overflow: 'hidden' }}
@@ -220,7 +210,6 @@ const ProductSection = () => {
             alt={p.title}
             loading="eager"
             fetchPriority="high"
-            crossOrigin="anonymous"
             style={{
               width: '100%',
               height: '100%',
@@ -238,14 +227,9 @@ const ProductSection = () => {
               console.log('%c[Product Image] LOADED', 'color: green; font-weight: bold', p.title, src);
             }}
             onError={(e) => {
-              const target = e.currentTarget;
-              target.src = '/images/fallback.jpg';
-              console.error('%c[Product Image] FAILED TO LOAD', 'color: red; font-weight: bold', {
-                id: p.id,
-                title: p.title,
-                attempted_url: src,
-                fallback_used: '/images/fallback.jpg',
-              });
+              const img = e.currentTarget;
+              img.src = '/images/fallback.jpg';
+              console.error('%c[Product Image] FAILED', 'color: red; font-weight: bold', p.id, p.title, src);
             }}
           />
         </Box>
@@ -288,30 +272,30 @@ const ProductSection = () => {
 
           {inCart ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, mt: 1.2 }}>
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  sub(p.id);
-                }}
-                sx={{ color: '#e91e63', border: '1.5px solid #e91e63', width: 32, height: 32 }}
-              >
-                <Remove fontSize="small" />
-              </IconButton>
-              <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', minWidth: 28, textAlign: 'center' }}>
-                {inCart.quantity}
-              </Typography>
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  add(p);
-                }}
-                disabled={inCart.quantity >= p.stock}
-                sx={{ color: '#e91e63', border: '1.5px solid #e91e63', width: 32, height: 32 }}
-              >
-                <Add fontSize="small" />
-              </IconButton>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    sub(p.id);
+                  }}
+                  sx={{ color: '#e91e63', border: '1.5px solid #e91e63', width: 32, height: 32 }}
+                >
+                  <Remove fontSize="small" />
+                </IconButton>
+                <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', minWidth: 28, textAlign: 'center' }}>
+                  {inCart.quantity}
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    add(p);
+                  }}
+                  disabled={inCart.quantity >= p.stock}
+                  sx={{ color: '#e91e63', border: '1.5px solid #e91e63', width: 32, height: 32 }}
+                >
+                  <Add fontSize="small" />
+                </IconButton>
             </Box>
           ) : (
             <Button
