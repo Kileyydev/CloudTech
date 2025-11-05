@@ -239,9 +239,9 @@ const ProductAdminPage: React.FC = () => {
   const ramGBNum = ramGB ? parseInt(ramGB, 10) : null;
   const colorIdNum = colorId ? parseInt(colorId, 10) : null;
 
-  if (storageGBNum) form.append("storage_gb", storageGBNum);
-  if (ramGBNum) form.append("ram_gb", ramGBNum);
-  if (colorIdNum) form.append("color_id", colorIdNum);
+  if (storageGBNum) form.append("storage_gb", String(storageGBNum));
+  if (ramGBNum) form.append("ram_gb", String(ramGBNum));
+  if (colorIdNum) form.append("color_id", String(colorIdNum));
   if (condition) form.append("condition", condition);
 
   if (coverFile) form.append("cover_image", coverFile);
@@ -249,7 +249,7 @@ const ProductAdminPage: React.FC = () => {
 
   setSaving(true);
   try {
-    const url = editId ? `${API_BASE}${editId}/` : API_BASE;
+    const url = editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS;
     const method = editId ? "PATCH" : "POST";
     const res = await fetch(url, {
       method,
