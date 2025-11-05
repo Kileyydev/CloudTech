@@ -41,7 +41,7 @@ class ProductImageSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request:
             return request.build_absolute_uri(obj.image.url)
-        return obj.image.url  # Cloudinary already full
+        return obj.image.url
 
 
 # ===================================================================
@@ -81,7 +81,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request:
             return request.build_absolute_uri(obj.cover_image.url)
-        return obj.cover_image.url  # Cloudinary already full
+        return obj.cover_image.url  # Cloudinary: https://res.cloudinary.com/...
 
 
 # ===================================================================

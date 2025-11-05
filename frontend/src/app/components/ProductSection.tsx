@@ -38,12 +38,6 @@ const API_FEATURED = `${
     : 'https://cloudtech-c4ft.onrender.com/api'
 }/products/?is_featured=true`;
 
-// MEDIA_BASE — NEVER USED NOW (Django sends full URLs)
-const MEDIA_BASE = 
-  typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://localhost:8000/'
-    : 'https://cloudtech-c4ft.onrender.com/';
-
 const ProductSection = () => {
   const theme = useTheme();
   const router = useRouter();
@@ -64,15 +58,6 @@ const ProductSection = () => {
   });
 
   const hasFetched = useRef(false);
-
-  // ——— DEBUG: Log MEDIA_BASE (optional) ———
-  useEffect(() => {
-    console.log('%c[MEDIA_BASE DEBUG]', 'color: purple; font-weight: bold', {
-      NODE_ENV: process.env.NODE_ENV,
-      hostname: typeof window !== 'undefined' ? window.location.hostname : 'server',
-      MEDIA_BASE,
-    });
-  }, []);
 
   // ——— LOAD FROM CACHE ———
   useEffect(() => {
@@ -148,25 +133,13 @@ const ProductSection = () => {
 
   const cartCount = Object.values(cart).reduce((s, i) => s + (i.quantity || 0), 0);
 
-  // ——— IMAGE URL BUILDER: FULL URL FROM API (NO MORE LOGIC!) ———
+  // ——— SIMPLIFIED getImageUrl — FULL URL FROM DJANGO ———
   const getImageUrl = (path?: string): string => {
     if (!path) {
       console.warn('%c[Image] No path provided', 'color: yellow');
       return '/images/fallback.jpg';
     }
-
-    // CASE 1: Full URL from Django (Cloudinary or localhost with request.build_absolute_uri)
-    if (path.startsWith('http')) {
-      console.log('%c[Image] Full URL from API', 'color: green', path);
-      return path;
-    }
-
-    // CASE 2: Fallback (should NEVER happen now)
-    const base = MEDIA_BASE.replace(/\/$/, '');
-    const clean = path.replace(/^\/+/, '');
-    const built = `${base}/${clean}`;
-    console.log('%c[Image] Built URL (fallback)', 'color: orange', { path, built });
-    return built;
+    return path; // Already a full URL from Django (Cloudinary or build_absolute_uri)
   };
 
   // ——— CARD DIMENSIONS ———
@@ -233,7 +206,7 @@ const ProductSection = () => {
           <Favorite sx={{ color: wishlist.has(p.id) ? '#e91e63' : '#888', fontSize: 20 }} />
         </Box>
 
-        {/* RAW IMG */}
+        {/* Image */}
         <Box
           onClick={() => router.push(`/product/${p.id}`)}
           sx={{ width: '100%', height: CARD_H * 0.56, cursor: 'pointer', overflow: 'hidden' }}
