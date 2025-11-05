@@ -217,54 +217,61 @@ const ProductAdminPage: React.FC = () => {
   };
 
   // Save
-  const saveProduct = async () => {
-    if (!token || !title || price === "" || !brandId) {
-      setSnack({ open: true, msg: "Fill required fields", sev: "error" });
-      return;
+ const saveProduct = async () => {
+  if (!token || !title || price === "" || !brandId) {
+    setSnack({ open: true, msg: "Fill required fields", sev: "error" });
+    return;
+  }
+
+  const form = new FormData();
+  form.append("title", title);
+  form.append("description", description);
+  form.append("price", String(price));
+  form.append("stock", String(stock || 0));
+  form.append("discount", String(discount));
+  form.append("is_active", String(isActive));
+  form.append("is_featured", String(isFeatured));
+  selectedCats.forEach(c => form.append("category_ids", c));
+  form.append("brand_id", brandId);
+
+  // FIXED: CONVERT TO NUMBER
+  const storageGBNum = storageGB ? parseInt(storageGB, 10) : null;
+  const ramGBNum = ramGB ? parseInt(ramGB, 10) : null;
+  const colorIdNum = colorId ? parseInt(colorId, 10) : null;
+
+  if (storageGBNum) form.append("storage_gb", storageGBNum);
+  if (ramGBNum) form.append("ram_gb", ramGBNum);
+  if (colorIdNum) form.append("color_id", colorIdNum);
+  if (condition) form.append("condition", condition);
+
+  if (coverFile) form.append("cover_image", coverFile);
+  galleryFiles.forEach(f => form.append("gallery", f));
+
+  setSaving(true);
+  try {
+    const url = editId ? `${API_BASE}${editId}/` : API_BASE;
+    const method = editId ? "PATCH" : "POST";
+    const res = await fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${token}` },
+      body: form
+    });
+
+    if (res.ok) {
+      setSnack({ open: true, msg: editId ? "Updated" : "Added", sev: "success" });
+      resetForm();
+      fetchData();
+      setTab(1);
+    } else {
+      const error = await res.text();
+      setSnack({ open: true, msg: `Save failed: ${error}`, sev: "error" });
     }
-
-    const form = new FormData();
-    form.append("title", title);
-    form.append("description", description);
-    form.append("price", String(price));
-    form.append("stock", String(stock || 0));
-    form.append("discount", String(discount));
-    form.append("is_active", String(isActive));
-    form.append("is_featured", String(isFeatured));
-    selectedCats.forEach(c => form.append("category_ids", c));
-    form.append("brand_id", brandId);
-    if (storageGB) form.append("storage_gb", storageGB);
-    if (ramGB) form.append("ram_gb", ramGB);
-    if (colorId) form.append("color_id", colorId);
-    if (condition) form.append("condition", condition);
-    if (coverFile) form.append("cover_image", coverFile);
-    galleryFiles.forEach(f => form.append("gallery", f));
-
-    setSaving(true);
-    try {
-      const url = editId ? `${API_BASE}${editId}/` : API_PRODUCTS;
-      const method = editId ? "PATCH" : "POST";
-      const res = await fetch(url, {
-        method,
-        headers: { Authorization: `Bearer ${token}` },
-        body: form
-      });
-
-      if (res.ok) {
-        setSnack({ open: true, msg: editId ? "Updated" : "Added", sev: "success" });
-        resetForm();
-        fetchData();
-        setTab(1);
-      } else {
-        const error = await res.text();
-        setSnack({ open: true, msg: `Save failed: ${error}`, sev: "error" });
-      }
-    } catch (err) {
-      setSnack({ open: true, msg: "Network error", sev: "error" });
-    } finally {
-      setSaving(false);
-    }
-  };
+  } catch (err) {
+    setSnack({ open: true, msg: "Network error", sev: "error" });
+  } finally {
+    setSaving(false);
+  }
+};
 
   // Edit — FIXED: Force string ID
   const startEdit = (p: Product) => {
