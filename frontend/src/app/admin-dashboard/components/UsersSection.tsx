@@ -18,6 +18,8 @@ import {
   DialogActions,
   TextField,
   Tooltip,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import { useRouter } from "next/navigation";
@@ -31,42 +33,41 @@ type UserT = {
   is_superuser?: boolean;
 };
 
+const API_USERS = process.env.NEXT_PUBLIC_API_BASE + "/auth/users/";
+
 const UsersSection: React.FC = () => {
+  const router = useRouter();
+
   const [users, setUsers] = useState<UserT[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [snack, setSnack] = useState<{ open: boolean; msg: string; sev: "success" | "error" }>({
+    open: false,
+    msg: "",
+    sev: "success",
+  });
+
+  // Edit dialog states
   const [openEdit, setOpenEdit] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserT | null>(null);
   const [fullNameInput, setFullNameInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [isStaffInput, setIsStaffInput] = useState(false);
   const [isSuperuserInput, setIsSuperuserInput] = useState(false);
-  const [saving, setSaving] = useState(false);
 
-  const router = useRouter();
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE + "/auth";
+  // === TOKEN HANDLER ===
+  const token = typeof window !== "undefined" ? localStorage.getItem("access") : null;
 
-
-  // Get token from localStorage
-  const getToken = () => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("access");
-  };
-
-  useEffect(() => {
-    fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  // === FETCH USERS ===
   const fetchUsers = async () => {
-    const token = getToken();
     if (!token) {
       router.push("/admin/login");
       return;
     }
 
-    setUsersLoading(true);
+    setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/users/`, {
+      const res = await fetch(API_USERS, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -80,27 +81,32 @@ const UsersSection: React.FC = () => {
       if (!res.ok) {
         const text = await res.text();
         console.error("Failed to fetch users:", res.status, text);
+        setSnack({ open: true, msg: "Failed to load users", sev: "error" });
         setUsers([]);
-        setUsersLoading(false);
         return;
       }
 
       const data = await res.json();
+      const usersList = Array.isArray(data)
+        ? data
+        : Array.isArray(data.results)
+        ? data.results
+        : [];
 
-      if (Array.isArray(data)) setUsers(data);
-      else if (data.results && Array.isArray(data.results)) setUsers(data.results);
-      else {
-        console.warn("Unexpected users response format", data);
-        setUsers([]);
-      }
+      setUsers(usersList);
     } catch (err) {
-      console.error("Error fetching users", err);
-      setUsers([]);
+      console.error("Error fetching users:", err);
+      setSnack({ open: true, msg: "Network error while fetching users", sev: "error" });
     } finally {
-      setUsersLoading(false);
+      setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // === EDIT HANDLERS ===
   const openEditDialog = (user: UserT) => {
     setSelectedUser(user);
     setFullNameInput(user.full_name ?? user.name ?? "");
@@ -111,49 +117,51 @@ const UsersSection: React.FC = () => {
   };
 
   const handleSaveUser = async () => {
-    if (!selectedUser) return;
-    const token = getToken();
-    if (!token) {
-      router.push("/admin/login");
-      return;
-    }
-    setSaving(true);
+    if (!selectedUser || !token) return;
 
+    setSaving(true);
     const payload: any = {
       full_name: fullNameInput,
       name: fullNameInput,
       is_staff: isStaffInput,
       is_superuser: isSuperuserInput,
     };
-    if (passwordInput.trim().length > 0) payload.password = passwordInput;
+    if (passwordInput.trim()) payload.password = passwordInput;
 
     try {
-      const res = await fetch(`${API_BASE}/users/${selectedUser.id}/`, {
+      const res = await fetch(`${API_USERS}${selectedUser.id}/`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(payload),
       });
 
       if (res.ok) {
-        await fetchUsers();
+        setSnack({ open: true, msg: "User updated successfully", sev: "success" });
+        fetchUsers();
         setOpenEdit(false);
-        setSelectedUser(null);
       } else {
-        const errText = await res.text();
-        console.error("Failed to update user:", res.status, errText);
-        alert("Failed to update user. Check console for details.");
+        const text = await res.text();
+        console.error("Update failed:", res.status, text);
+        setSnack({ open: true, msg: "Failed to update user", sev: "error" });
       }
     } catch (err) {
-      console.error("Error updating user", err);
-      alert("Error updating user");
+      console.error("Error updating user:", err);
+      setSnack({ open: true, msg: "Network error while updating user", sev: "error" });
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+    <Box sx={{ p: 2 }}>
+      {/* HEADER */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          Users
+        </Typography>
         <Button
           variant="contained"
           onClick={fetchUsers}
@@ -163,80 +171,78 @@ const UsersSection: React.FC = () => {
         </Button>
       </Box>
 
-      <Box sx={{ backgroundColor: "#F9FAFB", p: 2, borderRadius: 2 }}>
-        {usersLoading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-            <CircularProgress />
+      {/* TABLE */}
+      <Box sx={{ backgroundColor: "#fff", borderRadius: 2, boxShadow: 1, p: 2 }}>
+        {loading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", p: 6 }}>
+            <CircularProgress sx={{ color: "#DC1A8A" }} />
           </Box>
+        ) : users.length === 0 ? (
+          <Typography textAlign="center" py={4}>
+            No users found
+          </Typography>
         ) : (
           <Table>
             <TableHead>
               <TableRow
                 sx={{
                   backgroundColor: "#DC1A8A",
-                  "& .MuiTableCell-root": { color: "#FFFFFF", fontWeight: "bold" },
+                  "& .MuiTableCell-root": { color: "#fff", fontWeight: "bold" },
                 }}
               >
                 <TableCell>Full Name</TableCell>
                 <TableCell>Email</TableCell>
-                <TableCell>Is Admin</TableCell>
-                <TableCell>Is Superuser</TableCell>
+                <TableCell>Admin</TableCell>
+                <TableCell>Superuser</TableCell>
                 <TableCell>Modify</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} sx={{ textAlign: "center", p: 4 }}>
-                    No users found
+              {users.map((u) => (
+                <TableRow key={u.id} hover>
+                  <TableCell>{u.full_name ?? u.name ?? "-"}</TableCell>
+                  <TableCell>{u.email}</TableCell>
+                  <TableCell>
+                    <Checkbox checked={Boolean(u.is_staff)} disabled />
+                  </TableCell>
+                  <TableCell>
+                    <Checkbox checked={Boolean(u.is_superuser)} disabled />
+                  </TableCell>
+                  <TableCell>
+                    <Tooltip title="Edit user">
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        startIcon={<EditIcon />}
+                        onClick={() => openEditDialog(u)}
+                      >
+                        Edit
+                      </Button>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
-              ) : (
-                users.map((u) => (
-                  <TableRow key={u.id} sx={{ "&:hover": { backgroundColor: "#F5F5F5" } }}>
-                    <TableCell>{u.full_name ?? u.name ?? "-"}</TableCell>
-                    <TableCell>{u.email}</TableCell>
-                    <TableCell>
-                      <Checkbox checked={Boolean(u.is_staff)} disabled />
-                    </TableCell>
-                    <TableCell>
-                      <Checkbox checked={Boolean(u.is_superuser)} disabled />
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip title="Modify user">
-                        <Button
-                          variant="outlined"
-                          startIcon={<EditIcon />}
-                          onClick={() => openEditDialog(u)}
-                        >
-                          Modify
-                        </Button>
-                      </Tooltip>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
+              ))}
             </TableBody>
           </Table>
         )}
       </Box>
 
-      {/* Edit dialog */}
+      {/* === EDIT DIALOG === */}
       <Dialog open={openEdit} onClose={() => setOpenEdit(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Modify User</DialogTitle>
+        <DialogTitle>Edit User</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
           <TextField
-            label="Full name"
+            label="Full Name"
             value={fullNameInput}
             onChange={(e) => setFullNameInput(e.target.value)}
           />
           <TextField
-            label="New password (leave empty to keep current)"
+            label="New Password (optional)"
             type="password"
             value={passwordInput}
             onChange={(e) => setPasswordInput(e.target.value)}
           />
-          <Box sx={{ display: "flex", gap: 4, alignItems: "center", mt: 1 }}>
+          <Box sx={{ display: "flex", gap: 3 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Checkbox
                 checked={isStaffInput}
@@ -256,8 +262,8 @@ const UsersSection: React.FC = () => {
         <DialogActions>
           <Button onClick={() => setOpenEdit(false)}>Cancel</Button>
           <Button
-            onClick={handleSaveUser}
             variant="contained"
+            onClick={handleSaveUser}
             disabled={saving}
             sx={{ backgroundColor: "#DC1A8A", "&:hover": { backgroundColor: "#B00053" } }}
           >
@@ -265,6 +271,21 @@ const UsersSection: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* SNACKBAR */}
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={4000}
+        onClose={() => setSnack((s) => ({ ...s, open: false }))}
+      >
+        <Alert
+          severity={snack.sev}
+          sx={{ width: "100%" }}
+          onClose={() => setSnack((s) => ({ ...s, open: false }))}
+        >
+          {snack.msg}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
