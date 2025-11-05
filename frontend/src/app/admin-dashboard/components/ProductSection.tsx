@@ -1,3 +1,4 @@
+// app/admin-dashboard/products/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -15,6 +16,7 @@ import type { Product } from "@/app/types/products";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE; // e.g. http://localhost:8000
 
+// FIXED: NO DOUBLE /api
 const API_PRODUCTS = `${API_BASE}/products/products/`;
 const API_CATEGORIES = `${API_BASE}/products/categories/`;
 const API_BRANDS = `${API_BASE}/products/brands/`;
@@ -167,7 +169,7 @@ const ProductAdminPage: React.FC = () => {
       ]);
 
       if (!pRes.ok || !cRes.ok || !bRes.ok || !colRes.ok) {
-        throw new Error("Failed to fetch data");
+        throw new Error(`HTTP ${pRes.status} ${cRes.status} ${bRes.status} ${colRes.status}`);
       }
 
       const [pJson, cJson, bJson, colJson] = await Promise.all([
@@ -216,66 +218,83 @@ const ProductAdminPage: React.FC = () => {
     setIsActive(true); setIsFeatured(false);
   };
 
-  // Save
- const saveProduct = async () => {
-  if (!token || !title || price === "" || !brandId) {
-    setSnack({ open: true, msg: "Fill required fields", sev: "error" });
-    return;
-  }
-
-  const form = new FormData();
-  form.append("title", title);
-  form.append("description", description);
-  form.append("price", String(price));
-  form.append("stock", String(stock || 0));
-  form.append("discount", String(discount));
-  form.append("is_active", String(isActive));
-  form.append("is_featured", String(isFeatured));
-  selectedCats.forEach(c => form.append("category_ids", c));
-  form.append("brand_id", brandId);
-
-  // FIXED: CONVERT TO NUMBER
-  const storageGBNum = storageGB ? parseInt(storageGB, 10) : null;
-  const ramGBNum = ramGB ? parseInt(ramGB, 10) : null;
-  const colorIdNum = colorId ? parseInt(colorId, 10) : null;
-
-  if (storageGBNum) form.append("storage_gb", String(storageGBNum));
-  if (ramGBNum) form.append("ram_gb", String(ramGBNum));
-  if (colorIdNum) form.append("color_id", String(colorIdNum));
-  if (condition) form.append("condition", condition);
-
-  if (coverFile) form.append("cover_image", coverFile);
-  galleryFiles.forEach(f => form.append("gallery", f));
-
-  setSaving(true);
-  try {
-    const url = editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS;
-    const method = editId ? "PATCH" : "POST";
-    const res = await fetch(url, {
-      method,
-      headers: { Authorization: `Bearer ${token}` },
-      body: form
-    });
-
-    if (res.ok) {
-      setSnack({ open: true, msg: editId ? "Updated" : "Added", sev: "success" });
-      resetForm();
-      fetchData();
-      setTab(1);
-    } else {
-      const error = await res.text();
-      setSnack({ open: true, msg: `Save failed: ${error}`, sev: "error" });
+  // === SAVE PRODUCT WITH ERROR CONSOLE ===
+  const saveProduct = async () => {
+    if (!token || !title || price === "" || !brandId) {
+      setSnack({ open: true, msg: "Fill required fields", sev: "error" });
+      return;
     }
-  } catch (err) {
-    setSnack({ open: true, msg: "Network error", sev: "error" });
-  } finally {
-    setSaving(false);
-  }
-};
 
-  // Edit — FIXED: Force string ID
+    const form = new FormData();
+    form.append("title", title);
+    form.append("description", description || "");
+    form.append("price", String(price));
+    form.append("stock", String(stock || 0));
+    form.append("discount", String(discount || 0));
+    form.append("is_active", String(isActive));
+    form.append("is_featured", String(isFeatured));
+    form.append("brand_id", brandId);
+
+    // CATEGORY IDS — MUST BE MULTIPLE
+    selectedCats.forEach(id => form.append("category_ids", id));
+
+    // OPTIONAL FIELDS
+    if (colorId && colorId.trim()) form.append("color_id", colorId);
+    if (storageGB && storageGB.trim()) form.append("storage_gb", storageGB);
+    if (ramGB && ramGB.trim()) form.append("ram_gb", ramGB);
+    if (condition) form.append("condition", condition);
+
+    if (coverFile) form.append("cover_image", coverFile);
+    galleryFiles.forEach(f => form.append("gallery", f));
+
+    // === ERROR CONSOLE ===
+    console.log("SAVING PRODUCT...");
+    console.log("URL:", editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS);
+    console.log("METHOD:", editId ? "PATCH" : "POST");
+    console.log("FORM DATA:");
+    for (let [k, v] of form.entries()) {
+      if (v instanceof File) {
+        console.log(k, `(File: ${v.name}, ${v.size} bytes)`);
+      } else {
+        console.log(k, v);
+      }
+    }
+
+    setSaving(true);
+    try {
+      const url = editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS;
+      const res = await fetch(url, {
+        method: editId ? "PATCH" : "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      });
+
+      const text = await res.text();
+      console.log("RESPONSE STATUS:", res.status);
+      console.log("RESPONSE BODY:", text);
+
+      if (res.ok) {
+        const data = JSON.parse(text);
+        console.log("SUCCESS:", data);
+        setSnack({ open: true, msg: editId ? "Updated!" : "Added!", sev: "success" });
+        resetForm();
+        fetchData();
+        setTab(1);
+      } else {
+        console.error("SAVE FAILED:", res.status, text);
+        setSnack({ open: true, msg: `Error ${res.status}: ${text.substring(0, 200)}`, sev: "error" });
+      }
+    } catch (err: any) {
+      console.error("NETWORK ERROR:", err);
+      setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Edit
   const startEdit = (p: Product) => {
-    const id = String(p.id); // ← THIS FIXES UUID ISSUE
+    const id = String(p.id);
     setEditId(id);
     setTitle(p.title || "");
     setDescription(p.description || "");
@@ -308,7 +327,7 @@ const ProductAdminPage: React.FC = () => {
   const doDelete = async () => {
     if (!token || !deleteId) return;
     try {
-      await fetch(`${API_BASE}${deleteId}/`, {
+      await fetch(`${API_PRODUCTS}${deleteId}/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -321,13 +340,13 @@ const ProductAdminPage: React.FC = () => {
     }
   };
 
-  // Discount quick update
+  // Discount update
   const updateDiscount = async (p: Product) => {
     if (!token) return;
     setSavingId(p.id);
     const final = p.price! - (p.price! * (p.discount || 0)) / 100;
     try {
-      await fetch(`${API_BASE}${p.id}/`, {
+      await fetch(`${API_PRODUCTS}${p.id}/`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -353,22 +372,7 @@ const ProductAdminPage: React.FC = () => {
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#f8f9fa", p: { xs: 2, md: 4 } }}>
       {/* TABS */}
-      <Tabs
-        value={tab}
-        onChange={(_, v) => setTab(v)}
-        centered
-        sx={{
-          mb: 4,
-          "& .MuiTab-root": {
-            textTransform: "none",
-            fontWeight: 600,
-            fontSize: "1.1rem",
-            color: "#666",
-            "&.Mui-selected": { color: "#DC1A8A" },
-          },
-          "& .MuiTabs-indicator": { backgroundColor: "#DC1A8A", height: 3 },
-        }}
-      >
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} centered sx={{ mb: 4 }}>
         <Tab label={editId ? "Edit Product" : "Add Product"} />
         <Tab label="All Products" />
         <Tab label="Discounted" />
@@ -383,51 +387,16 @@ const ProductAdminPage: React.FC = () => {
             </Typography>
 
             <Stack spacing={4}>
-              <TextField
-                label="Title *"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                fullWidth
-                variant="outlined"
-              />
-
-              <TextField
-                label="Description"
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                multiline
-                rows={4}
-                fullWidth
-                variant="outlined"
-              />
+              <TextField label="Title *" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+              <TextField label="Description" value={description} onChange={e => setDescription(e.target.value)} multiline rows={4} fullWidth />
 
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <TextField
-                  label="Price *"
-                  type="number"
-                  value={price}
-                  onChange={e => setPrice(Number(e.target.value) || "")}
-                />
-                <TextField
-                  label="Discount %"
-                  type="number"
-                  value={discount}
-                  onChange={e => setDiscount(Number(e.target.value) || 0)}
-                />
-                <TextField
-                  label="Final Price"
-                  value={finalPrice}
-                  disabled
-                />
+                <TextField label="Price *" type="number" value={price} onChange={e => setPrice(Number(e.target.value) || "")} />
+                <TextField label="Discount %" type="number" value={discount} onChange={e => setDiscount(Number(e.target.value) || 0)} />
+                <TextField label="Final Price" value={finalPrice} disabled />
               </Stack>
 
-              <TextField
-                label="Stock"
-                type="number"
-                value={stock}
-                onChange={e => setStock(Number(e.target.value) || "")}
-                fullWidth
-              />
+              <TextField label="Stock" type="number" value={stock} onChange={e => setStock(Number(e.target.value) || "")} fullWidth />
 
               {/* STORAGE & RAM */}
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
@@ -436,9 +405,7 @@ const ProductAdminPage: React.FC = () => {
                   <Select value={storageGB} onChange={e => setStorageGB(e.target.value)}>
                     <MenuItem value="">None</MenuItem>
                     {storageOptions.map(gb => (
-                      <MenuItem key={gb} value={gb}>
-                        {gb >= 1024 ? `${gb / 1024}TB` : `${gb}GB`}
-                      </MenuItem>
+                      <MenuItem key={gb} value={gb}>{gb >= 1024 ? `${gb / 1024}TB` : `${gb}GB`}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
@@ -447,9 +414,7 @@ const ProductAdminPage: React.FC = () => {
                   <InputLabel>RAM (GB)</InputLabel>
                   <Select value={ramGB} onChange={e => setRamGB(e.target.value)}>
                     <MenuItem value="">None</MenuItem>
-                    {ramOptions.map(ram => (
-                      <MenuItem key={ram} value={ram}>{ram}GB</MenuItem>
-                    ))}
+                    {ramOptions.map(ram => <MenuItem key={ram} value={ram}>{ram}GB</MenuItem>)}
                   </Select>
                 </FormControl>
               </Stack>
@@ -460,18 +425,14 @@ const ProductAdminPage: React.FC = () => {
                   <InputLabel>Color</InputLabel>
                   <Select value={colorId} onChange={e => setColorId(e.target.value)}>
                     <MenuItem value="">None</MenuItem>
-                    {colors.length === 0 ? (
-                      <MenuItem disabled>Loading colors...</MenuItem>
-                    ) : (
-                      colors.map(c => (
-                        <MenuItem key={c.id} value={c.id}>
-                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                            <Box sx={{ width: 16, height: 16, bgcolor: c.hex_code, borderRadius: "50%", border: "1px solid #ccc" }} />
-                            {c.name}
-                          </Box>
-                        </MenuItem>
-                      ))
-                    )}
+                    {colors.map(c => (
+                      <MenuItem key={c.id} value={c.id}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Box sx={{ width: 16, height: 16, bgcolor: c.hex_code, borderRadius: "50%", border: "1px solid #ccc" }} />
+                          {c.name}
+                        </Box>
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
 
@@ -520,14 +481,8 @@ const ProductAdminPage: React.FC = () => {
               </FormControl>
 
               <Stack direction="row" spacing={3}>
-                <FormControlLabel
-                  control={<Checkbox checked={isActive} onChange={e => setIsActive(e.target.checked)} />}
-                  label="Active"
-                />
-                <FormControlLabel
-                  control={<Checkbox checked={isFeatured} onChange={e => setIsFeatured(e.target.checked)} />}
-                  label="Featured"
-                />
+                <FormControlLabel control={<Checkbox checked={isActive} onChange={e => setIsActive(e.target.checked)} />} label="Active" />
+                <FormControlLabel control={<Checkbox checked={isFeatured} onChange={e => setIsFeatured(e.target.checked)} />} label="Featured" />
               </Stack>
 
               {/* Cover Image */}
@@ -577,21 +532,7 @@ const ProductAdminPage: React.FC = () => {
       {/* === ALL PRODUCTS === */}
       {tab === 1 && (
         <Box>
-          <Tabs
-            value={categoryFilter}
-            onChange={(_, v) => setCategoryFilter(v)}
-            variant={isMobile ? "scrollable" : "standard"}
-            sx={{
-              mb: 3,
-              "& .MuiTab-root": {
-                textTransform: "none",
-                fontWeight: 600,
-                color: "#666",
-                "&.Mui-selected": { color: "#DC1A8A" },
-              },
-              "& .MuiTabs-indicator": { backgroundColor: "#DC1A8A" },
-            }}
-          >
+          <Tabs value={categoryFilter} onChange={(_, v) => setCategoryFilter(v)} variant={isMobile ? "scrollable" : "standard"} sx={{ mb: 3 }}>
             <Tab label="All" value="all" />
             {categories.map(c => <Tab key={c.id} label={c.name} value={c.id} />)}
           </Tabs>
@@ -691,7 +632,7 @@ const ProductAdminPage: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {discounted.map(p => (
-                    <TableRow key={p.id} hover sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
+                    <TableRow key={p.id} hover>
                       <TableCell>
                         <img src={getProductImageSrc(p)} width={60} height={60} style={{ objectFit: "cover", border: "2px solid #eee" }} />
                       </TableCell>
@@ -755,7 +696,7 @@ const ProductAdminPage: React.FC = () => {
       {/* SNACKBAR */}
       <Snackbar
         open={snack.open}
-        autoHideDuration={3000}
+        autoHideDuration={5000}
         onClose={() => setSnack(s => ({ ...s, open: false }))}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
