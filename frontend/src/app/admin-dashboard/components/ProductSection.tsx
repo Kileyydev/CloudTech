@@ -151,7 +151,7 @@ const ProductAdminPage: React.FC = () => {
     }
   }, [price, discount]);
 
-  // Fetch all
+  // === FETCH ALL DATA: PRODUCTS, CATEGORIES, BRANDS, COLORS ===
   const fetchData = async () => {
     if (!token) return;
     setLoading(true);
@@ -163,8 +163,15 @@ const ProductAdminPage: React.FC = () => {
         fetch(API_COLORS, { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
+      if (!pRes.ok || !cRes.ok || !bRes.ok || !colRes.ok) {
+        throw new Error("Failed to fetch data");
+      }
+
       const [pJson, cJson, bJson, colJson] = await Promise.all([
-        pRes.json(), cRes.json(), bRes.json(), colRes.json()
+        pRes.json(),
+        cRes.json(),
+        bRes.json(),
+        colRes.json()
       ]);
 
       setProducts(Array.isArray(pJson) ? pJson : pJson.results || []);
@@ -172,13 +179,16 @@ const ProductAdminPage: React.FC = () => {
       setBrands(Array.isArray(bJson) ? bJson : bJson.results || []);
       setColors(Array.isArray(colJson) ? colJson : colJson.results || []);
     } catch (err) {
-      setSnack({ open: true, msg: "Failed to load", sev: "error" });
+      console.error("Fetch error:", err);
+      setSnack({ open: true, msg: "Failed to load data", sev: "error" });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+  }, [token]);
 
   // Image handlers
   const handleCover = (files: FileList | null) => {
@@ -206,7 +216,7 @@ const ProductAdminPage: React.FC = () => {
   // Save
   const saveProduct = async () => {
     if (!token || !title || price === "" || !brandId) {
-      setSnack({ open: true, msg: "Fill required", sev: "error" });
+      setSnack({ open: true, msg: "Fill required fields", sev: "error" });
       return;
     }
 
@@ -243,9 +253,10 @@ const ProductAdminPage: React.FC = () => {
         fetchData();
         setTab(1);
       } else {
-        setSnack({ open: true, msg: "Save failed", sev: "error" });
+        const error = await res.text();
+        setSnack({ open: true, msg: `Save failed: ${error}`, sev: "error" });
       }
-    } catch {
+    } catch (err) {
       setSnack({ open: true, msg: "Network error", sev: "error" });
     } finally {
       setSaving(false);
@@ -438,14 +449,18 @@ const ProductAdminPage: React.FC = () => {
                   <InputLabel>Color</InputLabel>
                   <Select value={colorId} onChange={e => setColorId(e.target.value)}>
                     <MenuItem value="">None</MenuItem>
-                    {colors.map(c => (
-                      <MenuItem key={c.id} value={c.id}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <Box sx={{ width: 16, height: 16, bgcolor: c.hex_code, borderRadius: "50%", border: "1px solid #ccc" }} />
-                          {c.name}
-                        </Box>
-                      </MenuItem>
-                    ))}
+                    {colors.length === 0 ? (
+                      <MenuItem disabled>Loading colors...</MenuItem>
+                    ) : (
+                      colors.map(c => (
+                        <MenuItem key={c.id} value={c.id}>
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                            <Box sx={{ width: 16, height: 16, bgcolor: c.hex_code, borderRadius: "50%", border: "1px solid #ccc" }} />
+                            {c.name}
+                          </Box>
+                        </MenuItem>
+                      ))
+                    )}
                   </Select>
                 </FormControl>
 
