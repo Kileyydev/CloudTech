@@ -1,5 +1,14 @@
 from rest_framework import serializers
 from .models import Order, OrderItem
+import time
+import random
+import string
+
+# Utility to generate unique Order ID
+def generate_unique_order_id():
+    now = int(time.time() * 1000)
+    rand = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    return f"CT{now}-{rand}"
 
 class OrderItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -20,13 +29,22 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
+
+        # Generate unique ID if not provided
+        if not validated_data.get('id'):
+            validated_data['id'] = generate_unique_order_id()
+
         order = Order.objects.create(**validated_data)
+
+        # Create order items
         for item_data in items_data:
             OrderItem.objects.create(order=order, **item_data)
+
         return order
 
     def update(self, instance, validated_data):
         items_data = validated_data.pop('items', None)
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()

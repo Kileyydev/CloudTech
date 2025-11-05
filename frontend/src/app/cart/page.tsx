@@ -43,7 +43,7 @@ async function verifyMpesaTransaction(
 type ProductT = {
   id: number;
   title: string;
-  price: number;
+  price: number | string; // Allow string from API
   discount?: number;
   cover_image?: string;
   stock: number;
@@ -67,6 +67,21 @@ const generateUniqueOrderId = (): string => {
   const rand1 = Math.random().toString(36).substring(2, 8).toUpperCase();
   const rand2 = Math.random().toString(36).substring(2, 5).toUpperCase();
   return `CT${timestamp}-${rand1}${nano}${rand2}`;
+};
+
+// Safe number formatting
+const toNum = (val: any): number => {
+  const n = parseFloat(String(val));
+  return isNaN(n) ? 0 : n;
+};
+
+const round = (num: any): number => {
+  const n = toNum(num);
+  return Number(n.toFixed(2));
+};
+
+const formatPrice = (val: any): string => {
+  return toNum(val).toLocaleString();
 };
 
 export default function CartPage() {
@@ -94,10 +109,16 @@ export default function CartPage() {
   const [loadingTrending, setLoadingTrending] = useState(true);
   const hasFetched = useRef(false);
 
-  const subtotal = Object.values(cart).reduce((s, i) => s + i.price * i.quantity, 0);
+  // Sanitize cart items: ensure price is number
+  const safeCart = Object.values(cart).map(item => ({
+    ...item,
+    price: toNum(item.price),
+  }));
+
+  const subtotal = safeCart.reduce((s, i) => s + i.price * i.quantity, 0);
   const shipping = subtotal > 0 ? 200 : 0;
   const total = subtotal + shipping;
-  const cashPaid = parseFloat(checkoutDetails.cashAmount) || 0;
+  const cashPaid = toNum(checkoutDetails.cashAmount);
   const change = paymentMethod === 'cod' && cashPaid > total ? cashPaid - total : 0;
 
   // Load Trending
@@ -110,8 +131,15 @@ export default function CartPage() {
         const res = await fetch(`${API_BASE}/products/?ordering=-sold`);
         const data = await res.json();
         const list = (Array.isArray(data) ? data : data.results || []).slice(0, 10);
-        setTrending(list);
-      } catch {
+        // Sanitize trending prices
+        const sanitized = list.map((p: any) => ({
+          ...p,
+          price: toNum(p.price),
+          discount: p.discount ? toNum(p.discount) : undefined,
+        }));
+        setTrending(sanitized);
+      } catch (err) {
+        console.error('Failed to load trending:', err);
         setTrending([]);
       } finally {
         setLoadingTrending(false);
@@ -143,15 +171,15 @@ export default function CartPage() {
       return false;
     }
     if (paymentMethod === 'cod' && cashPaid < total) {
-      setError(`Enter at least KES ${total.toLocaleString()}`);
+      setError(`Enter at least KES ${formatPrice(total)}`);
       return false;
     }
     return true;
   };
 
-  // ✅ Final Checkout sending data to Django purchases API
+  // Final Checkout
   const handleCheckout = async () => {
-    if (Object.values(cart).length === 0) return show('Cart empty', 'error');
+    if (safeCart.length === 0) return show('Cart empty', 'error');
     if (!validate()) return;
 
     setIsProcessing(true);
@@ -175,43 +203,40 @@ export default function CartPage() {
 
       const orderId = generateUniqueOrderId();
 
- const round = (num: number) => Number(num.toFixed(2));
+      const order = {
+        id: orderId,
+        name: checkoutDetails.name.trim(),
+        phone: checkoutDetails.phone.trim(),
+        address: checkoutDetails.address.trim(),
+        city: checkoutDetails.city.trim(),
+        payment: paymentMethod,
+        mpesa_code: checkoutDetails.mpesaCode || '',
+        cash_amount: round(cashPaid),
+        change: round(change),
+        subtotal: round(subtotal),
+        shipping: round(shipping),
+        total: round(total),
+        items: safeCart.map((item) => ({
+          product_id: item.id,
+          title: item.title,
+          price: round(item.price),
+          quantity: item.quantity,
+        })),
+      };
 
-const order = {
-  id: orderId,
-  name: checkoutDetails.name.trim(),
-  phone: checkoutDetails.phone.trim(),
-  address: checkoutDetails.address.trim(),
-  city: checkoutDetails.city.trim(),
-  payment: paymentMethod,
-  mpesa_code: checkoutDetails.mpesaCode || '',
-  cash_amount: round(cashPaid),
-  change: round(change),
-  subtotal: round(subtotal),
-  shipping: round(shipping),
-  total: round(total),
-  items: Object.values(cart).map((item) => ({
-    product_id: item.id,
-    title: item.title,
-    price: round(item.price),
-    quantity: item.quantity,
-  })),
-};
-
-
-      // 🧠 Send to backend purchases API
+      // Send to backend
       try {
-        const token = localStorage.getItem('token'); // only if using auth
+        const token = localStorage.getItem('token');
         const res = await axios.post(`${API_BASE}/purchases/`, order, {
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Token ${token}` } : {}),
           },
         });
-        console.log('✅ Order sent:', res.data);
+        console.log('Order sent:', res.data);
         show('Order placed successfully!');
       } catch (err: any) {
-        console.error(err);
+        console.error('Order failed:', err);
         show('Failed to send order to server', 'error');
       }
 
@@ -253,7 +278,9 @@ const order = {
 
   const trendingCard = (p: ProductT) => {
     const src = p.cover_image?.startsWith('http') ? p.cover_image : `${MEDIA_BASE}${p.cover_image}`;
-    const final = p.discount ? p.price * (1 - p.discount / 100) : p.price;
+    const basePrice = toNum(p.price);
+    const discount = p.discount ? toNum(p.discount) : 0;
+    const final = discount > 0 ? basePrice * (1 - discount / 100) : basePrice;
 
     const handleAdd = (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -292,18 +319,18 @@ const order = {
               {p.title}
             </Typography>
             <Box sx={{ mt: 0.8, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              {p.discount ? (
+              {discount > 0 ? (
                 <>
                   <Typography sx={{
                     textDecoration: 'line-through', color: '#999', fontSize: '0.75rem'
-                  }}>KES {p.price.toLocaleString()}</Typography>
+                  }}>KES {formatPrice(basePrice)}</Typography>
                   <Typography sx={{
                     fontWeight: 700, color: '#e91e63', fontSize: '1rem'
-                  }}>KES {final.toLocaleString()}</Typography>
+                  }}>KES {formatPrice(final)}</Typography>
                 </>
               ) : (
                 <Typography sx={{ fontWeight: 700, color: '#222', fontSize: '1rem' }}>
-                  KES {p.price.toLocaleString()}
+                  KES {formatPrice(basePrice)}
                 </Typography>
               )}
             </Box>
@@ -331,7 +358,7 @@ const order = {
           <Stack direction={{ xs: 'column', lg: 'row' }} spacing={4}>
             {/* CART */}
             <Box sx={{ flex: 1 }}>
-              {Object.values(cart).length === 0 ? (
+              {safeCart.length === 0 ? (
                 <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 0 }}>
                   <Typography variant="h6" color="text.secondary">Cart empty</Typography>
                   <Button variant="contained" sx={{ mt: 2, bgcolor: '#e91e63', borderRadius: 0 }}
@@ -353,7 +380,7 @@ const order = {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {Object.values(cart).map(item => (
+                        {safeCart.map(item => (
                           <TableRow key={item.id}>
                             <TableCell>{item.title}</TableCell>
                             <TableCell align="center">
@@ -363,9 +390,9 @@ const order = {
                                 <IconButton size="small" onClick={() => updateQuantity(item.id, 1)}><Add /></IconButton>
                               </Box>
                             </TableCell>
-                            <TableCell align="right">KES {item.price.toLocaleString()}</TableCell>
+                            <TableCell align="right">KES {formatPrice(item.price)}</TableCell>
                             <TableCell align="right" sx={{ fontWeight: 600 }}>
-                              KES {(item.price * item.quantity).toLocaleString()}
+                              KES {formatPrice(item.price * item.quantity)}
                             </TableCell>
                             <TableCell align="center">
                               <IconButton color="error" onClick={() => removeFromCart(item.id)}><Delete /></IconButton>
@@ -379,16 +406,16 @@ const order = {
                   <Box sx={{ p: 3, borderTop: '1px solid #eee' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Typography>Subtotal</Typography>
-                      <Typography>KES {subtotal.toLocaleString()}</Typography>
+                      <Typography>KES {formatPrice(subtotal)}</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                       <Typography>Shipping</Typography>
-                      <Typography>KES {shipping.toLocaleString()}</Typography>
+                      <Typography>KES {formatPrice(shipping)}</Typography>
                     </Box>
                     <Divider sx={{ my: 1 }} />
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
                       <Typography variant="h6">Total</Typography>
-                      <Typography variant="h6" color="#e91e63">KES {total.toLocaleString()}</Typography>
+                      <Typography variant="h6" color="#e91e63">KES {formatPrice(total)}</Typography>
                     </Box>
                   </Box>
                 </Paper>
@@ -420,7 +447,7 @@ const order = {
                     <Alert severity="info">
                       <strong>Paybill:</strong> 247247<br />
                       <strong>Account:</strong> 0722244482<br />
-                      <strong>Amount:</strong> KES {total.toLocaleString()}
+                      <strong>Amount:</strong> KES {formatPrice(total)}
                       <TextField fullWidth size="small" label="M-Pesa Code *" placeholder="e.g. ABC123XYZ"
                         value={checkoutDetails.mpesaCode}
                         onChange={e => handleChange('mpesaCode', e.target.value)} sx={{ mt: 1 }} />
@@ -445,7 +472,7 @@ const order = {
                         InputProps={{ startAdornment: <InputAdornment position="start">KES</InputAdornment> }}
                         sx={{ mt: 1 }} />
                       {change > 0 && <Typography sx={{ mt: 1, fontWeight: 600 }}>
-                        Change: KES {change.toLocaleString()}
+                        Change: KES {formatPrice(change)}
                       </Typography>}
                     </Alert>
                   </Collapse>
@@ -472,7 +499,7 @@ const order = {
             }}>
               {loadingTrending
                 ? Array.from({ length: 10 }).map((_, i) => <Box key={i}>{skeletonCard()}</Box>)
-                : trending.filter(p => p.stock > 0).map(trendingCard)
+                : trending.filter(p => toNum(p.stock) > 0).map(trendingCard)
               }
             </Box>
           </Box>
