@@ -67,6 +67,15 @@ const ProductSection = () => {
 
   const hasFetched = useRef(false);
 
+  // ——— DEBUG: Log MEDIA_BASE after it's declared ———
+  useEffect(() => {
+    console.log('%c[MEDIA_BASE DEBUG]', 'color: purple; font-weight: bold', {
+      NODE_ENV: process.env.NODE_ENV,
+      NEXT_PUBLIC_MEDIA_URL: process.env.NEXT_PUBLIC_MEDIA_URL,
+      MEDIA_BASE: MEDIA_BASE,
+    });
+  }, []);
+
   // ——— LOAD FROM CACHE ———
   useEffect(() => {
     const cached = sessionStorage.getItem(CACHE_KEY);
@@ -170,6 +179,14 @@ const ProductSection = () => {
     const src = getImageUrl(p.cover_image);
     const inCart = cart[p.id];
 
+    // DEBUG: Log every image URL being used
+    console.log('%c[Product Image] Loading:', 'color: cyan; font-weight: bold', {
+      productId: p.id,
+      title: p.title,
+      cover_image_from_db: p.cover_image,
+      final_url: src,
+    });
+
     return (
       <Card
         key={p.id}
@@ -184,7 +201,7 @@ const ProductSection = () => {
           position: 'relative',
         }}
       >
-        {/* Heart Icon */}
+        {/* Heart */}
         <Box
           onClick={(e) => {
             e.stopPropagation();
@@ -208,7 +225,7 @@ const ProductSection = () => {
           <Favorite sx={{ color: wishlist.has(p.id) ? '#e91e63' : '#888', fontSize: 20 }} />
         </Box>
 
-        {/* Image */}
+        {/* Image with LOUD ERROR LOGGING */}
         <Box
           onClick={() => router.push(`/product/${p.id}`)}
           sx={{ width: '100%', height: CARD_H * 0.56, cursor: 'pointer', overflow: 'hidden' }}
@@ -217,8 +234,17 @@ const ProductSection = () => {
             component="img"
             image={src}
             alt={p.title}
+            onLoad={() => {
+              console.log('%c[Product Image] LOADED', 'color: green; font-weight: bold', p.title, src);
+            }}
             onError={(e) => {
-              console.warn('Image failed to load:', src);
+              console.error('%c[Product Image] FAILED TO LOAD', 'color: red; font-weight: bold', {
+                productId: p.id,
+                title: p.title,
+                attempted_url: src,
+                cover_image_db_value: p.cover_image,
+                MEDIA_BASE: MEDIA_BASE,
+              });
               e.currentTarget.src = '/images/fallback.jpg';
             }}
             sx={{
@@ -231,7 +257,7 @@ const ProductSection = () => {
           />
         </Box>
 
-        {/* Content */}
+        {/* Rest of card */}
         <CardContent sx={{ p: 1.5, height: CARD_H * 0.44, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <Box>
             <Typography
@@ -267,7 +293,6 @@ const ProductSection = () => {
             </Typography>
           </Box>
 
-          {/* Cart Controls */}
           {inCart ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, mt: 1.2 }}>
               <IconButton
