@@ -236,7 +236,7 @@ const ProductSection = () => {
           <Favorite sx={{ color: wishlist.has(p.id) ? '#e91e63' : '#888', fontSize: 20 }} />
         </Box>
 
-        {/* Image with LOUD ERROR LOGGING + unoptimized */}
+        {/* Image with LOUD ERROR LOGGING + FIXED (unoptimized + priority) */}
         <Box
           onClick={() => router.push(`/product/${p.id}`)}
           sx={{ width: '100%', height: CARD_H * 0.56, cursor: 'pointer', overflow: 'hidden' }}

@@ -8,7 +8,7 @@ import Link from 'next/link';
 
 const SLIDES = [
   '/images/gaming-headphone.jpg',
-  '/images/iphone17.webp',
+  '/images/laptop.jpg',
   '/images/galaxy.jpg',
 ];
 
@@ -29,12 +29,6 @@ const Slide = styled(Box)<{ active: boolean }>(({ active }) => ({
   transition: 'opacity 1.6s ease-in-out',
 }));
 
-const WhiteCover = styled(Box)({
-  position: 'absolute',
-  inset: 0,
-  background: 'linear-gradient(180deg, rgba(154,151,159,0.13) 0%, rgba(255,255,255,0.49) 70%)',
-  zIndex: 1,
-});
 
 const Content = styled(Container)({
   position: 'relative',
@@ -97,7 +91,6 @@ export default function HeroSection() {
         ))}
       </Slider>
 
-      <WhiteCover />
 
       <Content maxWidth="lg">
 
