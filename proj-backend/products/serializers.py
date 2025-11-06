@@ -1,33 +1,33 @@
 # products/serializers.py
 from rest_framework import serializers
-from .models import Category, Brand, Tag, Product, ProductVariant, ProductImage, Color
-from cloudinary.uploader import upload
-import logging
-from decimal import Decimal
+from django.utils.text import slugify
+from .models import Category, Brand, Tag, Product, ProductVariant, ProductImage
 
-logger = logging.getLogger(__name__)
 
-# === BASIC SERIALIZERS ===
-class ColorSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Color
-        fields = ['id', 'name', 'hex_code']
-
+# ===================================================================
+# BASIC SERIALIZERS
+# ===================================================================
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ['id', 'name', 'slug']
+
 
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
         fields = ['id', 'name', 'slug']
 
+
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = ['id', 'name', 'slug']
 
+
+# ===================================================================
+# PRODUCT IMAGE — CLOUDINARY FULL URL
+# ===================================================================
 class ProductImageSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
 
@@ -36,115 +36,163 @@ class ProductImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'image', 'alt_text', 'is_primary']
 
     def get_image(self, obj):
-        return obj.image.url if obj.image else None
+        if not obj.image:
+            return None
+        # CloudinaryField returns full HTTPS URL: https://res.cloudinary.com/...
+        return obj.image.url
 
-# === PRODUCT CREATE / UPDATE SERIALIZER ===
-class ProductCreateUpdateSerializer(serializers.ModelSerializer):
-    brand_id = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all(), source='brand', write_only=True, required=False, allow_null=True)
-    category_ids = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), many=True, write_only=True, required=False)
-    color_id = serializers.PrimaryKeyRelatedField(queryset=Color.objects.all(), source='color', write_only=True, required=False, allow_null=True)
-    tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(), many=True, write_only=True, required=False)
 
-    cover_image = serializers.FileField(write_only=True, required=False, allow_null=True)
-    gallery = serializers.ListField(
-        child=serializers.FileField(), write_only=True, required=False, allow_empty=True
-    )
+# ===================================================================
+# PRODUCT VARIANT
+# ===================================================================
+class ProductVariantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductVariant
+        fields = [
+            'id', 'sku', 'color', 'storage', 'ram', 'processor',
+            'size', 'price', 'compare_at_price', 'stock', 'is_active'
+        ]
 
+
+# ===================================================================
+# PRODUCT LIST (READ-ONLY) — FULL CLOUDINARY URLS
+# ===================================================================
+class ProductListSerializer(serializers.ModelSerializer):
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
-    color = ColorSerializer(read_only=True)
-    images = ProductImageSerializer(many=True, read_only=True, source='images')
+    tags = serializers.SlugRelatedField(many=True, read_only=True, slug_field='name')
+    images = ProductImageSerializer(many=True, read_only=True, source='productimage_set')
+    cover_image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'title', 'slug', 'description', 'brand', 'categories', 'tags',
+            'cover_image', 'images', 'price', 'stock', 'discount', 'final_price',
+            'is_active', 'is_featured', 'colors', 'storage_options',
+            'condition_options', 'features', 'created_at'
+        ]
+
+    def get_cover_image(self, obj):
+        if not obj.cover_image:
+            return None
+        # CloudinaryField: returns https://res.cloudinary.com/... directly
+        return obj.cover_image.url
+
+
+# ===================================================================
+# PRODUCT CREATE / UPDATE — ACCEPTS FILES, SAVES TO CLOUDINARY
+# ===================================================================
+class ProductCreateUpdateSerializer(serializers.ModelSerializer):
+    # Write-only fields
+    brand_id = serializers.PrimaryKeyRelatedField(
+        queryset=Brand.objects.all(), source='brand', write_only=True
+    )
+    category_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(), many=True, write_only=True
+    )
+    tag_names = serializers.ListField(
+        child=serializers.CharField(max_length=60), write_only=True, required=False
+    )
+    cover_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
+    gallery = serializers.ListField(
+        child=serializers.ImageField(), write_only=True, required=False
+    )
+
+    # Read-only fields
+    brand = BrandSerializer(read_only=True)
+    categories = CategorySerializer(many=True, read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True, source='productimage_set')
 
     class Meta:
         model = Product
         fields = [
             'id', 'title', 'description', 'price', 'stock', 'discount',
-            'storage_gb', 'ram_gb', 'color', 'color_id', 'condition',
-            'is_active', 'is_featured', 'brand', 'brand_id',
-            'categories', 'category_ids', 'tags', 'cover_image', 'gallery', 'images'
+            'final_price', 'is_active', 'is_featured', 'colors',
+            'storage_options', 'condition_options', 'features',
+            'brand', 'brand_id', 'categories', 'category_ids',
+            'tag_names', 'cover_image', 'gallery', 'images'
         ]
+        read_only_fields = ['final_price', 'id', 'slug']
 
-    def validate(self, data):
-        discount = data.get('discount')
-        price = data.get('price')
-        if discount and price and discount >= Decimal('100'):
-            raise serializers.ValidationError({"discount": "Discount cannot be 100% or more"})
-        return data
-
+    # ===================================================================
+    # CREATE
+    # ===================================================================
     def create(self, validated_data):
-        logger.info("=== PRODUCT CREATE STARTED ===")
         category_ids = validated_data.pop('category_ids', [])
-        tags = validated_data.pop('tags', [])
+        tag_names = validated_data.pop('tag_names', [])
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery', [])
 
-        try:
-            product = Product.objects.create(**validated_data)
-            product.categories.set(category_ids)
-            product.tags.set(tags)
+        # Auto-generate slug
+        validated_data['slug'] = slugify(validated_data.get('title', ''))
 
-            # === UPLOAD COVER ===
-            if cover_file:
-                upload_result = upload(cover_file, folder="products/cover")
-                product.cover_image = upload_result['public_id']
-                logger.info(f"Cover uploaded: {upload_result['public_id']}")
+        product = Product.objects.create(**validated_data)
+        product.categories.set(category_ids)
 
-            # === UPLOAD GALLERY ===
-            for i, img_file in enumerate(gallery_files):
-                upload_result = upload(img_file, folder="products/gallery")
-                is_primary = (not product.cover_image and i == 0)
-                ProductImage.objects.create(
-                    product=product,
-                    image=upload_result['public_id'],
-                    is_primary=is_primary
-                )
-                logger.info(f"Gallery image {i+1} uploaded: {upload_result['public_id']}")
+        # Handle tags
+        for name in tag_names:
+            tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
+            product.tags.add(tag)
 
-            product.save()
-            logger.info(f"PRODUCT CREATED: {product.id}")
-            return product
+        # Cover image → saved to Cloudinary via CloudinaryField
+        if cover_file:
+            product.cover_image = cover_file
 
-        except Exception as e:
-            logger.error(f"PRODUCT CREATE FAILED: {e}", exc_info=True)
-            raise serializers.ValidationError({"error": "Failed to create product", "details": str(e)})
+        # Gallery images
+        for img_file in gallery_files:
+            ProductImage.objects.create(product=product, image=img_file)
 
+        product.final_price = self._calc_final_price(product)
+        product.save()
+        return product
+
+    # ===================================================================
+    # UPDATE
+    # ===================================================================
     def update(self, instance, validated_data):
-        logger.info(f"=== PRODUCT UPDATE STARTED: {instance.id} ===")
         category_ids = validated_data.pop('category_ids', None)
-        tags = validated_data.pop('tags', None)
+        tag_names = validated_data.pop('tag_names', None)
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery', None)
 
-        try:
-            for attr, value in validated_data.items():
-                setattr(instance, attr, value)
+        # Update basic fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
 
-            if category_ids is not None:
-                instance.categories.set(category_ids)
-            if tags is not None:
-                instance.tags.set(tags)
+        # Update slug if title changed
+        if 'title' in validated_data:
+            instance.slug = slugify(validated_data['title'])
 
-            if cover_file is not None:
-                upload_result = upload(cover_file, folder="products/cover")
-                instance.cover_image = upload_result['public_id']
-                logger.info(f"Cover updated: {upload_result['public_id']}")
+        # Categories
+        if category_ids is not None:
+            instance.categories.set(category_ids)
 
-            if gallery_files is not None:
-                instance.images.all().delete()
-                for i, img_file in enumerate(gallery_files):
-                    upload_result = upload(img_file, folder="products/gallery")
-                    is_primary = (not instance.cover_image and i == 0)
-                    ProductImage.objects.create(
-                        product=instance,
-                        image=upload_result['public_id'],
-                        is_primary=is_primary
-                    )
-                    logger.info(f"Gallery image {i+1} updated: {upload_result['public_id']}")
+        # Tags
+        if tag_names is not None:
+            instance.tags.clear()
+            for name in tag_names:
+                tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
+                instance.tags.add(tag)
 
-            instance.save()
-            logger.info(f"PRODUCT UPDATED: {instance.id}")
-            return instance
+        # Cover image
+        if cover_file is not None:
+            instance.cover_image = cover_file
 
-        except Exception as e:
-            logger.error(f"PRODUCT UPDATE FAILED: {e}", exc_info=True)
-            raise serializers.ValidationError({"error": "Failed to update product", "details": str(e)})
+        # Gallery
+        if gallery_files is not None:
+            instance.productimage_set.all().delete()
+            for img_file in gallery_files:
+                ProductImage.objects.create(product=instance, image=img_file)
+
+        instance.final_price = self._calc_final_price(instance)
+        instance.save()
+        return instance
+
+    # ===================================================================
+    # HELPERS
+    # ===================================================================
+    def _calc_final_price(self, obj):
+        if obj.discount and obj.discount > 0:
+            return round(obj.price * (1 - obj.discount / 100), 2)
+        return obj.price

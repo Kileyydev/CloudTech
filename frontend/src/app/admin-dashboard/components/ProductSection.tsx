@@ -1,4 +1,3 @@
-// app/admin-dashboard/products/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -14,16 +13,13 @@ import { Edit, Delete, AddPhotoAlternate, Image as ImageIcon } from "@mui/icons-
 import { getProductImageSrc } from "@/app/utils/image";
 import type { Product } from "@/app/types/products";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
-const API_PRODUCTS = `${API_BASE}/products/`;        // FIXED: no duplicate /products/
-const API_CATEGORIES = `${API_BASE}/categories/`;
-const API_BRANDS = `${API_BASE}/brands/`;
-const API_COLORS = `${API_BASE}/colors/`;
-const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || API_BASE;
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE + "/products/";
+const API_CATEGORIES = process.env.NEXT_PUBLIC_API_BASE + "/categories/";
+const API_BRANDS = process.env.NEXT_PUBLIC_API_BASE + "/brands/";
+const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || process.env.NEXT_PUBLIC_API_BASE;
 
-const storageOptions = [64, 128, 256, 512, 1024, 2048];
-const ramOptions = [2, 4, 6, 8, 12, 16, 24, 32, 64, 128, 256];
 
+// === STYLED COMPONENTS ===
 const StyledPaper = styled(Paper)(({ theme }) => ({
   overflow: "hidden",
   boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
@@ -65,6 +61,7 @@ const StyledButton = styled(Button)(({ theme }) => ({
   "&.danger": {
     background: "#f44336",
     color: "#fff",
+    
   },
 }));
 
@@ -89,9 +86,11 @@ const GalleryPreview = styled(Box)(({ theme }) => ({
     objectFit: "cover",
     border: `2px solid ${alpha("#DC1A8A", 0.2)}`,
     transition: "all 0.2s",
+
   },
 }));
 
+// === MAIN COMPONENT ===
 const ProductAdminPage: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -102,11 +101,11 @@ const ProductAdminPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
   const [brands, setBrands] = useState<{ id: number; name: string }[]>([]);
-  const [colors, setColors] = useState<{ id: number; name: string; hex_code: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
 
+  // Form
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -116,10 +115,6 @@ const ProductAdminPage: React.FC = () => {
   const [finalPrice, setFinalPrice] = useState<number | "">("");
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [brandId, setBrandId] = useState<string>("");
-  const [storageGB, setStorageGB] = useState<string>("");
-  const [ramGB, setRamGB] = useState<string>("");
-  const [colorId, setColorId] = useState<string>("");
-  const [condition, setCondition] = useState<"new" | "ex_dubai" | "">("");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
@@ -127,15 +122,18 @@ const ProductAdminPage: React.FC = () => {
   const [isActive, setIsActive] = useState(true);
   const [isFeatured, setIsFeatured] = useState(false);
 
+  // Delete
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  // Snackbar
   const [snack, setSnack] = useState<{ open: boolean; msg: string; sev: "success" | "error" }>({
     open: false, msg: "", sev: "success"
   });
 
   const token = typeof window !== "undefined" ? localStorage.getItem("access") : null;
 
+  // Final price calc
   useEffect(() => {
     if (price !== "" && discount !== "") {
       const p = Number(price);
@@ -146,44 +144,31 @@ const ProductAdminPage: React.FC = () => {
     }
   }, [price, discount]);
 
+  // Fetch all
   const fetchData = async () => {
-    if (!token || !API_BASE) return;
+    if (!token) return;
     setLoading(true);
     try {
-      const [pRes, cRes, bRes, colRes] = await Promise.all([
-        fetch(API_PRODUCTS, { headers: { Authorization: `Bearer ${token}` } }),
+      const [pRes, cRes, bRes] = await Promise.all([
+        fetch(API_BASE, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(API_CATEGORIES, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(API_BRANDS, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(API_COLORS, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(API_BRANDS, { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
-      if (!pRes.ok || !cRes.ok || !bRes.ok || !colRes.ok) {
-        throw new Error(`HTTP ${pRes.status}`);
-      }
-
-      const [pJson, cJson, bJson, colJson] = await Promise.all([
-        pRes.json(),
-        cRes.json(),
-        bRes.json(),
-        colRes.json()
-      ]);
-
+      const [pJson, cJson, bJson] = await Promise.all([pRes.json(), cRes.json(), bRes.json()]);
       setProducts(Array.isArray(pJson) ? pJson : pJson.results || []);
       setCategories(Array.isArray(cJson) ? cJson : cJson.results || []);
       setBrands(Array.isArray(bJson) ? bJson : bJson.results || []);
-      setColors(Array.isArray(colJson) ? colJson : colJson.results || []);
     } catch (err) {
-      console.error("FETCH ERROR:", err);
-      setSnack({ open: true, msg: "Failed to load data", sev: "error" });
+      setSnack({ open: true, msg: "Failed to load", sev: "error" });
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [token]);
+  useEffect(() => { fetchData(); }, []);
 
+  // Image handlers
   const handleCover = (files: FileList | null) => {
     if (!files?.[0]) { setCoverFile(null); setCoverPreview(null); return; }
     const f = files[0];
@@ -201,105 +186,58 @@ const ProductAdminPage: React.FC = () => {
   const resetForm = () => {
     setEditId(null); setTitle(""); setDescription(""); setPrice(""); setStock("");
     setDiscount(0); setFinalPrice(""); setSelectedCats([]); setBrandId("");
-    setStorageGB(""); setRamGB(""); setColorId(""); setCondition("");
     setCoverFile(null); setCoverPreview(null); setGalleryFiles([]); setGalleryPreviews([]);
     setIsActive(true); setIsFeatured(false);
   };
 
-  // === SAVE PRODUCT — FINAL VERSION ===
+  // Save
   const saveProduct = async () => {
-    console.log("=== SAVE PRODUCT STARTED ===");
-    console.log("editId:", editId);
-    console.log("token exists:", !!token);
-    console.log("API_PRODUCTS:", API_PRODUCTS);
-
-    if (!token) {
-      setSnack({ open: true, msg: "Not authenticated", sev: "error" });
-      return;
-    }
-
-    if (!title || price === "" || !brandId) {
-      setSnack({ open: true, msg: "Fill required fields", sev: "error" });
+    if (!token || !title || price === "" || !brandId) {
+      setSnack({ open: true, msg: "Fill required", sev: "error" });
       return;
     }
 
     const form = new FormData();
     form.append("title", title);
-    form.append("description", description || "");
+    form.append("description", description);
     form.append("price", String(price));
     form.append("stock", String(stock || 0));
-    form.append("discount", String(discount || 0));
+    form.append("discount", String(discount));
     form.append("is_active", String(isActive));
     form.append("is_featured", String(isFeatured));
+    selectedCats.forEach(c => form.append("category_ids", c));
     form.append("brand_id", brandId);
-
-    // FIXED: category_ids (not category_ids[])
-    selectedCats.forEach(id => form.append("category_ids", id));
-
-    if (colorId) form.append("color_id", colorId);
-    if (storageGB) form.append("storage_gb", storageGB);
-    if (ramGB) form.append("ram_gb", ramGB);
-    if (condition) form.append("condition", condition);
-
     if (coverFile) form.append("cover_image", coverFile);
     galleryFiles.forEach(f => form.append("gallery", f));
 
-    console.log("FORM DATA BEING SENT:");
-    for (let [k, v] of form.entries()) {
-      if (v instanceof File) {
-        console.log(`  ${k}: (File) ${v.name} | ${v.size} bytes | type: ${v.type}`);
-      } else {
-        console.log(`  ${k}: "${v}"`);
-      }
-    }
-
     setSaving(true);
-    const url = editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS;
-    const method = editId ? "PATCH" : "POST";
-
-    console.log("REQUEST URL:", url);
-    console.log("METHOD:", method);
-
     try {
+      const url = editId ? `${API_BASE}${editId}/` : API_BASE;
+      const method = editId ? "PATCH" : "POST";
       const res = await fetch(url, {
         method,
         headers: { Authorization: `Bearer ${token}` },
         body: form
       });
 
-      const text = await res.text();
-      console.log("RESPONSE STATUS:", res.status);
-      console.log("RESPONSE BODY (first 1000):", text.substring(0, 1000));
-
       if (res.ok) {
-        let data;
-        try { data = JSON.parse(text); } catch {}
-        setSnack({ open: true, msg: editId ? "Updated!" : "Added!", sev: "success" });
+        setSnack({ open: true, msg: editId ? "Updated" : "Added", sev: "success" });
         resetForm();
         fetchData();
         setTab(1);
       } else {
-        let errorMsg = `Error ${res.status}`;
-        try {
-          const err = JSON.parse(text);
-          errorMsg += `: ${JSON.stringify(err)}`;
-        } catch {
-          errorMsg += `: ${text.substring(0, 200)}`;
-        }
-        setSnack({ open: true, msg: errorMsg, sev: "error" });
+        setSnack({ open: true, msg: "Save failed", sev: "error" });
       }
-    } catch (err: any) {
-      console.error("NETWORK ERROR:", err);
-      setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
+    } catch {
+      setSnack({ open: true, msg: "Network error", sev: "error" });
     } finally {
       setSaving(false);
-      console.log("=== SAVE PRODUCT ENDED ===");
     }
   };
 
+  // Edit
   const startEdit = (p: Product) => {
-    const id = String(p.id);
-    setEditId(id);
+    setEditId(p.id);
     setTitle(p.title || "");
     setDescription(p.description || "");
     setPrice(p.price || "");
@@ -308,10 +246,6 @@ const ProductAdminPage: React.FC = () => {
     setFinalPrice(p.final_price || "");
     setBrandId(p.brand?.id?.toString() || "");
     setSelectedCats(p.categories?.map(c => String(c.id)) || []);
-    setStorageGB(p.storage_gb?.toString() || "");
-    setRamGB(p.ram_gb?.toString() || "");
-    setColorId(p.color?.id?.toString() || "");
-    setCondition(p.condition || "");
     setIsActive(p.is_active ?? true);
     setIsFeatured(p.is_featured ?? false);
 
@@ -326,11 +260,12 @@ const ProductAdminPage: React.FC = () => {
     setTab(0);
   };
 
+  // Delete
   const confirmDel = (id: string) => { setDeleteId(id); setConfirmOpen(true); };
   const doDelete = async () => {
     if (!token || !deleteId) return;
     try {
-      await fetch(`${API_PRODUCTS}${deleteId}/`, {
+      await fetch(`${API_BASE}${deleteId}/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -343,12 +278,13 @@ const ProductAdminPage: React.FC = () => {
     }
   };
 
+  // Discount quick update
   const updateDiscount = async (p: Product) => {
     if (!token) return;
     setSavingId(p.id);
     const final = p.price! - (p.price! * (p.discount || 0)) / 100;
     try {
-      await fetch(`${API_PRODUCTS}${p.id}/`, {
+      await fetch(`${API_BASE}${p.id}/`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -373,13 +309,29 @@ const ProductAdminPage: React.FC = () => {
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#f8f9fa", p: { xs: 2, md: 4 } }}>
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} centered sx={{ mb: 4 }}>
+      {/* TABS */}
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        centered
+        sx={{
+          mb: 4,
+          "& .MuiTab-root": {
+            textTransform: "none",
+            fontWeight: 600,
+            fontSize: "1.1rem",
+            color: "#666",
+            "&.Mui-selected": { color: "#DC1A8A" },
+          },
+          "& .MuiTabs-indicator": { backgroundColor: "#DC1A8A", height: 3 },
+        }}
+      >
         <Tab label={editId ? "Edit Product" : "Add Product"} />
         <Tab label="All Products" />
         <Tab label="Discounted" />
       </Tabs>
 
-      {/* === ADD / EDIT FORM === */}
+      {/* === FORM === */}
       {tab === 0 && (
         <StyledPaper elevation={0}>
           <Box sx={{ p: { xs: 3, md: 5 } }}>
@@ -388,62 +340,56 @@ const ProductAdminPage: React.FC = () => {
             </Typography>
 
             <Stack spacing={4}>
-              <TextField label="Title *" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
-              <TextField label="Description" value={description} onChange={e => setDescription(e.target.value)} multiline rows={4} fullWidth />
+              <TextField
+                label="Title *"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                fullWidth
+                variant="outlined"
+              />
+
+              <TextField
+                label="Description"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                multiline
+                rows={4}
+                fullWidth
+                variant="outlined"
+                
+              />
 
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <TextField label="Price *" type="number" value={price} onChange={e => setPrice(Number(e.target.value) || "")} />
-                <TextField label="Discount %" type="number" value={discount} onChange={e => setDiscount(Number(e.target.value) || 0)} />
-                <TextField label="Final Price" value={finalPrice} disabled />
+                <TextField
+                  label="Price *"
+                  type="number"
+                  value={price}
+                  onChange={e => setPrice(Number(e.target.value) || "")}
+                  
+                />
+                <TextField
+                  label="Discount %"
+                  type="number"
+                  value={discount}
+                  onChange={e => setDiscount(Number(e.target.value) || 0)}
+                  
+                />
+                <TextField
+                  label="Final Price"
+                  value={finalPrice}
+                  disabled
+                
+                />
               </Stack>
 
-              <TextField label="Stock" type="number" value={stock} onChange={e => setStock(Number(e.target.value) || "")} fullWidth />
-
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <FormControl fullWidth>
-                  <InputLabel>Storage (GB)</InputLabel>
-                  <Select value={storageGB} onChange={e => setStorageGB(e.target.value)}>
-                    <MenuItem value="">None</MenuItem>
-                    {storageOptions.map(gb => (
-                      <MenuItem key={gb} value={gb}>{gb >= 1024 ? `${gb / 1024}TB` : `${gb}GB`}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl fullWidth>
-                  <InputLabel>RAM (GB)</InputLabel>
-                  <Select value={ramGB} onChange={e => setRamGB(e.target.value)}>
-                    <MenuItem value="">None</MenuItem>
-                    {ramOptions.map(ram => <MenuItem key={ram} value={ram}>{ram}GB</MenuItem>)}
-                  </Select>
-                </FormControl>
-              </Stack>
-
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <FormControl fullWidth>
-                  <InputLabel>Color</InputLabel>
-                  <Select value={colorId} onChange={e => setColorId(e.target.value)}>
-                    <MenuItem value="">None</MenuItem>
-                    {colors.map(c => (
-                      <MenuItem key={c.id} value={c.id}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <Box sx={{ width: 16, height: 16, bgcolor: c.hex_code, borderRadius: "50%", border: "1px solid #ccc" }} />
-                          {c.name}
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl fullWidth>
-                  <InputLabel>Condition</InputLabel>
-                  <Select value={condition} onChange={e => setCondition(e.target.value as any)}>
-                    <MenuItem value="">None</MenuItem>
-                    <MenuItem value="new">New</MenuItem>
-                    <MenuItem value="ex_dubai">Ex-Dubai</MenuItem>
-                  </Select>
-                </FormControl>
-              </Stack>
+              <TextField
+                label="Stock"
+                type="number"
+                value={stock}
+                onChange={e => setStock(Number(e.target.value) || "")}
+                fullWidth
+                
+              />
 
               <FormControl fullWidth>
                 <InputLabel>Categories</InputLabel>
@@ -459,6 +405,7 @@ const ProductAdminPage: React.FC = () => {
                       })}
                     </Box>
                   )}
+                
                 >
                   {categories.map(c => (
                     <MenuItem key={c.id} value={String(c.id)}>
@@ -471,7 +418,11 @@ const ProductAdminPage: React.FC = () => {
 
               <FormControl fullWidth>
                 <InputLabel>Brand *</InputLabel>
-                <Select value={brandId} onChange={e => setBrandId(e.target.value)}>
+                <Select
+                  value={brandId}
+                  onChange={e => setBrandId(e.target.value)}
+                  
+                >
                   <MenuItem value="">None</MenuItem>
                   {brands.map(b => (
                     <MenuItem key={b.id} value={String(b.id)}>{b.name}</MenuItem>
@@ -480,10 +431,17 @@ const ProductAdminPage: React.FC = () => {
               </FormControl>
 
               <Stack direction="row" spacing={3}>
-                <FormControlLabel control={<Checkbox checked={isActive} onChange={e => setIsActive(e.target.checked)} />} label="Active" />
-                <FormControlLabel control={<Checkbox checked={isFeatured} onChange={e => setIsFeatured(e.target.checked)} />} label="Featured" />
+                <FormControlLabel
+                  control={<Checkbox checked={isActive} onChange={e => setIsActive(e.target.checked)} />}
+                  label="Active"
+                />
+                <FormControlLabel
+                  control={<Checkbox checked={isFeatured} onChange={e => setIsFeatured(e.target.checked)} />}
+                  label="Featured"
+                />
               </Stack>
 
+              {/* Cover Image */}
               <Box>
                 <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>Cover Image</Typography>
                 <ImageUpload>
@@ -500,6 +458,7 @@ const ProductAdminPage: React.FC = () => {
                 )}
               </Box>
 
+              {/* Gallery */}
               <Box>
                 <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>Gallery</Typography>
                 <ImageUpload>
@@ -526,10 +485,24 @@ const ProductAdminPage: React.FC = () => {
         </StyledPaper>
       )}
 
-      {/* === ALL PRODUCTS GRID === */}
+      {/* === ALL PRODUCTS === */}
       {tab === 1 && (
         <Box>
-          <Tabs value={categoryFilter} onChange={(_, v) => setCategoryFilter(v)} variant={isMobile ? "scrollable" : "standard"} sx={{ mb: 3 }}>
+          <Tabs
+            value={categoryFilter}
+            onChange={(_, v) => setCategoryFilter(v)}
+            variant={isMobile ? "scrollable" : "standard"}
+            sx={{
+              mb: 3,
+              "& .MuiTab-root": {
+                textTransform: "none",
+                fontWeight: 600,
+                color: "#666",
+                "&.Mui-selected": { color: "#DC1A8A" },
+              },
+              "& .MuiTabs-indicator": { backgroundColor: "#DC1A8A" },
+            }}
+          >
             <Tab label="All" value="all" />
             {categories.map(c => <Tab key={c.id} label={c.name} value={c.id} />)}
           </Tabs>
@@ -564,12 +537,6 @@ const ProductAdminPage: React.FC = () => {
                     <Typography variant="h6" noWrap sx={{ fontWeight: 700, color: "#222" }}>
                       {p.title}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-                      {p.storage_gb && `${p.storage_gb >= 1024 ? `${p.storage_gb / 1024}TB` : `${p.storage_gb}GB`}`}
-                      {p.ram_gb && ` • ${p.ram_gb}GB RAM`}
-                      {p.color && ` • ${p.color.name}`}
-                      {p.condition && ` • ${p.condition === 'ex_dubai' ? 'Ex-Dubai' : 'New'}`}
-                    </Typography>
                     <Typography variant="body2" sx={{ color: "#666", mb: 1.5, height: 40, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                       {p.description}
                     </Typography>
@@ -587,7 +554,7 @@ const ProductAdminPage: React.FC = () => {
                       <StyledButton size="small" startIcon={<Edit />} onClick={() => startEdit(p)}>
                         Edit
                       </StyledButton>
-                      <StyledButton size="small" className="danger" startIcon={<Delete />} onClick={() => confirmDel(String(p.id))}>
+                      <StyledButton size="small" className="danger" startIcon={<Delete />} onClick={() => confirmDel(p.id)}>
                         Delete
                       </StyledButton>
                     </Box>
@@ -619,7 +586,6 @@ const ProductAdminPage: React.FC = () => {
                   <TableRow sx={{ bgcolor: alpha("#DC1A8A", 0.05) }}>
                     <TableCell><strong>Image</strong></TableCell>
                     <TableCell><strong>Title</strong></TableCell>
-                    <TableCell><strong>Specs</strong></TableCell>
                     <TableCell><strong>Original</strong></TableCell>
                     <TableCell><strong>Discount %</strong></TableCell>
                     <TableCell><strong>Final Price</strong></TableCell>
@@ -629,17 +595,11 @@ const ProductAdminPage: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {discounted.map(p => (
-                    <TableRow key={p.id} hover>
+                    <TableRow key={p.id} hover sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
                       <TableCell>
                         <img src={getProductImageSrc(p)} width={60} height={60} style={{ objectFit: "cover", border: "2px solid #eee" }} />
                       </TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>{p.title}</TableCell>
-                      <TableCell sx={{ fontSize: "0.8rem" }}>
-                        {p.storage_gb && `${p.storage_gb >= 1024 ? `${p.storage_gb / 1024}TB` : `${p.storage_gb}GB`}`}
-                        {p.ram_gb && ` • ${p.ram_gb}GB`}
-                        {p.color && ` • ${p.color.name}`}
-                        {p.condition && ` • ${p.condition === 'ex_dubai' ? 'Ex-Dubai' : 'New'}`}
-                      </TableCell>
                       <TableCell>
                         <Typography sx={{ textDecoration: "line-through", color: "#999" }}>
                           KES {p.price?.toLocaleString()}
@@ -651,6 +611,7 @@ const ProductAdminPage: React.FC = () => {
                           size="small"
                           value={p.discount ?? 0}
                           onChange={e => setProducts(prev => prev.map(x => x.id === p.id ? { ...x, discount: Number(e.target.value) } : x))}
+                          
                         />
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: "#DC1A8A" }}>
@@ -676,24 +637,24 @@ const ProductAdminPage: React.FC = () => {
         </StyledPaper>
       )}
 
-      {/* === DELETE CONFIRM === */}
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+      {/* DELETE DIALOG */}
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} >
         <DialogTitle sx={{ fontWeight: 700 }}>Confirm Delete</DialogTitle>
         <DialogContent>
           <Typography>This action cannot be undone. Are you sure?</Typography>
         </DialogContent>
         <DialogActions sx={{ p: 3, gap: 1 }}>
-          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+          <Button onClick={() => setConfirmOpen(false)} >Cancel</Button>
           <StyledButton className="danger" onClick={doDelete} variant="contained">
             Delete
           </StyledButton>
         </DialogActions>
       </Dialog>
 
-      {/* === SNACKBAR === */}
+      {/* SNACKBAR */}
       <Snackbar
         open={snack.open}
-        autoHideDuration={6000}
+        autoHideDuration={3000}
         onClose={() => setSnack(s => ({ ...s, open: false }))}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
@@ -702,6 +663,7 @@ const ProductAdminPage: React.FC = () => {
           severity={snack.sev}
           sx={{
             width: "100%",
+           
             fontWeight: 600,
             boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
             ...(snack.sev === "success" && { bgcolor: "#4caf50", color: "#fff" }),

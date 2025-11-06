@@ -2,40 +2,9 @@
 from django.db import models
 from django.utils.text import slugify
 import uuid
-from cloudinary.models import CloudinaryField
-from decimal import Decimal
+from cloudinary.models import CloudinaryField  # ← CRITICAL
 
-# ================== STORAGE & RAM CHOICES ==================
-STORAGE_CHOICES = [
-    (64, "64GB"), (128, "128GB"), (256, "256GB"), (512, "512GB"),
-    (1024, "1TB"), (2048, "2TB")
-]
 
-RAM_CHOICES = [
-    (2, "2GB"), (4, "4GB"), (6, "6GB"), (8, "8GB"),
-    (12, "12GB"), (16, "16GB"), (24, "24GB"),
-    (32, "32GB"), (64, "64GB"), (128, "128GB"), (256, "256GB")
-]
-
-CONDITION_CHOICES = [
-    ('new', 'New'),
-    ('ex_dubai', 'Ex-Dubai'),
-]
-
-# ================== COLOR MODEL ==================
-class Color(models.Model):
-    name = models.CharField(max_length=50, unique=True)
-    hex_code = models.CharField(max_length=7, default="#000000")
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['name']
-        verbose_name_plural = "Colors"
-
-    def __str__(self):
-        return self.name
-
-# ================== CATEGORY ==================
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=120, unique=True, blank=True)
@@ -52,7 +21,7 @@ class Category(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
-# ================== BRAND ==================
+
 class Brand(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=120, unique=True, blank=True)
@@ -65,7 +34,7 @@ class Brand(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
-# ================== TAG ==================
+
 class Tag(models.Model):
     name = models.CharField(max_length=60, unique=True)
     slug = models.SlugField(max_length=80, unique=True, blank=True)
@@ -78,17 +47,22 @@ class Tag(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
-# ================== PRODUCT ==================
+
 class Product(models.Model):
+    """
+    Represents a general product (e.g., 'iPhone 16 Pro Max').
+    Images stored in Cloudinary → full HTTPS URLs.
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=300, unique=True, blank=True)
     description = models.TextField(blank=True)
 
     categories = models.ManyToManyField('Category', related_name='products', blank=True)
-    brand = models.ForeignKey('Brand', on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
+    brand = models.ForeignKey('Brand', on_delete=models.SET_NULL, null=True, related_name='products')
     tags = models.ManyToManyField('Tag', blank=True, related_name='products')
 
+    # CLOUDINARY: Full HTTPS URL
     cover_image = CloudinaryField('image', blank=True, null=True)
 
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -96,10 +70,10 @@ class Product(models.Model):
     discount = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     final_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
-    storage_gb = models.IntegerField(choices=STORAGE_CHOICES, null=True, blank=True)
-    ram_gb = models.IntegerField(choices=RAM_CHOICES, null=True, blank=True)
-    color = models.ForeignKey(Color, on_delete=models.SET_NULL, null=True, blank=True)
-    condition = models.CharField(max_length=20, choices=CONDITION_CHOICES, blank=True)
+    colors = models.JSONField(blank=True, null=True)
+    storage_options = models.JSONField(blank=True, null=True)
+    condition_options = models.JSONField(blank=True, null=True)
+    features = models.JSONField(blank=True, null=True)
 
     is_active = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
@@ -113,7 +87,7 @@ class Product(models.Model):
         return self.title
 
     def save(self, *args, **kwargs):
-        # Generate slug
+        # Generate unique slug
         if not self.slug:
             base = slugify(self.title)[:240]
             slug = base
@@ -123,24 +97,29 @@ class Product(models.Model):
                 i += 1
             self.slug = slug
 
-        # Calculate final_price
-        if self.discount and self.discount > Decimal('0'):
-            self.final_price = (self.price * (Decimal('100') - self.discount)) / Decimal('100')
+        # Auto calculate final price
+        if self.discount and self.discount > 0:
+            self.final_price = round(self.price * (1 - self.discount / 100), 2)
         else:
             self.final_price = self.price
 
         super().save(*args, **kwargs)
 
-# ================== PRODUCT VARIANT ==================
+
 class ProductVariant(models.Model):
+    """
+    Specific configurations (color, storage, etc.).
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
     sku = models.CharField(max_length=120, unique=True)
-    color = models.ForeignKey(Color, on_delete=models.SET_NULL, null=True, blank=True)
-    storage = models.IntegerField(choices=STORAGE_CHOICES, null=True, blank=True)
-    ram = models.IntegerField(choices=RAM_CHOICES, null=True, blank=True)
-    condition = models.CharField(max_length=20, choices=CONDITION_CHOICES, blank=True)
+    color = models.CharField(max_length=80, blank=True, null=True)
+    storage = models.CharField(max_length=80, blank=True, null=True)
+    ram = models.CharField(max_length=80, blank=True, null=True)
+    processor = models.CharField(max_length=200, blank=True, null=True)
+    size = models.CharField(max_length=80, blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    compare_at_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     stock = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -152,12 +131,18 @@ class ProductVariant(models.Model):
     def __str__(self):
         return f"{self.product.title} — {self.sku}"
 
-# ================== PRODUCT IMAGE ==================
+
 class ProductImage(models.Model):
+    """
+    Gallery images. Stored in Cloudinary → full HTTPS URLs.
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
-    variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, null=True, blank=True, related_name='images')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='productimage_set')
+    variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name='images', null=True, blank=True)
+
+    # CLOUDINARY: Full HTTPS URL
     image = CloudinaryField('image')
+
     alt_text = models.CharField(max_length=255, blank=True)
     is_primary = models.BooleanField(default=False)
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -170,6 +155,8 @@ class ProductImage(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        # Avoid recursive save
-        if self.is_primary and self.product.cover_image != self.image:
-            Product.objects.filter(pk=self.product.pk).update(cover_image=self.image)
+        # Sync primary image to product cover
+        if self.is_primary:
+            if self.product.cover_image != self.image:
+                self.product.cover_image = self.image
+                self.product.save(update_fields=['cover_image'])
