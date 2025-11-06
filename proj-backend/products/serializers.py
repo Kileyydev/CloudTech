@@ -153,6 +153,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     # CREATE — FIXED
     # ===================================================================
     def create(self, validated_data):
+        print("POOKIE: CREATE METHOD RUNNING WITH .set(color_ids)")
         category_ids = validated_data.pop('category_ids', [])
         tag_names = validated_data.pop('tag_names', [])
         cover_file = validated_data.pop('cover_image', None)
@@ -169,7 +170,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         product.categories.set(category_ids)
         product.ram_options.set(ram_ids)
         product.storage_options.set(storage_ids)
-        product.colors.set(color_ids)  # FIXED
+        product.colors.set(color_ids)
         
 
         # Tags
