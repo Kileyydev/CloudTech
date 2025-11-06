@@ -25,6 +25,7 @@ DEBUG = env.bool("DEBUG", default=False)
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
+    "http://localhost:3000",
     "cloudtech-c4ft.onrender.com",
     "api.cloudtechstore.net",
     "cloudtechstore.net",
@@ -227,3 +228,5 @@ LOGGING = {
         },
     },
 }
+
+
