@@ -176,14 +176,19 @@ class ProductViewSet(viewsets.ModelViewSet):
         return product
 
     def _invalidate_product_caches(self, product=None):
-        # Invalidate list caches
-        cache.delete_pattern("product_qs_list_*")
-        cache.delete_pattern("product_qs_retrieve_*")
-        # Invalidate detail
+        from django.core.cache import cache
+
+        # Safe for LocMemCache, FileBasedCache, etc.
+        cache.delete_many([
+            key for key in cache.keys("product_qs_*") 
+            if key.startswith("product_qs_")
+        ])
+        
         if product:
             cache.delete(f"product_detail_{product.id}")
-        # Invalidate featured
-        cache.delete("view_cache_featured")
+        
+        # Featured view cache (from @cache_page)
+        cache.delete("views.decorators.cache.cache_page.featured")
 
     # ===================================================================
     # NO MORE FINAL PRICE HERE — HANDLED IN SERIALIZER
