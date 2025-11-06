@@ -273,11 +273,11 @@ const saveProduct = async () => {
   form.append("is_featured", isFeatured ? "true" : "false");
   form.append("brand_id", brandId);
 
-  form.append("category_ids", JSON.stringify(selectedCats.map(Number)));
-  form.append("ram_option_ids", JSON.stringify(selectedRam.map(Number)));
-  form.append("storage_option_ids", JSON.stringify(selectedStorage.map(Number)));
-  form.append("color_option_ids", JSON.stringify(selectedColors.map(Number)));
-  form.append("tag_names", JSON.stringify(tagNames));
+  selectedCats.map(Number).forEach(id => form.append("category_ids", String(id)));
+  selectedRam.map(Number).forEach(id => form.append("ram_option_ids", String(id)));
+  selectedStorage.map(Number).forEach(id => form.append("storage_option_ids", String(id)));
+  selectedColors.map(Number).forEach(id => form.append("color_option_ids", String(id)));
+  tagNames.forEach(tag => form.append("tag_names", tag));
   form.append("variants", JSON.stringify(variants));
 
   if (coverFile) form.append("cover_image", coverFile);
