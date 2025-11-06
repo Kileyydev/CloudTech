@@ -85,6 +85,7 @@ class ProductListSerializer(serializers.ModelSerializer):
             'cover_image', 'images', 'variants',
             'price', 'stock', 'discount', 'final_price',
             'is_active', 'is_featured',
+            'colors', 'ram_options', 'storage_options',
             'condition_options', 'features', 'created_at'
         ]
 
