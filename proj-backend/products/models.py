@@ -1,7 +1,9 @@
+# products/models.py
 from django.db import models
 from django.utils.text import slugify
 import uuid
 from cloudinary.models import CloudinaryField
+from django.core.exceptions import ValidationError
 
 
 # ===================================================================
@@ -74,7 +76,7 @@ class GlobalOption(models.Model):
         ordering = ['type', 'value']
 
     def __str__(self):
-        return f"{self.type}: {self.value}"
+        return f"{self.get_type_display()}: {self.value}"
 
 
 # ===================================================================
@@ -92,10 +94,10 @@ class Product(models.Model):
 
     cover_image = CloudinaryField('image', blank=True, null=True)
 
-    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     stock = models.PositiveIntegerField(default=0)
-    discount = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    final_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    discount = models.DecimalField(max_digits=5, decimal_places=2, default=0, validators=[models.MinValueValidator(0), models.MaxValueValidator(100)])
+    final_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
 
     ram_options = models.ManyToManyField(
         'GlobalOption', blank=True, related_name='ram_products',
@@ -120,11 +122,18 @@ class Product(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['slug']),
+            models.Index(fields=['brand']),
+            models.Index(fields=['is_active']),
+            models.Index(fields=['is_featured']),
+        ]
 
     def __str__(self):
         return self.title
 
     def save(self, *args, **kwargs):
+        # Generate unique slug
         if not self.slug:
             base = slugify(self.title)[:240]
             slug = base
@@ -134,13 +143,17 @@ class Product(models.Model):
                 i += 1
             self.slug = slug
 
-        # Auto-calculate discounted price
-        if self.discount and self.discount > 0:
-            self.final_price = round(self.price * (1 - self.discount / 100), 2)
+        # Auto-calculate final price
+        if self.discount > 0:
+            self.final_price = round(float(self.price) * (1 - self.discount / 100), 2)
         else:
             self.final_price = self.price
 
         super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.discount < 0 or self.discount > 100:
+            raise ValidationError("Discount must be between 0 and 100.")
 
 
 # ===================================================================
@@ -157,19 +170,33 @@ class ProductVariant(models.Model):
     processor = models.CharField(max_length=200, blank=True, null=True)
     size = models.CharField(max_length=80, blank=True, null=True)
 
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    compare_at_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    price = models.DecimalField(max_digits=12, decimal_places=2)
+    compare_at_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     stock = models.PositiveIntegerField(default=0)
 
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=False)  # Default False — force admin to enable
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('product', 'sku')
+        unique_together = ('product', 'color', 'ram', 'storage')  # Better than just SKU
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['sku']),
+            models.Index(fields=['product', 'is_active']),
+        ]
 
     def __str__(self):
-        return f"{self.product.title} — {self.sku}"
+        parts = [self.product.title]
+        if self.color: parts.append(self.color)
+        if self.ram: parts.append(self.ram)
+        if self.storage: parts.append(self.storage)
+        return " — ".join(parts)
+
+    def clean(self):
+        if not self.sku:
+            raise ValidationError("SKU is required.")
+        if self.price < 0:
+            raise ValidationError("Price cannot be negative.")
 
 
 # ===================================================================
@@ -192,13 +219,23 @@ class ProductImage(models.Model):
 
     class Meta:
         ordering = ['-is_primary', 'uploaded_at']
+        indexes = [
+            models.Index(fields=['product', 'is_primary']),
+        ]
 
     def __str__(self):
         return f"Image for {self.product.title}"
 
     def save(self, *args, **kwargs):
+        # Ensure only one primary per product
+        if self.is_primary:
+            ProductImage.objects.filter(product=self.product, is_primary=True).update(is_primary=False)
+            # Sync cover image
+            if self.product.cover_image != self.image:
+                self.product.cover_image = self.image
+                self.product.save(update_fields=['cover_image'])
         super().save(*args, **kwargs)
-        # Auto-sync cover image
-        if self.is_primary and self.product.cover_image != self.image:
-            self.product.cover_image = self.image
-            self.product.save(update_fields=['cover_image'])
+
+    def clean(self):
+        if self.is_primary and self.variant:
+            raise ValidationError("Primary image cannot be tied to a variant.")
