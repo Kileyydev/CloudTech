@@ -219,6 +219,7 @@ const ProductAdminPage: React.FC = () => {
   };
 
   // === SAVE PRODUCT WITH ERROR CONSOLE ===
+// === SAVE PRODUCT (FIXED) ===
 const saveProduct = async () => {
   if (!token || !title || price === "" || !brandId) {
     setSnack({ open: true, msg: "Fill required fields", sev: "error" });
@@ -235,10 +236,11 @@ const saveProduct = async () => {
   form.append("is_featured", String(isFeatured));
   form.append("brand_id", brandId);
 
-  // CATEGORY IDS
-  selectedCats.forEach(id => form.append("category_ids", id));
+  // FIXED: Send category_ids as comma-separated string
+  if (selectedCats.length > 0) {
+    form.append("category_ids", selectedCats.join(","));
+  }
 
-  // === SAFE TRIM FUNCTION ===
   const safeTrim = (val: string | number | undefined | null): string | null => {
     if (val === null || val === undefined) return null;
     const str = String(val);
@@ -257,7 +259,7 @@ const saveProduct = async () => {
   if (coverFile) form.append("cover_image", coverFile);
   galleryFiles.forEach(f => form.append("gallery", f));
 
-  // === ERROR CONSOLE ===
+  // === DEBUG LOGS ===
   console.log("SAVING PRODUCT...");
   console.log("URL:", editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS);
   console.log("FORM DATA:");
