@@ -94,7 +94,7 @@ class ProductListSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT CREATE / UPDATE — FULL CRUD
+# PRODUCT CREATE / UPDATE — FULL CRUD (FIXED)
 # ===================================================================
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     brand_id = serializers.PrimaryKeyRelatedField(
@@ -150,7 +150,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         read_only_fields = ['final_price', 'id', 'slug']
 
     # ===================================================================
-    # CREATE
+    # CREATE — FIXED
     # ===================================================================
     def create(self, validated_data):
         category_ids = validated_data.pop('category_ids', [])
@@ -162,12 +162,21 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         color_ids = validated_data.pop('color_option_ids', [])
         variants_data = validated_data.pop('variants', [])
 
+        # Create product
         product = Product.objects.create(**validated_data)
+
+        # M2M: Use .set()
         product.categories.set(category_ids)
+        product.ram_options.set(ram_ids)
+        product.storage_options.set(storage_ids)
+        product.colors.set(color_ids)  # FIXED
 
         # Tags
         for name in tag_names:
-            tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
+            tag, _ = Tag.objects.get_or_create(
+                name=name.strip().lower(),
+                defaults={'slug': slugify(name)}
+            )
             product.tags.add(tag)
 
         # Images
@@ -176,21 +185,18 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         for img_file in gallery_files:
             ProductImage.objects.create(product=product, image=img_file)
 
-        # Options
-        product.ram_options.set(ram_ids)
-        product.storage_options.set(storage_ids)
-        product.colors.set(color_ids)
-
         # Variants
         for var in variants_data:
             ProductVariant.objects.create(product=product, **var)
 
+        # Final price
         product.final_price = self._calc_final_price(product)
         product.save()
+
         return product
 
     # ===================================================================
-    # UPDATE
+    # UPDATE — FIXED
     # ===================================================================
     def update(self, instance, validated_data):
         category_ids = validated_data.pop('category_ids', None)
@@ -202,45 +208,53 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         color_ids = validated_data.pop('color_option_ids', None)
         variants_data = validated_data.pop('variants', None)
 
+        # Update scalar fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
         if 'title' in validated_data:
             instance.slug = slugify(validated_data['title'])
 
+        # M2M: Use .set() if provided
         if category_ids is not None:
             instance.categories.set(category_ids)
-
-        if tag_names is not None:
-            instance.tags.clear()
-            for name in tag_names:
-                tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
-                instance.tags.add(tag)
-
-        if cover_file is not None:
-            instance.cover_image = cover_file
-
-        if gallery_files is not None:
-            # replace existing gallery images
-            instance.images.all().delete()
-            for img_file in gallery_files:
-                ProductImage.objects.create(product=instance, image=img_file)
-
         if ram_ids is not None:
             instance.ram_options.set(ram_ids)
         if storage_ids is not None:
             instance.storage_options.set(storage_ids)
         if color_ids is not None:
-            instance.colors.set(color_ids)
+            instance.colors.set(color_ids)  # FIXED
 
-        # 🔥 Variants update — full sync
+        # Tags
+        if tag_names is not None:
+            instance.tags.clear()
+            for name in tag_names:
+                tag, _ = Tag.objects.get_or_create(
+                    name=name.strip().lower(),
+                    defaults={'slug': slugify(name)}
+                )
+                instance.tags.add(tag)
+
+        # Cover image
+        if cover_file is not None:
+            instance.cover_image = cover_file
+
+        # Gallery — replace all
+        if gallery_files is not None:
+            instance.images.all().delete()
+            for img_file in gallery_files:
+                ProductImage.objects.create(product=instance, image=img_file)
+
+        # Variants — full replace
         if variants_data is not None:
             instance.variants.all().delete()
             for var in variants_data:
                 ProductVariant.objects.create(product=instance, **var)
 
+        # Final price
         instance.final_price = self._calc_final_price(instance)
         instance.save()
+
         return instance
 
     # ===================================================================
