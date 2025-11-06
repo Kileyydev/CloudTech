@@ -96,87 +96,84 @@ class ProductListSerializer(serializers.ModelSerializer):
 # ===================================================================
 # PRODUCT CREATE / UPDATE — FULL CRUD (SAFE + STABLE)
 # ===================================================================
+# ===================================================================
+# PRODUCT CREATE / UPDATE — FIXED & STABLE
+# ===================================================================
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
-    brand_id = serializers.PrimaryKeyRelatedField(
-        queryset=Brand.objects.all(), source='brand', write_only=True
+    # === WRITE-ONLY: Accept IDs as lists ===
+    category_ids = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=False
     )
-    category_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(), many=True, write_only=True, source='categories'
+    ram_option_ids = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=False
+    )
+    storage_option_ids = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=False
+    )
+    color_option_ids = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=False
     )
     tag_names = serializers.ListField(
-        child=serializers.CharField(max_length=60),
-        write_only=True,
-        required=False
+        child=serializers.CharField(max_length=60), write_only=True, required=False
     )
 
+    # === FILES ===
     cover_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
     gallery = serializers.ListField(
-        child=serializers.ImageField(),
-        write_only=True,
-        required=False
+        child=serializers.ImageField(), write_only=True, required=False
     )
 
-    ram_option_ids = serializers.PrimaryKeyRelatedField(
-        queryset=GlobalOption.objects.filter(type='RAM'),
-        many=True, required=False, write_only=True, source='ram_options'
-    )
-    storage_option_ids = serializers.PrimaryKeyRelatedField(
-        queryset=GlobalOption.objects.filter(type='STORAGE'),
-        many=True, required=False, write_only=True, source='storage_options'
-    )
-    color_option_ids = serializers.PrimaryKeyRelatedField(
-        queryset=GlobalOption.objects.filter(type='COLOR'),
-        many=True, required=False, write_only=True, source='colors'
-    )
-
+    # === NESTED WRITE ===
     variants = ProductVariantSerializer(many=True, required=False)
 
-    # Read-only
+    # === READ-ONLY ===
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
+    ram_options = GlobalOptionSerializer(many=True, read_only=True)
+    storage_options = GlobalOptionSerializer(many=True, read_only=True)
+    colors = GlobalOptionSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
         fields = [
             'id', 'title', 'description', 'price', 'stock', 'discount',
             'final_price', 'is_active', 'is_featured',
-            'colors', 'ram_options', 'storage_options',
-            'condition_options', 'features',
-            'brand', 'brand_id', 'categories', 'category_ids',
-            'tag_names', 'cover_image', 'gallery', 'images', 'variants',
-            'ram_option_ids', 'storage_option_ids', 'color_option_ids'
+            'brand', 'brand_id',
+            'categories', 'category_ids',
+            'ram_options', 'ram_option_ids',
+            'storage_options', 'storage_option_ids',
+            'colors', 'color_option_ids',
+            'tag_names', 'cover_image', 'gallery', 'images', 'variants'
         ]
         read_only_fields = ['final_price', 'id', 'slug']
 
-
-    # ===================================================================
-    # CREATE — SAFE VERSION
-    # ===================================================================
+    # === CREATE ===
     def create(self, validated_data):
+        # Pop M2M IDs
         category_ids = validated_data.pop('category_ids', [])
-        tag_names = validated_data.pop('tag_names', [])
-        cover_file = validated_data.pop('cover_image', None)
-        gallery_files = validated_data.pop('gallery', [])
         ram_ids = validated_data.pop('ram_option_ids', [])
         storage_ids = validated_data.pop('storage_option_ids', [])
         color_ids = validated_data.pop('color_option_ids', [])
+        tag_names = validated_data.pop('tag_names', [])
         variants_data = validated_data.pop('variants', [])
+        cover_file = validated_data.pop('cover_image', None)
+        gallery_files = validated_data.pop('gallery', [])
 
         # Create product
         product = Product.objects.create(**validated_data)
 
-        # Safe M2M sets
+        # === SET M2M USING .set() + Queryset ===
         if category_ids:
-            product.categories.set(category_ids)
+            product.categories.set(Category.objects.filter(id__in=category_ids))
         if ram_ids:
-            product.ram_options.set(ram_ids)
+            product.ram_options.set(GlobalOption.objects.filter(id__in=ram_ids, type='RAM'))
         if storage_ids:
-            product.storage_options.set(storage_ids)
+            product.storage_options.set(GlobalOption.objects.filter(id__in=storage_ids, type='STORAGE'))
         if color_ids:
-            product.colors.set(color_ids)
+            product.colors.set(GlobalOption.objects.filter(id__in=color_ids, type='COLOR'))
 
-        # Tags
+        # === TAGS ===
         for name in tag_names:
             tag, _ = Tag.objects.get_or_create(
                 name=name.strip().lower(),
@@ -184,55 +181,53 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             )
             product.tags.add(tag)
 
-        # Images
+        # === COVER & GALLERY ===
         if cover_file:
             product.cover_image = cover_file
             product.save(update_fields=['cover_image'])
+
         for img_file in gallery_files:
             ProductImage.objects.create(product=product, image=img_file)
 
-        # Variants
+        # === VARIANTS ===
         for var in variants_data:
             ProductVariant.objects.create(product=product, **var)
 
-        # Final price
+        # === FINAL PRICE ===
         product.final_price = self._calc_final_price(product)
         product.save()
 
         return product
 
-
-    # ===================================================================
-    # UPDATE — SAFE VERSION
-    # ===================================================================
+    # === UPDATE ===
     def update(self, instance, validated_data):
+        # Pop M2M
         category_ids = validated_data.pop('category_ids', None)
-        tag_names = validated_data.pop('tag_names', None)
-        cover_file = validated_data.pop('cover_image', None)
-        gallery_files = validated_data.pop('gallery', None)
         ram_ids = validated_data.pop('ram_option_ids', None)
         storage_ids = validated_data.pop('storage_option_ids', None)
         color_ids = validated_data.pop('color_option_ids', None)
+        tag_names = validated_data.pop('tag_names', None)
         variants_data = validated_data.pop('variants', None)
+        cover_file = validated_data.pop('cover_image', None)
+        gallery_files = validated_data.pop('gallery', None)
 
         # Update scalar fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-
         if 'title' in validated_data:
             instance.slug = slugify(validated_data['title'])
 
-        # Safe M2M updates
+        # === M2M SET ===
         if category_ids is not None:
-            instance.categories.set(category_ids)
+            instance.categories.set(Category.objects.filter(id__in=category_ids))
         if ram_ids is not None:
-            instance.ram_options.set(ram_ids)
+            instance.ram_options.set(GlobalOption.objects.filter(id__in=ram_ids))
         if storage_ids is not None:
-            instance.storage_options.set(storage_ids)
+            instance.storage_options.set(GlobalOption.objects.filter(id__in=storage_ids))
         if color_ids is not None:
-            instance.colors.set(color_ids)
+            instance.colors.set(GlobalOption.objects.filter(id__in=color_ids))
 
-        # Tags
+        # === TAGS ===
         if tag_names is not None:
             instance.tags.clear()
             for name in tag_names:
@@ -242,32 +237,28 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                 )
                 instance.tags.add(tag)
 
-        # Cover image
+        # === COVER ===
         if cover_file is not None:
             instance.cover_image = cover_file
 
-        # Gallery — replace all
+        # === GALLERY REPLACE ===
         if gallery_files is not None:
             instance.images.all().delete()
             for img_file in gallery_files:
                 ProductImage.objects.create(product=instance, image=img_file)
 
-        # Variants — replace all
+        # === VARIANTS REPLACE ===
         if variants_data is not None:
             instance.variants.all().delete()
             for var in variants_data:
                 ProductVariant.objects.create(product=instance, **var)
 
-        # Final price
+        # === FINAL PRICE ===
         instance.final_price = self._calc_final_price(instance)
         instance.save()
 
         return instance
 
-
-    # ===================================================================
-    # PRICE CALC
-    # ===================================================================
     def _calc_final_price(self, obj):
         if obj.discount and obj.discount > 0:
             return round(obj.price * (1 - obj.discount / 100), 2)
