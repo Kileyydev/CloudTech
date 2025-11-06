@@ -36,7 +36,7 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT IMAGE
+# PRODUCT IMAGE — CLOUDINARY URL
 # ===================================================================
 class ProductImageSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
@@ -63,7 +63,38 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT CREATE / UPDATE
+# PRODUCT LIST / DETAIL (READ)
+# ===================================================================
+class ProductListSerializer(serializers.ModelSerializer):
+    brand = BrandSerializer(read_only=True)
+    categories = CategorySerializer(many=True, read_only=True)
+    tags = serializers.SlugRelatedField(many=True, read_only=True, slug_field='name')
+    images = ProductImageSerializer(many=True, read_only=True)
+    variants = ProductVariantSerializer(many=True, read_only=True)
+    cover_image = serializers.SerializerMethodField()
+
+    ram_options = GlobalOptionSerializer(many=True, read_only=True)
+    storage_options = GlobalOptionSerializer(many=True, read_only=True)
+    colors = GlobalOptionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'title', 'slug', 'description',
+            'brand', 'categories', 'tags',
+            'cover_image', 'images', 'variants',
+            'price', 'stock', 'discount', 'final_price',
+            'is_active', 'is_featured',
+            'colors', 'ram_options', 'storage_options',
+            'condition_options', 'features', 'created_at'
+        ]
+
+    def get_cover_image(self, obj):
+        return obj.cover_image.url if obj.cover_image else None
+
+
+# ===================================================================
+# PRODUCT CREATE / UPDATE — FULL CRUD (FIXED)
 # ===================================================================
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     brand_id = serializers.PrimaryKeyRelatedField(
@@ -119,19 +150,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         read_only_fields = ['final_price', 'id', 'slug']
 
     # ===================================================================
-    # Fix: properly handle multipart/form-data lists
-    # ===================================================================
-    def to_internal_value(self, data):
-        ret = super().to_internal_value(data)
-        request = self.context.get('request')
-
-        if request and hasattr(request, 'FILES'):
-            # Support multiple gallery files
-            ret['gallery'] = request.FILES.getlist('gallery')
-        return ret
-
-    # ===================================================================
-    # CREATE
+    # CREATE — FIXED
     # ===================================================================
     def create(self, validated_data):
         category_ids = validated_data.pop('category_ids', [])
@@ -146,11 +165,12 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         # Create product
         product = Product.objects.create(**validated_data)
 
-        # M2M
+        # M2M: Use .set()
         product.categories.set(category_ids)
         product.ram_options.set(ram_ids)
         product.storage_options.set(storage_ids)
-        product.colors.set(color_ids)
+        product.colors.set(color_ids)  # FIXED
+        
 
         # Tags
         for name in tag_names:
@@ -177,7 +197,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         return product
 
     # ===================================================================
-    # UPDATE
+    # UPDATE — FIXED
     # ===================================================================
     def update(self, instance, validated_data):
         category_ids = validated_data.pop('category_ids', None)
@@ -196,7 +216,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         if 'title' in validated_data:
             instance.slug = slugify(validated_data['title'])
 
-        # M2M
+        # M2M: Use .set() if provided
         if category_ids is not None:
             instance.categories.set(category_ids)
         if ram_ids is not None:
@@ -204,7 +224,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         if storage_ids is not None:
             instance.storage_options.set(storage_ids)
         if color_ids is not None:
-            instance.colors.set(color_ids)
+            instance.colors.set(color_ids)  # FIXED
 
         # Tags
         if tag_names is not None:
