@@ -7,9 +7,6 @@ from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from django.core.cache import cache
 from django.db.models import Prefetch, Q
-from django.db import transaction
-from decimal import Decimal, InvalidOperation
-import logging
 
 from .models import (
     Product, ProductVariant, Category, Brand, ProductImage, GlobalOption
@@ -24,13 +21,14 @@ from .serializers import (
     GlobalOptionSerializer
 )
 
-logger = logging.getLogger(__name__)
-
 
 # ===================================================================
 # GLOBAL OPTION VIEWSET
 # ===================================================================
 class GlobalOptionViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Read-only for frontend. Admins can manage via admin panel.
+    """
     queryset = GlobalOption.objects.all().order_by('type', 'value')
     serializer_class = GlobalOptionSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
@@ -39,7 +37,7 @@ class GlobalOptionViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # ===================================================================
-# PERMISSION: Admin write, anyone read
+# CUSTOM PERMISSION: Admin can write, anyone can read
 # ===================================================================
 class IsAdminOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -49,7 +47,7 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 
 
 # ===================================================================
-# PRODUCT VIEWSET — FULLY FIXED & CACHE-SAFE
+# PRODUCT VIEWSET — FULLY OPTIMIZED & FIXED
 # ===================================================================
 class ProductViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrReadOnly]
@@ -62,12 +60,23 @@ class ProductViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ['list', 'retrieve', 'featured']:
             return ProductListSerializer
-        return ProductCreateUpdateSerializer
+        return ProductCreateUpdateSerializer  # For create, update, partial_update
 
     # ===================================================================
-    # DYNAMIC + CACHED QUERYSET WITH INVALIDATION
+    # OPTIMIZED + CACHED QUERYSET
     # ===================================================================
     def get_queryset(self):
+        # Build cache key
+        category_slug = self.request.query_params.get('category')
+        brand_id = self.request.query_params.get('brand')
+        is_featured = self.request.query_params.get('is_featured')
+        cache_key = f"products_qs_{category_slug or 'all'}_{brand_id or 'all'}_{is_featured or 'all'}"
+
+        cached_qs = cache.get(cache_key)
+        if cached_qs is not None:
+            return cached_qs
+
+        # Base queryset — only active products
         queryset = Product.objects.filter(is_active=True).select_related('brand').prefetch_related(
             'tags',
             'categories',
@@ -87,11 +96,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             'variants'
         )
 
-        # Apply filters
-        category_slug = self.request.query_params.get('category')
-        brand_id = self.request.query_params.get('brand')
-        is_featured = self.request.query_params.get('is_featured')
-
+        # Filters
         if category_slug:
             queryset = queryset.filter(categories__slug=category_slug)
         if brand_id:
@@ -99,6 +104,8 @@ class ProductViewSet(viewsets.ModelViewSet):
         if is_featured is not None:
             queryset = queryset.filter(is_featured=(is_featured.lower() == 'true'))
 
+        # Cache for 5 minutes
+        cache.set(cache_key, queryset, timeout=60 * 5)
         return queryset
 
     def get_serializer_context(self):
@@ -107,93 +114,32 @@ class ProductViewSet(viewsets.ModelViewSet):
         return context
 
     # ===================================================================
-    # CACHE KEY HELPER
-    # ===================================================================
-    def _get_cache_key(self, suffix=''):
-        params = self.request.query_params.copy()
-        # Normalize featured
-        if 'is_featured' in params:
-            params['is_featured'] = 'true' if params['is_featured'].lower() == 'true' else 'false'
-        key = f"product_qs_{self.action}_{params.urlencode()}_{suffix}"
-        return key
-
-    # ===================================================================
-    # LIST + RETRIEVE: CACHED
-    # ===================================================================
-    def list(self, request, *args, **kwargs):
-        cache_key = self._get_cache_key()
-        cached = cache.get(cache_key)
-        if cached:
-            return Response(cached)
-
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            response = self.get_paginated_response(serializer.data)
-        else:
-            serializer = self.get_serializer(queryset, many=True)
-            response = Response(serializer.data)
-
-        cache.set(cache_key, response.data, timeout=60 * 5)
-        return response
-
-    def retrieve(self, request, *args, **kwargs):
-        cache_key = f"product_detail_{kwargs['pk']}"
-        cached = cache.get(cache_key)
-        if cached:
-            return Response(cached)
-
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        data = serializer.data
-        cache.set(cache_key, data, timeout=60 * 10)
-        return Response(data)
-
-    # ===================================================================
-    # FEATURED: CACHED
+    # CUSTOM ACTION: /api/products/featured/
     # ===================================================================
     @action(detail=False, methods=['get'], url_path='featured')
     @method_decorator(cache_page(60 * 5))
     def featured(self, request):
-        queryset = self.filter_queryset(self.get_queryset()).filter(is_featured=True)[:12]
+        queryset = self.get_queryset().filter(is_featured=True)[:12]
         serializer = ProductListSerializer(queryset, many=True, context=self.get_serializer_context())
         return Response(serializer.data)
 
     # ===================================================================
-    # CREATE / UPDATE: INVALIDATE CACHES + USE SERIALIZER LOGIC
+    # OVERRIDE PERFORM CREATE/UPDATE TO ENSURE FINAL PRICE
     # ===================================================================
-    @transaction.atomic
     def perform_create(self, serializer):
         product = serializer.save()
-        self._invalidate_product_caches()
-        return product
+        product.final_price = self._calc_final_price(product)
+        product.save(update_fields=['final_price'])
 
-    @transaction.atomic
     def perform_update(self, serializer):
         product = serializer.save()
-        self._invalidate_product_caches(product)
-        return product
+        product.final_price = self._calc_final_price(product)
+        product.save(update_fields=['final_price'])
 
-    def _invalidate_product_caches(self, product=None):
-        from django.core.cache import cache
-
-        # Safe for LocMemCache, FileBasedCache, etc.
-        cache.delete_many([
-            key for key in cache.keys("product_qs_*") 
-            if key.startswith("product_qs_")
-        ])
-        
-        if product:
-            cache.delete(f"product_detail_{product.id}")
-        
-        # Featured view cache (from @cache_page)
-        cache.delete("views.decorators.cache.cache_page.featured")
-
-    # ===================================================================
-    # NO MORE FINAL PRICE HERE — HANDLED IN SERIALIZER
-    # ===================================================================
-    # Removed _calc_final_price — already in serializer with Decimal safety
+    def _calc_final_price(self, product):
+        if product.discount and product.discount > 0:
+            return round(product.price * (1 - product.discount / 100), 2)
+        return product.price
 
 
 # ===================================================================
