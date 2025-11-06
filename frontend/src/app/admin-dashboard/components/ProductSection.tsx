@@ -257,58 +257,74 @@ const ProductAdminPage: React.FC = () => {
   /* ------------------------------------------------------------------ */
   /*  SAVE (CREATE / UPDATE) - FIXED                                    */
   /* ------------------------------------------------------------------ */
-  const saveProduct = async () => {
-    if (!token || !title || price === "" || !brandId) {
-      setSnack({ open: true, msg: "Fill required fields", sev: "error" });
-      return;
+const saveProduct = async () => {
+  if (!token || !title || price === "" || !brandId) {
+    setSnack({ open: true, msg: "Fill required fields", sev: "error" });
+    return;
+  }
+
+  const form = new FormData();
+  form.append("title", title);
+  form.append("description", description);
+  form.append("price", String(price));
+  form.append("stock", String(stock || 0));
+  form.append("discount", String(discount));
+  form.append("is_active", isActive ? "true" : "false");
+  form.append("is_featured", isFeatured ? "true" : "false");
+  form.append("brand_id", brandId);
+
+  form.append("category_ids", JSON.stringify(selectedCats.map(Number)));
+  form.append("ram_option_ids", JSON.stringify(selectedRam.map(Number)));
+  form.append("storage_option_ids", JSON.stringify(selectedStorage.map(Number)));
+  form.append("color_option_ids", JSON.stringify(selectedColors.map(Number)));
+  form.append("tag_names", JSON.stringify(tagNames));
+  form.append("variants", JSON.stringify(variants));
+
+  if (coverFile) form.append("cover_image", coverFile);
+  galleryFiles.forEach(f => form.append("gallery", f));
+
+  // ADD THIS LOG BLOCK
+  console.log("Sending to:", editId ? "PATCH" : "POST", editId ? `${API_BASE}${editId}/` : API_BASE);
+  console.log("FORM DATA:");
+  for (const [key, value] of form.entries()) {
+    if (value instanceof File) {
+      console.log(`  ${key}: [File] ${value.name} (${value.size} bytes)`);
+    } else {
+      console.log(`  ${key}:`, value);
     }
+  }
+  // END LOG BLOCK
 
-    const form = new FormData();
-    form.append("title", title);
-    form.append("description", description);
-    form.append("price", String(price));
-    form.append("stock", String(stock || 0));
-    form.append("discount", String(discount));
-    form.append("is_active", isActive ? "true" : "false");
-    form.append("is_featured", isFeatured ? "true" : "false");
-    form.append("brand_id", brandId);
+  setSaving(true);
+  try {
+    const url = editId ? `${API_BASE}${editId}/` : API_BASE;
+    const method = editId ? "PATCH" : "POST";
+    const res = await fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${token}` },
+      body: form
+    });
 
-    // Send arrays as JSON strings
-    form.append("category_ids", JSON.stringify(selectedCats.map(Number)));
-    form.append("ram_option_ids", JSON.stringify(selectedRam.map(Number)));
-    form.append("storage_option_ids", JSON.stringify(selectedStorage.map(Number)));
-    form.append("color_option_ids", JSON.stringify(selectedColors.map(Number)));
-    form.append("tag_names", JSON.stringify(tagNames));
-    form.append("variants", JSON.stringify(variants));
+    // ADD THIS: Log response status + body
+    console.log("Response status:", res.status);
+    const responseText = await res.text();
+    console.log("Response body:", responseText);
 
-    if (coverFile) form.append("cover_image", coverFile);
-    galleryFiles.forEach(f => form.append("gallery", f));
-
-    setSaving(true);
-    try {
-      const url = editId ? `${API_BASE}${editId}/` : API_BASE;
-      const method = editId ? "PATCH" : "POST";
-      const res = await fetch(url, {
-        method,
-        headers: { Authorization: `Bearer ${token}` }, // NO Content-Type!
-        body: form
-      });
-
-      if (res.ok) {
-        setSnack({ open: true, msg: editId ? "Updated" : "Created", sev: "success" });
-        resetForm();
-        fetchAll();
-        setTab(1);
-      } else {
-        const err = await res.text();
-        setSnack({ open: true, msg: `Save failed: ${err}`, sev: "error" });
-      }
-    } catch (err: any) {
-      setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
-    } finally {
-      setSaving(false);
+    if (res.ok) {
+      setSnack({ open: true, msg: editId ? "Updated" : "Created", sev: "success" });
+      resetForm();
+      fetchAll();
+      setTab(1);
+    } else {
+      setSnack({ open: true, msg: `Save failed: ${responseText}`, sev: "error" });
     }
-  };
+  } catch (err: any) {
+    console.error("Fetch error:", err);
+    setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
+  } finally {
+    setSaving(false);
+  }
+};
 
   /* ------------------------------------------------------------------ */
   /*  DELETE                                                            */
