@@ -1,39 +1,42 @@
 "use client";
-
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Box, Button, TextField, Tabs, Tab, CircularProgress,
   FormControl, InputLabel, Select, MenuItem, Chip, Checkbox,
   FormControlLabel, Typography, Paper, Dialog, DialogTitle,
   DialogContent, DialogActions, Card, CardContent, CardMedia,
   Stack, Snackbar, Alert, Table, TableHead, TableRow,
-  TableCell, TableBody, useTheme, useMediaQuery, styled, alpha
+  TableCell, TableBody, useTheme, useMediaQuery, styled, alpha,
+  IconButton, Tooltip
 } from "@mui/material";
-import { Edit, Delete, AddPhotoAlternate, Image as ImageIcon } from "@mui/icons-material";
-import { getProductImageSrc } from "@/app/utils/image";
-import type { Product } from "@/app/types/products";
+import {
+  Edit, Delete, AddPhotoAlternate, Image as ImageIcon,
+  Close as CloseIcon
+} from "@mui/icons-material";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE + "/products/";
-const API_CATEGORIES = process.env.NEXT_PUBLIC_API_BASE + "/categories/";
-const API_BRANDS = process.env.NEXT_PUBLIC_API_BASE + "/brands/";
-const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || process.env.NEXT_PUBLIC_API_BASE;
+/* ------------------------------------------------------------------ */
+/*  CONFIG                                                            */
+/* ------------------------------------------------------------------ */
+const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE}/products/`;
+const API_OPTS  = `${process.env.NEXT_PUBLIC_API_BASE}/options/`;
+const API_CATS  = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
+const API_BRANDS= `${process.env.NEXT_PUBLIC_API_BASE}/brands/`;
 
-
-// === STYLED COMPONENTS ===
+/* ------------------------------------------------------------------ */
+/*  STYLED COMPONENTS (unchanged)                                     */
+/* ------------------------------------------------------------------ */
 const StyledPaper = styled(Paper)(({ theme }) => ({
   overflow: "hidden",
   boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
   background: "linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)",
   border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
 }));
-
 const StyledCard = styled(Card)(({ theme }) => ({
   overflow: "hidden",
   transition: "all 0.3s ease",
   background: "#fff",
   boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
 }));
-
 const DiscountBadge = styled(Box)(({ theme }) => ({
   position: "absolute",
   top: 12,
@@ -47,7 +50,6 @@ const DiscountBadge = styled(Box)(({ theme }) => ({
   boxShadow: "0 2px 8px rgba(233, 30, 99, 0.3)",
   zIndex: 2,
 }));
-
 const StyledButton = styled(Button)(({ theme }) => ({
   textTransform: "none",
   fontWeight: 600,
@@ -61,10 +63,8 @@ const StyledButton = styled(Button)(({ theme }) => ({
   "&.danger": {
     background: "#f44336",
     color: "#fff",
-    
   },
 }));
-
 const ImageUpload = styled(Box)(({ theme }) => ({
   border: `2px dashed ${alpha("#DC1A8A", 0.3)}`,
   padding: theme.spacing(3),
@@ -74,7 +74,6 @@ const ImageUpload = styled(Box)(({ theme }) => ({
   background: alpha("#DC1A8A", 0.02),
   "& input": { display: "none" },
 }));
-
 const GalleryPreview = styled(Box)(({ theme }) => ({
   display: "flex",
   gap: 8,
@@ -86,26 +85,37 @@ const GalleryPreview = styled(Box)(({ theme }) => ({
     objectFit: "cover",
     border: `2px solid ${alpha("#DC1A8A", 0.2)}`,
     transition: "all 0.2s",
-
   },
 }));
 
-// === MAIN COMPONENT ===
+/* ------------------------------------------------------------------ */
+/*  HELPERS                                                            */
+/* ------------------------------------------------------------------ */
+const getCoverSrc = (p: any) => {
+  if (p.cover_image?.url) return p.cover_image.url;
+  if (p.cover_image) return p.cover_image;
+  return "/placeholder.png";
+};
+
+/* ------------------------------------------------------------------ */
+/*  MAIN COMPONENT                                                     */
+/* ------------------------------------------------------------------ */
 const ProductAdminPage: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
+  /* ---------- GLOBAL STATE ---------- */
   const [tab, setTab] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState<number | "all">("all");
-
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<{ id: number; name: string }[]>([]);
-  const [brands, setBrands] = useState<{ id: number; name: string }[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [brands, setBrands] = useState<any[]>([]);
+  const [options, setOptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  // Form
+  /* ---------- FORM STATE ---------- */
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -115,88 +125,145 @@ const ProductAdminPage: React.FC = () => {
   const [finalPrice, setFinalPrice] = useState<number | "">("");
   const [selectedCats, setSelectedCats] = useState<string[]>([]);
   const [brandId, setBrandId] = useState<string>("");
+  const [selectedRam, setSelectedRam] = useState<string[]>([]);
+  const [selectedStorage, setSelectedStorage] = useState<string[]>([]);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [tagNames, setTagNames] = useState<string[]>([]);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
   const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [isFeatured, setIsFeatured] = useState(false);
+  const [variants, setVariants] = useState<any[]>([]); // [{sku,color,ram,storage,processor,size,price,compare_at_price,stock}]
 
-  // Delete
+  /* ---------- DELETE DIALOG ---------- */
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // Snackbar
+  /* ---------- SNACKBAR ---------- */
   const [snack, setSnack] = useState<{ open: boolean; msg: string; sev: "success" | "error" }>({
     open: false, msg: "", sev: "success"
   });
 
   const token = typeof window !== "undefined" ? localStorage.getItem("access") : null;
 
-  // Final price calc
+  /* ------------------------------------------------------------------ */
+  /*  CALC FINAL PRICE (client side)                                    */
+  /* ------------------------------------------------------------------ */
   useEffect(() => {
     if (price !== "" && discount !== "") {
       const p = Number(price);
       const d = Number(discount);
-      setFinalPrice(d > 0 ? p - (p * d) / 100 : p);
+      setFinalPrice(d > 0 ? Math.round(p * (1 - d / 100) * 100) / 100 : p);
     } else {
       setFinalPrice("");
     }
   }, [price, discount]);
 
-  // Fetch all
-  const fetchData = async () => {
+  /* ------------------------------------------------------------------ */
+  /*  FETCH ALL DATA                                                    */
+  /* ------------------------------------------------------------------ */
+  const fetchAll = useCallback(async () => {
     if (!token) return;
     setLoading(true);
     try {
-      const [pRes, cRes, bRes] = await Promise.all([
+      const [pRes, cRes, bRes, oRes] = await Promise.all([
         fetch(API_BASE, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(API_CATEGORIES, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(API_BRANDS, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(API_CATS, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(API_BRANDS, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(API_OPTS, { headers: { Authorization: `Bearer ${token}` } })
       ]);
-
-      const [pJson, cJson, bJson] = await Promise.all([pRes.json(), cRes.json(), bRes.json()]);
+      const [pJson, cJson, bJson, oJson] = await Promise.all([
+        pRes.json(),
+        cRes.json(),
+        bRes.json(),
+        oRes.json()
+      ]);
       setProducts(Array.isArray(pJson) ? pJson : pJson.results || []);
       setCategories(Array.isArray(cJson) ? cJson : cJson.results || []);
       setBrands(Array.isArray(bJson) ? bJson : bJson.results || []);
-    } catch (err) {
-      setSnack({ open: true, msg: "Failed to load", sev: "error" });
+      setOptions(Array.isArray(oJson) ? oJson : oJson.results || []);
+    } catch {
+      setSnack({ open: true, msg: "Failed to load data", sev: "error" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // Image handlers
+  /* ------------------------------------------------------------------ */
+  /*  IMAGE HANDLERS                                                    */
+  /* ------------------------------------------------------------------ */
   const handleCover = (files: FileList | null) => {
     if (!files?.[0]) { setCoverFile(null); setCoverPreview(null); return; }
     const f = files[0];
     setCoverFile(f);
     setCoverPreview(URL.createObjectURL(f));
   };
-
   const handleGallery = (files: FileList | null) => {
     if (!files) { setGalleryFiles([]); setGalleryPreviews([]); return; }
     const arr = Array.from(files);
     setGalleryFiles(arr);
     setGalleryPreviews(arr.map(f => URL.createObjectURL(f)));
   };
-
-  const resetForm = () => {
-    setEditId(null); setTitle(""); setDescription(""); setPrice(""); setStock("");
-    setDiscount(0); setFinalPrice(""); setSelectedCats([]); setBrandId("");
-    setCoverFile(null); setCoverPreview(null); setGalleryFiles([]); setGalleryPreviews([]);
-    setIsActive(true); setIsFeatured(false);
+  const removeGallery = (idx: number) => {
+    setGalleryFiles(prev => prev.filter((_, i) => i !== idx));
+    setGalleryPreviews(prev => prev.filter((_, i) => i !== idx));
   };
 
-  // Save
+  /* ------------------------------------------------------------------ */
+  /*  FORM RESET                                                        */
+  /* ------------------------------------------------------------------ */
+  const resetForm = () => {
+    setEditId(null);
+    setTitle(""); setDescription(""); setPrice(""); setStock("");
+    setDiscount(0); setFinalPrice(""); setSelectedCats([]);
+    setBrandId(""); setSelectedRam([]); setSelectedStorage([]);
+    setSelectedColors([]); setTagNames([]); setCoverFile(null);
+    setCoverPreview(null); setGalleryFiles([]); setGalleryPreviews([]);
+    setIsActive(true); setIsFeatured(false); setVariants([]);
+  };
+
+  /* ------------------------------------------------------------------ */
+  /*  START EDIT                                                        */
+  /* ------------------------------------------------------------------ */
+  const startEdit = (p: any) => {
+    setEditId(p.id);
+    setTitle(p.title ?? "");
+    setDescription(p.description ?? "");
+    setPrice(p.price ?? "");
+    setStock(p.stock ?? "");
+    setDiscount(p.discount ?? 0);
+    setFinalPrice(p.final_price ?? "");
+    setBrandId(p.brand?.id?.toString() ?? "");
+    setSelectedCats(p.categories?.map((c: any) => c.id.toString()) ?? []);
+    setSelectedRam(p.ram_options?.map((o: any) => o.id.toString()) ?? []);
+    setSelectedStorage(p.storage_options?.map((o: any) => o.id.toString()) ?? []);
+    setSelectedColors(p.colors?.map((o: any) => o.id.toString()) ?? []);
+    setTagNames(p.tags?.map((t: any) => t.name) ?? []);
+    setIsActive(p.is_active ?? true);
+    setIsFeatured(p.is_featured ?? false);
+    setCoverPreview(p.cover_image?.url ?? p.cover_image ?? null);
+    setGalleryPreviews(p.images?.map((i: any) => i.image?.url ?? i.image) ?? []);
+    setVariants(p.variants?.map((v: any) => ({
+      ...v,
+      price: v.price ?? "",
+      compare_at_price: v.compare_at_price ?? "",
+      stock: v.stock ?? ""
+    })) ?? []);
+    setTab(0);
+  };
+
+  /* ------------------------------------------------------------------ */
+  /*  SAVE (CREATE / UPDATE)                                            */
+  /* ------------------------------------------------------------------ */
   const saveProduct = async () => {
     if (!token || !title || price === "" || !brandId) {
-      setSnack({ open: true, msg: "Fill required", sev: "error" });
+      setSnack({ open: true, msg: "Fill required fields", sev: "error" });
       return;
     }
-
     const form = new FormData();
     form.append("title", title);
     form.append("description", description);
@@ -205,10 +272,15 @@ const ProductAdminPage: React.FC = () => {
     form.append("discount", String(discount));
     form.append("is_active", String(isActive));
     form.append("is_featured", String(isFeatured));
-    selectedCats.forEach(c => form.append("category_ids", c));
+    selectedCats.forEach(id => form.append("category_ids", id));
     form.append("brand_id", brandId);
+    selectedRam.forEach(id => form.append("ram_option_ids", id));
+    selectedStorage.forEach(id => form.append("storage_option_ids", id));
+    selectedColors.forEach(id => form.append("color_option_ids", id));
+    tagNames.forEach(name => form.append("tag_names", name));
     if (coverFile) form.append("cover_image", coverFile);
     galleryFiles.forEach(f => form.append("gallery", f));
+    variants.forEach(v => form.append("variants", JSON.stringify(v)));
 
     setSaving(true);
     try {
@@ -219,14 +291,14 @@ const ProductAdminPage: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` },
         body: form
       });
-
       if (res.ok) {
-        setSnack({ open: true, msg: editId ? "Updated" : "Added", sev: "success" });
+        setSnack({ open: true, msg: editId ? "Updated" : "Created", sev: "success" });
         resetForm();
-        fetchData();
+        fetchAll();
         setTab(1);
       } else {
-        setSnack({ open: true, msg: "Save failed", sev: "error" });
+        const err = await res.text();
+        setSnack({ open: true, msg: `Save failed: ${err}`, sev: "error" });
       }
     } catch {
       setSnack({ open: true, msg: "Network error", sev: "error" });
@@ -235,32 +307,9 @@ const ProductAdminPage: React.FC = () => {
     }
   };
 
-  // Edit
-  const startEdit = (p: Product) => {
-    setEditId(p.id);
-    setTitle(p.title || "");
-    setDescription(p.description || "");
-    setPrice(p.price || "");
-    setStock(p.stock || "");
-    setDiscount(p.discount || 0);
-    setFinalPrice(p.final_price || "");
-    setBrandId(p.brand?.id?.toString() || "");
-    setSelectedCats(p.categories?.map(c => String(c.id)) || []);
-    setIsActive(p.is_active ?? true);
-    setIsFeatured(p.is_featured ?? false);
-
-    if (p.cover_image) {
-      const url = p.cover_image.startsWith("http") ? p.cover_image : `${MEDIA_BASE}${p.cover_image}`;
-      setCoverPreview(url);
-    }
-    if (p.images?.length) {
-      const urls = p.images.map(img => img.image.startsWith("http") ? img.image : `${MEDIA_BASE}${img.image}`);
-      setGalleryPreviews(urls);
-    }
-    setTab(0);
-  };
-
-  // Delete
+  /* ------------------------------------------------------------------ */
+  /*  DELETE                                                            */
+  /* ------------------------------------------------------------------ */
   const confirmDel = (id: string) => { setDeleteId(id); setConfirmOpen(true); };
   const doDelete = async () => {
     if (!token || !deleteId) return;
@@ -270,19 +319,22 @@ const ProductAdminPage: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSnack({ open: true, msg: "Deleted", sev: "success" });
-      fetchData();
+      fetchAll();
     } catch {
       setSnack({ open: true, msg: "Delete failed", sev: "error" });
     } finally {
-      setConfirmOpen(false); setDeleteId(null);
+      setConfirmOpen(false);
+      setDeleteId(null);
     }
   };
 
-  // Discount quick update
-  const updateDiscount = async (p: Product) => {
+  /* ------------------------------------------------------------------ */
+  /*  QUICK DISCOUNT UPDATE (table tab)                                 */
+  /* ------------------------------------------------------------------ */
+  const updateDiscount = async (p: any) => {
     if (!token) return;
     setSavingId(p.id);
-    const final = p.price! - (p.price! * (p.discount || 0)) / 100;
+    const final = Math.round(p.price * (1 - (p.discount ?? 0) / 100) * 100) / 100;
     try {
       await fetch(`${API_BASE}${p.id}/`, {
         method: "PATCH",
@@ -293,7 +345,7 @@ const ProductAdminPage: React.FC = () => {
         body: JSON.stringify({ discount: p.discount, final_price: final })
       });
       setSnack({ open: true, msg: "Discount updated", sev: "success" });
-      fetchData();
+      fetchAll();
     } catch {
       setSnack({ open: true, msg: "Update failed", sev: "error" });
     } finally {
@@ -301,12 +353,33 @@ const ProductAdminPage: React.FC = () => {
     }
   };
 
+  /* ------------------------------------------------------------------ */
+  /*  FILTERED LISTS                                                    */
+  /* ------------------------------------------------------------------ */
   const filtered = categoryFilter === "all"
     ? products
-    : products.filter(p => p.categories?.some(c => c.id === categoryFilter));
-
+    : products.filter(p => p.categories?.some((c: any) => c.id === categoryFilter));
   const discounted = products.filter(p => p.discount && p.discount > 0);
 
+  /* ------------------------------------------------------------------ */
+  /*  VARIANT HELPERS                                                   */
+  /* ------------------------------------------------------------------ */
+  const addVariant = () => {
+    setVariants(prev => [...prev, {
+      sku: "", color: "", ram: "", storage: "", processor: "", size: "",
+      price: "", compare_at_price: "", stock: ""
+    }]);
+  };
+  const updateVariant = (idx: number, field: string, value: any) => {
+    setVariants(prev => prev.map((v, i) => i === idx ? { ...v, [field]: value } : v));
+  };
+  const removeVariant = (idx: number) => {
+    setVariants(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  /* ------------------------------------------------------------------ */
+  /*  RENDER                                                            */
+  /* ------------------------------------------------------------------ */
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#f8f9fa", p: { xs: 2, md: 4 } }}>
       {/* TABS */}
@@ -331,117 +404,135 @@ const ProductAdminPage: React.FC = () => {
         <Tab label="Discounted" />
       </Tabs>
 
-      {/* === FORM === */}
+      {/* ==================== FORM TAB ==================== */}
       {tab === 0 && (
         <StyledPaper elevation={0}>
           <Box sx={{ p: { xs: 3, md: 5 } }}>
             <Typography variant="h5" sx={{ mb: 4, fontWeight: 700, color: "#222" }}>
               {editId ? "Edit Product" : "Add New Product"}
             </Typography>
-
             <Stack spacing={4}>
-              <TextField
-                label="Title *"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                fullWidth
-                variant="outlined"
-              />
-
-              <TextField
-                label="Description"
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                multiline
-                rows={4}
-                fullWidth
-                variant="outlined"
-                
-              />
-
+              {/* BASIC FIELDS */}
+              <TextField label="Title *" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+              <TextField label="Description" value={description} onChange={e => setDescription(e.target.value)} multiline rows={4} fullWidth />
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <TextField
-                  label="Price *"
-                  type="number"
-                  value={price}
-                  onChange={e => setPrice(Number(e.target.value) || "")}
-                  
-                />
-                <TextField
-                  label="Discount %"
-                  type="number"
-                  value={discount}
-                  onChange={e => setDiscount(Number(e.target.value) || 0)}
-                  
-                />
-                <TextField
-                  label="Final Price"
-                  value={finalPrice}
-                  disabled
-                
-                />
+                <TextField label="Price *" type="number" value={price} onChange={e => setPrice(Number(e.target.value) || "")} />
+                <TextField label="Discount %" type="number" value={discount} onChange={e => setDiscount(Number(e.target.value) || 0)} />
+                <TextField label="Final Price" value={finalPrice} disabled />
               </Stack>
+              <TextField label="Stock" type="number" value={stock} onChange={e => setStock(Number(e.target.value) || "")} fullWidth />
 
-              <TextField
-                label="Stock"
-                type="number"
-                value={stock}
-                onChange={e => setStock(Number(e.target.value) || "")}
-                fullWidth
-                
-              />
-
+              {/* CATEGORIES */}
               <FormControl fullWidth>
                 <InputLabel>Categories</InputLabel>
-                <Select
-                  multiple
-                  value={selectedCats}
+                <Select multiple value={selectedCats}
                   onChange={e => setSelectedCats(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
                   renderValue={sel => (
                     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                       {(sel as string[]).map(v => {
-                        const cat = categories.find(c => String(c.id) === v);
+                        const cat = categories.find(c => c.id.toString() === v);
                         return <Chip key={v} label={cat?.name} size="small" sx={{ bgcolor: "#DC1A8A", color: "#fff" }} />;
                       })}
                     </Box>
                   )}
-                
                 >
                   {categories.map(c => (
-                    <MenuItem key={c.id} value={String(c.id)}>
-                      <Checkbox checked={selectedCats.includes(String(c.id))} />
+                    <MenuItem key={c.id} value={c.id.toString()}>
+                      <Checkbox checked={selectedCats.includes(c.id.toString())} />
                       {c.name}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
 
+              {/* BRAND */}
               <FormControl fullWidth>
                 <InputLabel>Brand *</InputLabel>
-                <Select
-                  value={brandId}
-                  onChange={e => setBrandId(e.target.value)}
-                  
-                >
-                  <MenuItem value="">None</MenuItem>
+                <Select value={brandId} onChange={e => setBrandId(e.target.value)}>
+                  <MenuItem value="">—</MenuItem>
                   {brands.map(b => (
-                    <MenuItem key={b.id} value={String(b.id)}>{b.name}</MenuItem>
+                    <MenuItem key={b.id} value={b.id.toString()}>{b.name}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
 
-              <Stack direction="row" spacing={3}>
-                <FormControlLabel
-                  control={<Checkbox checked={isActive} onChange={e => setIsActive(e.target.checked)} />}
-                  label="Active"
-                />
-                <FormControlLabel
-                  control={<Checkbox checked={isFeatured} onChange={e => setIsFeatured(e.target.checked)} />}
-                  label="Featured"
-                />
-              </Stack>
+              {/* GLOBAL OPTIONS */}
+              <FormControl fullWidth>
+                <InputLabel>RAM Options</InputLabel>
+                <Select multiple value={selectedRam}
+                  onChange={e => setSelectedRam(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
+                  renderValue={sel => (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      {(sel as string[]).map(v => {
+                        const o = options.find(o => o.id.toString() === v);
+                        return <Chip key={v} label={o?.value} size="small" sx={{ bgcolor: "#DC1A8A", color: "#fff" }} />;
+                      })}
+                    </Box>
+                  )}
+                >
+                  {options.filter(o => o.type === "RAM").map(o => (
+                    <MenuItem key={o.id} value={o.id.toString()}>
+                      <Checkbox checked={selectedRam.includes(o.id.toString())} />
+                      {o.value}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-              {/* Cover Image */}
+              <FormControl fullWidth>
+                <InputLabel>Storage Options</InputLabel>
+                <Select multiple value={selectedStorage}
+                  onChange={e => setSelectedStorage(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
+                  renderValue={sel => (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      {(sel as string[]).map(v => {
+                        const o = options.find(o => o.id.toString() === v);
+                        return <Chip key={v} label={o?.value} size="small" sx={{ bgcolor: "#DC1A8A", color: "#fff" }} />;
+                      })}
+                    </Box>
+                  )}
+                >
+                  {options.filter(o => o.type === "STORAGE").map(o => (
+                    <MenuItem key={o.id} value={o.id.toString()}>
+                      <Checkbox checked={selectedStorage.includes(o.id.toString())} />
+                      {o.value}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl fullWidth>
+                <InputLabel>Colors</InputLabel>
+                <Select multiple value={selectedColors}
+                  onChange={e => setSelectedColors(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
+                  renderValue={sel => (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                      {(sel as string[]).map(v => {
+                        const o = options.find(o => o.id.toString() === v);
+                        return <Chip key={v} label={o?.value} size="small" sx={{ bgcolor: "#DC1A8A", color: "#fff" }} />;
+                      })}
+                    </Box>
+                  )}
+                >
+                  {options.filter(o => o.type === "COLOR").map(o => (
+                    <MenuItem key={o.id} value={o.id.toString()}>
+                      <Checkbox checked={selectedColors.includes(o.id.toString())} />
+                      {o.value}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              {/* TAGS (free-text) */}
+              <TextField
+                label="Tags (comma separated)"
+                value={tagNames.join(", ")}
+                onChange={e => setTagNames(e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                fullWidth
+                helperText="Separate tags with commas"
+              />
+
+              {/* COVER IMAGE */}
               <Box>
                 <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>Cover Image</Typography>
                 <ImageUpload>
@@ -458,7 +549,7 @@ const ProductAdminPage: React.FC = () => {
                 )}
               </Box>
 
-              {/* Gallery */}
+              {/* GALLERY */}
               <Box>
                 <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>Gallery</Typography>
                 <ImageUpload>
@@ -470,14 +561,46 @@ const ProductAdminPage: React.FC = () => {
                 </ImageUpload>
                 <GalleryPreview>
                   {galleryPreviews.map((src, i) => (
-                    <img key={i} src={src} alt="" />
+                    <Box key={i} sx={{ position: "relative" }}>
+                      <img src={src} alt="" />
+                      <IconButton size="small" sx={{ position: "absolute", top: -8, right: -8, bgcolor: "rgba(0,0,0,0.5)" }} onClick={() => removeGallery(i)}>
+                        <CloseIcon fontSize="small" sx={{ color: "#fff" }} />
+                      </IconButton>
+                    </Box>
                   ))}
                 </GalleryPreview>
               </Box>
 
+              {/* VARIANTS */}
+              <Box>
+                <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>Variants</Typography>
+                <Button variant="outlined" size="small" onClick={addVariant} sx={{ mb: 2 }}>Add Variant</Button>
+                {variants.map((v, idx) => (
+                  <Stack key={idx} direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <TextField size="small" label="SKU" value={v.sku} onChange={e => updateVariant(idx, "sku", e.target.value)} />
+                    <TextField size="small" label="Color" value={v.color} onChange={e => updateVariant(idx, "color", e.target.value)} />
+                    <TextField size="small" label="RAM" value={v.ram} onChange={e => updateVariant(idx, "ram", e.target.value)} />
+                    <TextField size="small" label="Storage" value={v.storage} onChange={e => updateVariant(idx, "storage", e.target.value)} />
+                    <TextField size="small" label="Processor" value={v.processor} onChange={e => updateVariant(idx, "processor", e.target.value)} />
+                    <TextField size="small" label="Size" value={v.size} onChange={e => updateVariant(idx, "size", e.target.value)} />
+                    <TextField size="small" label="Price" type="number" value={v.price} onChange={e => updateVariant(idx, "price", Number(e.target.value) || "")} />
+                    <TextField size="small" label="Compare At" type="number" value={v.compare_at_price} onChange={e => updateVariant(idx, "compare_at_price", Number(e.target.value) || "")} />
+                    <TextField size="small" label="Stock" type="number" value={v.stock} onChange={e => updateVariant(idx, "stock", Number(e.target.value) || "")} />
+                    <IconButton size="small" color="error" onClick={() => removeVariant(idx)}><CloseIcon /></IconButton>
+                  </Stack>
+                ))}
+              </Box>
+
+              {/* FLAGS */}
+              <Stack direction="row" spacing={3}>
+                <FormControlLabel control={<Checkbox checked={isActive} onChange={e => setIsActive(e.target.checked)} />} label="Active" />
+                <FormControlLabel control={<Checkbox checked={isFeatured} onChange={e => setIsFeatured(e.target.checked)} />} label="Featured" />
+              </Stack>
+
+              {/* SUBMIT */}
               <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
                 <StyledButton className="primary" onClick={saveProduct} disabled={saving}>
-                  {saving ? "Saving..." : editId ? "Update Product" : "Add Product"}
+                  {saving ? "Saving…" : editId ? "Update Product" : "Add Product"}
                 </StyledButton>
               </Box>
             </Stack>
@@ -485,7 +608,7 @@ const ProductAdminPage: React.FC = () => {
         </StyledPaper>
       )}
 
-      {/* === ALL PRODUCTS === */}
+      {/* ==================== ALL PRODUCTS TAB ==================== */}
       {tab === 1 && (
         <Box>
           <Tabs
@@ -529,7 +652,7 @@ const ProductAdminPage: React.FC = () => {
                   <Box onClick={() => startEdit(p)} sx={{ height: 200, cursor: "pointer", overflow: "hidden" }}>
                     <CardMedia
                       component="img"
-                      image={getProductImageSrc(p)}
+                      image={getCoverSrc(p)}
                       sx={{ width: "100%", height: "100%", objectFit: "cover", transition: "0.3s", "&:hover": { transform: "scale(1.05)" } }}
                     />
                   </Box>
@@ -551,12 +674,8 @@ const ProductAdminPage: React.FC = () => {
                       </Typography>
                     </Box>
                     <Box sx={{ display: "flex", gap: 1 }}>
-                      <StyledButton size="small" startIcon={<Edit />} onClick={() => startEdit(p)}>
-                        Edit
-                      </StyledButton>
-                      <StyledButton size="small" className="danger" startIcon={<Delete />} onClick={() => confirmDel(p.id)}>
-                        Delete
-                      </StyledButton>
+                      <StyledButton size="small" startIcon={<Edit />} onClick={() => startEdit(p)}>Edit</StyledButton>
+                      <StyledButton size="small" className="danger" startIcon={<Delete />} onClick={() => confirmDel(p.id)}>Delete</StyledButton>
                     </Box>
                   </CardContent>
                 </StyledCard>
@@ -566,14 +685,13 @@ const ProductAdminPage: React.FC = () => {
         </Box>
       )}
 
-      {/* === DISCOUNTED TABLE === */}
+      {/* ==================== DISCOUNTED TABLE TAB ==================== */}
       {tab === 2 && (
         <StyledPaper elevation={0}>
           <Box sx={{ p: { xs: 3, md: 4 } }}>
             <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: "#222" }}>
               Discounted Products
             </Typography>
-
             {loading ? (
               <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
                 <CircularProgress size={50} sx={{ color: "#DC1A8A" }} />
@@ -595,9 +713,9 @@ const ProductAdminPage: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {discounted.map(p => (
-                    <TableRow key={p.id} hover sx={{ "&:last-child td, &:last-child th": { border: 0 } }}>
+                    <TableRow key={p.id} hover>
                       <TableCell>
-                        <img src={getProductImageSrc(p)} width={60} height={60} style={{ objectFit: "cover", border: "2px solid #eee" }} />
+                        <img src={getCoverSrc(p)} width={60} height={60} style={{ objectFit: "cover", border: "2px solid #eee" }} />
                       </TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>{p.title}</TableCell>
                       <TableCell>
@@ -611,7 +729,6 @@ const ProductAdminPage: React.FC = () => {
                           size="small"
                           value={p.discount ?? 0}
                           onChange={e => setProducts(prev => prev.map(x => x.id === p.id ? { ...x, discount: Number(e.target.value) } : x))}
-                          
                         />
                       </TableCell>
                       <TableCell sx={{ fontWeight: 700, color: "#DC1A8A" }}>
@@ -625,7 +742,7 @@ const ProductAdminPage: React.FC = () => {
                           onClick={() => updateDiscount(p)}
                           disabled={savingId === p.id}
                         >
-                          {savingId === p.id ? "..." : "Update"}
+                          {savingId === p.id ? "…" : "Update"}
                         </StyledButton>
                       </TableCell>
                     </TableRow>
@@ -637,21 +754,21 @@ const ProductAdminPage: React.FC = () => {
         </StyledPaper>
       )}
 
-      {/* DELETE DIALOG */}
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} >
+      {/* ==================== DELETE DIALOG ==================== */}
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle sx={{ fontWeight: 700 }}>Confirm Delete</DialogTitle>
         <DialogContent>
           <Typography>This action cannot be undone. Are you sure?</Typography>
         </DialogContent>
         <DialogActions sx={{ p: 3, gap: 1 }}>
-          <Button onClick={() => setConfirmOpen(false)} >Cancel</Button>
+          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
           <StyledButton className="danger" onClick={doDelete} variant="contained">
             Delete
           </StyledButton>
         </DialogActions>
       </Dialog>
 
-      {/* SNACKBAR */}
+      {/* ==================== SNACKBAR ==================== */}
       <Snackbar
         open={snack.open}
         autoHideDuration={3000}
@@ -663,7 +780,6 @@ const ProductAdminPage: React.FC = () => {
           severity={snack.sev}
           sx={{
             width: "100%",
-           
             fontWeight: 600,
             boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
             ...(snack.sev === "success" && { bgcolor: "#4caf50", color: "#fff" }),

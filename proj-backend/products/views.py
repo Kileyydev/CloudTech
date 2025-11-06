@@ -8,15 +8,25 @@ from django.utils.decorators import method_decorator
 from django.core.cache import cache
 from django.db.models import Prefetch
 
-from .models import Product, ProductVariant, Category, Brand, ProductImage
+from .models import (
+    Product, ProductVariant, Category, Brand, ProductImage, GlobalOption
+)
 from .serializers import (
     ProductListSerializer,
     ProductCreateUpdateSerializer,
     ProductVariantSerializer,
     CategorySerializer,
     BrandSerializer,
-    ProductImageSerializer
+    ProductImageSerializer,
+    GlobalOptionSerializer
 )
+
+# ===================================================================
+# GLOBAL OPTION VIEWSET
+# ===================================================================
+class GlobalOptionViewSet(viewsets.ModelViewSet):
+    queryset = GlobalOption.objects.all()
+    serializer_class = GlobalOptionSerializer
 
 
 # ===================================================================
@@ -43,36 +53,47 @@ class ProductViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         return ProductListSerializer if self.action in ['list', 'retrieve', 'featured'] else ProductCreateUpdateSerializer
 
+    # ===================================================================
+    # IMPROVED QUERYSET WITH SMART CACHING + FILTERING
+    # ===================================================================
     def get_queryset(self):
-        # Build cache key
         category_slug = self.request.query_params.get('category')
-        is_featured = self.request.query_params.get('is_featured') == 'true'
-        cache_key = f"products_{category_slug or 'all'}_featured_{is_featured}"
+        is_featured = self.request.query_params.get('is_featured')
+        brand_id = self.request.query_params.get('brand')
+        cache_key = f"products_{category_slug or 'all'}_{brand_id or 'all'}_{is_featured or 'all'}"
 
-        # Try cache
+        # Try from cache
         cached_qs = cache.get(cache_key)
         if cached_qs is not None:
             return cached_qs
 
-        # Base queryset
-        queryset = Product.objects.filter(is_active=True).select_related('brand')
-
-        # Apply filters
-        if category_slug:
-            queryset = queryset.filter(categories__slug=category_slug)
-        if is_featured:
-            queryset = queryset.filter(is_featured=True)
-
-        # OPTIMIZED PREFETCH: Use real relation names
-        queryset = queryset.prefetch_related(
-            'tags',
-            'categories',
-            Prefetch('productimage_set', queryset=ProductImage.objects.filter(is_primary=True), to_attr='primary_image'),
-            Prefetch('productimage_set', queryset=ProductImage.objects.all(), to_attr='gallery_images')
+        queryset = (
+            Product.objects.filter(is_active=True)
+            .select_related('brand')
+            .prefetch_related(
+                'tags',
+                'categories',
+                Prefetch(
+                    'productimage_set',
+                    queryset=ProductImage.objects.filter(is_primary=True),
+                    to_attr='primary_image'
+                ),
+                Prefetch(
+                    'productimage_set',
+                    queryset=ProductImage.objects.all(),
+                    to_attr='gallery_images'
+                )
+            )
         )
 
-        # Cache for 5 minutes
-        cache.set(cache_key, queryset, timeout=60 * 5)
+        if category_slug:
+            queryset = queryset.filter(categories__slug=category_slug)
+        if is_featured is not None:
+            queryset = queryset.filter(is_featured=(is_featured.lower() == 'true'))
+        if brand_id:
+            queryset = queryset.filter(brand_id=brand_id)
+
+        cache.set(cache_key, queryset, timeout=60 * 5)  # Cache for 5 min
         return queryset
 
     def get_serializer_context(self):
@@ -84,9 +105,9 @@ class ProductViewSet(viewsets.ModelViewSet):
     # CUSTOM ACTION: /api/products/featured/
     # ===================================================================
     @action(detail=False, methods=['get'], url_path='featured', url_name='featured')
-    @method_decorator(cache_page(60 * 5))  # Cache featured list
+    @method_decorator(cache_page(60 * 5))
     def featured(self, request):
-        queryset = self.get_queryset().filter(is_featured=True)[:12]  # Limit to 12
+        queryset = self.get_queryset().filter(is_featured=True)[:12]
         serializer = ProductListSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
 
@@ -126,7 +147,7 @@ class BrandViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # ===================================================================
-# PRODUCT IMAGE VIEWSET (Optional: for direct management)
+# PRODUCT IMAGE VIEWSET
 # ===================================================================
 class ProductImageViewSet(viewsets.ModelViewSet):
     queryset = ProductImage.objects.select_related('product').all()

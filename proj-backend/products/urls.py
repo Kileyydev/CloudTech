@@ -6,7 +6,8 @@ from .views import (
     ProductVariantViewSet,
     CategoryViewSet,
     ProductImageViewSet,
-    BrandViewSet
+    BrandViewSet,
+    GlobalOptionViewSet,  # 👈 add this
 )
 
 router = DefaultRouter()
@@ -17,6 +18,7 @@ router.register(r'variants', ProductVariantViewSet, basename='variant')
 router.register(r'categories', CategoryViewSet, basename='category')
 router.register(r'images', ProductImageViewSet, basename='image')
 router.register(r'brands', BrandViewSet, basename='brand')
+router.register(r'options', GlobalOptionViewSet, basename='option')  # 👈 new addition
 
 urlpatterns = [
     path('', include(router.urls)),
