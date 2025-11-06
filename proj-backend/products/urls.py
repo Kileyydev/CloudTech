@@ -14,7 +14,6 @@ router = DefaultRouter()
 router.register(r'products', ProductViewSet, basename='product')
 router.register(r'variants', ProductVariantViewSet, basename='variant')
 router.register(r'categories', CategoryViewSet, basename='category')
-
 router.register(r'images', ProductImageViewSet, basename='image')
 
 urlpatterns = [
