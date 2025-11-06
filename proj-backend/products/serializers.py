@@ -7,6 +7,7 @@ from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
+# === BASIC SERIALIZERS ===
 class ColorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Color
@@ -37,32 +38,7 @@ class ProductImageSerializer(serializers.ModelSerializer):
     def get_image(self, obj):
         return obj.image.url if obj.image else None
 
-class ProductVariantSerializer(serializers.ModelSerializer):
-    color = ColorSerializer(read_only=True)
-    color_id = serializers.PrimaryKeyRelatedField(queryset=Color.objects.all(), source='color', write_only=True, required=False, allow_null=True)
-
-    class Meta:
-        model = ProductVariant
-        fields = ['id', 'sku', 'color', 'color_id', 'storage', 'ram', 'condition', 'price', 'stock', 'is_active']
-
-class ProductListSerializer(serializers.ModelSerializer):
-    brand = BrandSerializer(read_only=True)
-    categories = CategorySerializer(many=True, read_only=True)
-    color = ColorSerializer(read_only=True)
-    images = ProductImageSerializer(many=True, read_only=True, source='images')
-    cover_image = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Product
-        fields = [
-            'id', 'title', 'slug', 'description', 'brand', 'categories',
-            'cover_image', 'images', 'price', 'stock', 'discount', 'final_price',
-            'storage_gb', 'ram_gb', 'color', 'condition', 'is_active', 'is_featured'
-        ]
-
-    def get_cover_image(self, obj):
-        return obj.cover_image.url if obj.cover_image else None
-
+# === PRODUCT CREATE / UPDATE SERIALIZER ===
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     brand_id = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all(), source='brand', write_only=True, required=False, allow_null=True)
     category_ids = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), many=True, write_only=True, required=False)
@@ -70,7 +46,9 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     tags = serializers.PrimaryKeyRelatedField(queryset=Tag.objects.all(), many=True, write_only=True, required=False)
 
     cover_image = serializers.FileField(write_only=True, required=False, allow_null=True)
-    gallery = serializers.ListField(child=serializers.FileField(), write_only=True, required=False, allow_empty=True)
+    gallery = serializers.ListField(
+        child=serializers.FileField(), write_only=True, required=False, allow_empty=True
+    )
 
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
@@ -87,9 +65,6 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-        """
-        Validate discount and price
-        """
         discount = data.get('discount')
         price = data.get('price')
         if discount and price and discount >= Decimal('100'):
@@ -97,51 +72,44 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        logger.info(f"=== Creating product with data: {validated_data} ===")
+        logger.info("=== PRODUCT CREATE STARTED ===")
         category_ids = validated_data.pop('category_ids', [])
         tags = validated_data.pop('tags', [])
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery', [])
 
         try:
-            # Create product
             product = Product.objects.create(**validated_data)
             product.categories.set(category_ids)
             product.tags.set(tags)
 
-            # Upload cover image
+            # === UPLOAD COVER ===
             if cover_file:
-                try:
-                    upload_result = upload(cover_file, folder="products/cover")
-                    product.cover_image = upload_result['public_id']
-                    logger.info(f"Cover uploaded: {upload_result['public_id']}")
-                except Exception as e:
-                    logger.error(f"Cover upload failed: {e}")
-                    raise serializers.ValidationError({"cover_image": "Failed to upload cover image"})
+                upload_result = upload(cover_file, folder="products/cover")
+                product.cover_image = upload_result['public_id']
+                logger.info(f"Cover uploaded: {upload_result['public_id']}")
 
-            # Upload gallery images
-            for img_file in gallery_files:
-                try:
-                    upload_result = upload(img_file, folder="products/gallery")
-                    ProductImage.objects.create(
-                        product=product,
-                        image=upload_result['public_id'],
-                        is_primary=(not product.cover_image and not gallery_files.index(img_file))
-                    )
-                    logger.info(f"Gallery image uploaded: {upload_result['public_id']}")
-                except Exception as e:
-                    logger.error(f"Gallery upload failed: {e}")
-                    continue  # Skip failed images
+            # === UPLOAD GALLERY ===
+            for i, img_file in enumerate(gallery_files):
+                upload_result = upload(img_file, folder="products/gallery")
+                is_primary = (not product.cover_image and i == 0)
+                ProductImage.objects.create(
+                    product=product,
+                    image=upload_result['public_id'],
+                    is_primary=is_primary
+                )
+                logger.info(f"Gallery image {i+1} uploaded: {upload_result['public_id']}")
 
             product.save()
+            logger.info(f"PRODUCT CREATED: {product.id}")
             return product
 
         except Exception as e:
-            logger.error(f"Product create failed: {e}", exc_info=True)
+            logger.error(f"PRODUCT CREATE FAILED: {e}", exc_info=True)
             raise serializers.ValidationError({"error": "Failed to create product", "details": str(e)})
 
     def update(self, instance, validated_data):
-        logger.info(f"=== Updating product {instance.id} with data: {validated_data} ===")
+        logger.info(f"=== PRODUCT UPDATE STARTED: {instance.id} ===")
         category_ids = validated_data.pop('category_ids', None)
         tags = validated_data.pop('tags', None)
         cover_file = validated_data.pop('cover_image', None)
@@ -157,32 +125,26 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                 instance.tags.set(tags)
 
             if cover_file is not None:
-                try:
-                    upload_result = upload(cover_file, folder="products/cover")
-                    instance.cover_image = upload_result['public_id']
-                    logger.info(f"Cover updated: {upload_result['public_id']}")
-                except Exception as e:
-                    logger.error(f"Cover update failed: {e}")
-                    raise serializers.ValidationError({"cover_image": "Failed to upload cover image"})
+                upload_result = upload(cover_file, folder="products/cover")
+                instance.cover_image = upload_result['public_id']
+                logger.info(f"Cover updated: {upload_result['public_id']}")
 
             if gallery_files is not None:
                 instance.images.all().delete()
-                for img_file in gallery_files:
-                    try:
-                        upload_result = upload(img_file, folder="products/gallery")
-                        ProductImage.objects.create(
-                            product=instance,
-                            image=upload_result['public_id'],
-                            is_primary=(not instance.cover_image and not gallery_files.index(img_file))
-                        )
-                        logger.info(f"Gallery image updated: {upload_result['public_id']}")
-                    except Exception as e:
-                        logger.error(f"Gallery update failed: {e}")
-                        continue
+                for i, img_file in enumerate(gallery_files):
+                    upload_result = upload(img_file, folder="products/gallery")
+                    is_primary = (not instance.cover_image and i == 0)
+                    ProductImage.objects.create(
+                        product=instance,
+                        image=upload_result['public_id'],
+                        is_primary=is_primary
+                    )
+                    logger.info(f"Gallery image {i+1} updated: {upload_result['public_id']}")
 
             instance.save()
+            logger.info(f"PRODUCT UPDATED: {instance.id}")
             return instance
 
         except Exception as e:
-            logger.error(f"Product update failed: {e}", exc_info=True)
+            logger.error(f"PRODUCT UPDATE FAILED: {e}", exc_info=True)
             raise serializers.ValidationError({"error": "Failed to update product", "details": str(e)})

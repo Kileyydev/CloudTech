@@ -1,6 +1,5 @@
 # products/views.py
-from rest_framework import viewsets, permissions, filters
-from rest_framework import status
+from rest_framework import viewsets, permissions, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -8,7 +7,6 @@ from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from django.core.cache import cache
 from django.db.models import Prefetch
-from django.shortcuts import get_object_or_404
 import logging
 
 from .models import Product, ProductVariant, Category, Brand, ProductImage, Color
@@ -29,9 +27,7 @@ logger = logging.getLogger(__name__)
 # ===================================================================
 class IsAdminOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        return bool(request.user and request.user.is_staff)
+        return request.method in permissions.SAFE_METHODS or (request.user and request.user.is_staff)
 
 # ===================================================================
 # COLOR VIEWSET — PUBLIC READ
@@ -44,7 +40,27 @@ class ColorViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ['name']
 
 # ===================================================================
-# PRODUCT VIEWSET — FULLY OPTIMIZED
+# CATEGORY VIEWSET — PUBLIC READ
+# ===================================================================
+class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Category.objects.all().order_by('name')
+    serializer_class = CategorySerializer
+    permission_classes = [permissions.AllowAny]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'slug']
+
+# ===================================================================
+# BRAND VIEWSET — PUBLIC READ
+# ===================================================================
+class BrandViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Brand.objects.all().order_by('name')
+    serializer_class = BrandSerializer
+    permission_classes = [permissions.AllowAny]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['name', 'slug']
+
+# ===================================================================
+# PRODUCT VIEWSET — FULLY OPTIMIZED & SAFE
 # ===================================================================
 class ProductViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrReadOnly]
@@ -58,14 +74,13 @@ class ProductViewSet(viewsets.ModelViewSet):
     ordering = ['-created_at']
 
     def get_serializer_class(self):
-        if self.action in ['list', 'retrieve', 'featured']:
-            return ProductListSerializer
-        return ProductCreateUpdateSerializer
+        return ProductListSerializer if self.action in ['list', 'retrieve', 'featured'] else ProductCreateUpdateSerializer
 
     def get_queryset(self):
+        # Dynamic cache key
         category_slug = self.request.query_params.get('category')
         is_featured = self.request.query_params.get('is_featured') == 'true'
-        cache_key = f"products_v3_{category_slug or 'all'}_featured_{is_featured}"
+        cache_key = f"products_v4_{category_slug or 'all'}_featured_{is_featured}"
 
         cached_qs = cache.get(cache_key)
         if cached_qs is not None:
@@ -84,7 +99,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             Prefetch('images', queryset=ProductImage.objects.all(), to_attr='gallery_images')
         )
 
-        cache.set(cache_key, queryset, timeout=60 * 5)
+        cache.set(cache_key, queryset, timeout=60 * 5)  # 5 mins
         return queryset
 
     def get_serializer_context(self):
@@ -93,9 +108,9 @@ class ProductViewSet(viewsets.ModelViewSet):
         return context
 
     def create(self, request, *args, **kwargs):
-        logger.info(f"=== PRODUCT CREATE STARTED ===\nDATA: {request.data}\nFILES: {request.FILES}")
+        logger.info(f"=== PRODUCT CREATE STARTED ===\nUSER: {request.user}\nDATA: {request.data}\nFILES: {list(request.FILES.keys())}")
         try:
-            # Handle category_ids[] from frontend
+            # Fix frontend sending category_ids[] or category_ids
             data = request.data.copy()
             category_ids = request.data.getlist('category_ids[]') or request.data.getlist('category_ids')
             if category_ids:
@@ -105,7 +120,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             serializer.is_valid(raise_exception=True)
             product = serializer.save()
             headers = self.get_success_headers(serializer.data)
-            logger.info(f"PRODUCT CREATED: {product.id}")
+            logger.info(f"PRODUCT CREATED SUCCESSFULLY: {product.id}")
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
         except Exception as e:
@@ -136,26 +151,6 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
     search_fields = ['sku', 'product__title']
     ordering_fields = ['price', 'stock', 'created_at']
     ordering = ['-created_at']
-
-# ===================================================================
-# CATEGORY VIEWSET
-# ===================================================================
-class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Category.objects.all().order_by('name')
-    serializer_class = CategorySerializer
-    permission_classes = [permissions.AllowAny]
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['name', 'slug']
-
-# ===================================================================
-# BRAND VIEWSET
-# ===================================================================
-class BrandViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Brand.objects.all().order_by('name')
-    serializer_class = BrandSerializer
-    permission_classes = [permissions.AllowAny]
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['name', 'slug']
 
 # ===================================================================
 # PRODUCT IMAGE VIEWSET
