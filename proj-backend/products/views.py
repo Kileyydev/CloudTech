@@ -74,12 +74,12 @@ class ProductViewSet(viewsets.ModelViewSet):
                 'tags',
                 'categories',
                 Prefetch(
-                    'productimage_set',
+                    'images',
                     queryset=ProductImage.objects.filter(is_primary=True),
                     to_attr='primary_image'
                 ),
                 Prefetch(
-                    'productimage_set',
+                    'images',
                     queryset=ProductImage.objects.all(),
                     to_attr='gallery_images'
                 )
