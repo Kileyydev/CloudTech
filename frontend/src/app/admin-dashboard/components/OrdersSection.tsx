@@ -15,7 +15,7 @@ import MainNavBar from '../../components/MainNavBar';
 
 const API_BASE = process.env.NODE_ENV === 'development'
   ? 'http://localhost:8000/api'
-  : 'https://cloudtech-c4ft.onrender.com/api';
+  : 'https://api.cloudtechstore.net/api';
 
 interface OrderItem {
   product_id: string;
@@ -56,7 +56,7 @@ export default function AdminOrdersPage() {
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
-  // Fetch all orders (admin view)
+  // ✅ Correct endpoint: /api/purchases/
   const fetchOrders = async () => {
     try {
       setLoading(true);
@@ -80,7 +80,7 @@ export default function AdminOrdersPage() {
     fetchOrders();
   }, []);
 
-  // Update order status
+  // ✅ PATCH order status via /api/purchases/:id/
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
       setUpdating(orderId);
@@ -122,6 +122,9 @@ export default function AdminOrdersPage() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f9f9f9' }}>
+      <TickerBar />
+      <TopNavBar />
+      <MainNavBar />
 
       <Container maxWidth="lg" sx={{ py: 6 }}>
         <Typography variant="h4" sx={{ mb: 4, fontWeight: 700, color: '#e91e63' }}>

@@ -7,9 +7,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 const SLIDES = [
-  '/images/headphone1.jpg',
   '/images/laptop.jpg',
-  '/images/ecosystem1.jpg',
+  '/images/samsung2.jpg',
+  '/images/17.jpg',
 ];
 
 const HeroWrapper = styled(Box)({

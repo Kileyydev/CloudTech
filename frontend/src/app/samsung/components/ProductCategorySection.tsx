@@ -1,3 +1,4 @@
+// src/app/samsung/components/ProductCategorySection.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -25,14 +26,15 @@ type ProductT = {
   price: number;
   description?: string;
   cover_image?: string | null;
-  images?: string[];
+  images?: (string | null)[];
   stock: number;
   discount?: number;
 };
 
 const CACHE_KEY = 'samsung_products_cache';
-const CACHE_TIME = 15 * 60 * 1000; // 15 minutes
+const CACHE_TIME = 15 * 60 * 1000;
 const API_BASE = 'https://cloudtech-c4ft.onrender.com/api/products/?category=samsung';
+const MEDIA_BASE = 'https://cloudtech-c4ft.onrender.com';
 
 const SamsungProductsSection = () => {
   const theme = useTheme();
@@ -50,7 +52,7 @@ const SamsungProductsSection = () => {
   });
   const mounted = useRef(true);
 
-  // Load from cache first
+  // Load from cache
   useEffect(() => {
     const cached = sessionStorage.getItem(CACHE_KEY);
     if (cached) {
@@ -62,7 +64,7 @@ const SamsungProductsSection = () => {
     }
   }, []);
 
-  // Fetch and cache
+  // Fetch products
   useEffect(() => {
     mounted.current = true;
     const fetchProducts = async () => {
@@ -74,6 +76,7 @@ const SamsungProductsSection = () => {
 
         const indexes: Record<number, number> = {};
         list.forEach((p: ProductT) => (indexes[p.id] = 0));
+
         if (mounted.current) {
           setCurrentIndexes(indexes);
           setProducts(list);
@@ -98,10 +101,8 @@ const SamsungProductsSection = () => {
   // Load wishlist
   useEffect(() => {
     try {
-      const storedWishlist = localStorage.getItem('wishlist');
-      if (storedWishlist) {
-        setWishlist(new Set(JSON.parse(storedWishlist)));
-      }
+      const stored = localStorage.getItem('wishlist');
+      if (stored) setWishlist(new Set(JSON.parse(stored)));
     } catch (error) {
       console.error('Error loading wishlist:', error);
     }
@@ -154,7 +155,7 @@ const SamsungProductsSection = () => {
   const getCartItemCount = () => Object.values(cart).reduce((total, item) => total + (item.quantity || 0), 0);
 
   const renderSkeletonCard = (_: any, index: number) => (
-    <Card key={index} sx={{ width: 220, height: 360, flex: '0 0 220px', backgroundColor: '#fff', borderRadius: 0 }}>
+    <Card key={index} sx={{ width: 220, height: 360, flex: '0 0 220px', bgcolor: '#fff' }}>
       <Skeleton variant="rectangular" width="100%" height={180} />
       <CardContent sx={{ p: 2 }}>
         <Skeleton width="80%" height={24} sx={{ mb: 1 }} />
@@ -165,13 +166,18 @@ const SamsungProductsSection = () => {
   );
 
   const renderCard = (product: ProductT) => {
-    const images = [product.cover_image, ...(product.images || [])].filter(Boolean).slice(0, 3);
+    // Build safe image array
+    const rawImages = [product.cover_image, ...(product.images || [])].filter((img): img is string => typeof img === 'string' && img.trim() !== '');
+    const images = rawImages.length > 0 ? rawImages : ['/images/fallback.jpg'];
     const currentIndex = currentIndexes[product.id] || 0;
+    const currentImage = images[currentIndex] || '/images/fallback.jpg';
+
+    // Determine final image source
+    const imageSrc = currentImage.startsWith('http') || currentImage.startsWith('data:')
+      ? currentImage
+      : `${MEDIA_BASE}${currentImage.startsWith('/') ? '' : '/'}${currentImage}`;
+
     const cartItem = cart[product.id];
-    const imageSrc =
-      images[currentIndex]?.startsWith('http')
-        ? images[currentIndex]
-        : `https://cloudtech-c4ft.onrender.com${images[currentIndex]}` || '/images/fallback.jpg';
 
     return (
       <Card
@@ -182,13 +188,10 @@ const SamsungProductsSection = () => {
           flex: '0 0 220px',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-          borderRadius: 0,
+      
+          bgcolor: '#fff',
           overflow: 'hidden',
           position: 'relative',
-          backgroundColor: '#fff',
-          transition: 'transform 0.2s',
-          '&:hover': { transform: 'translateY(-4px)' },
         }}
       >
         {/* Wishlist */}
@@ -198,22 +201,21 @@ const SamsungProductsSection = () => {
             top: 8,
             right: 8,
             zIndex: 1,
-            backgroundColor: 'rgba(255,255,255,0.95)',
+            bgcolor: '#fff',
             width: 32,
             height: 32,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            borderRadius: '50%',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+           
           }}
           onClick={(e) => {
             e.stopPropagation();
             handleWishlistToggle(product.id);
           }}
         >
-          <Favorite sx={{ color: wishlist.has(product.id) ? '#e91e63' : '#888', fontSize: 18 }} />
+          <Favorite sx={{ color: wishlist.has(product.id) ? '#c2185b' : '#888', fontSize: 18 }} />
         </Box>
 
         {/* Product Image */}
@@ -221,18 +223,24 @@ const SamsungProductsSection = () => {
           sx={{ width: 220, height: 180, cursor: 'pointer', overflow: 'hidden' }}
           onClick={() => router.push(`/product/${product.id}`)}
         >
-          <CardMedia component="img" image={imageSrc} alt={product.title} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          {product.stock < 5 && (
+          <CardMedia
+            component="img"
+            image={imageSrc}
+            alt={product.title}
+            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+          {product.stock < 5 && product.stock > 0 && (
             <Box
               sx={{
                 position: 'absolute',
                 bottom: 8,
                 left: 8,
-                backgroundColor: 'rgba(0,0,0,0.75)',
+                bgcolor: 'rgba(0,0,0,0.8)',
                 color: '#fff',
-                padding: '4px 8px',
-                fontSize: '0.8rem',
-                fontWeight: 500,
+                px: 1,
+                py: 0.5,
+                fontSize: '0.75rem',
+                fontWeight: 600,
               }}
             >
               Only {product.stock} left!
@@ -243,13 +251,21 @@ const SamsungProductsSection = () => {
         {/* Card Content */}
         <CardContent sx={{ flexGrow: 1, p: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: 180 }}>
           <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#222', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <Typography
+              sx={{
+                fontWeight: 700,
+                color: '#000',
+                fontSize: '1rem',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
               {product.title}
             </Typography>
             <Typography
-              variant="body2"
               sx={{
-                color: '#666',
+                color: '#444',
                 fontSize: '0.85rem',
                 display: '-webkit-box',
                 WebkitLineClamp: 2,
@@ -261,15 +277,11 @@ const SamsungProductsSection = () => {
               {product.description || 'No description available'}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#222', fontSize: '1rem' }}>
+              <Typography sx={{ fontWeight: 800, color: '#000', fontSize: '1rem' }}>
                 KES {product.price.toLocaleString()}
               </Typography>
               {product.discount && (
-                <Typography
-                  variant="body2"
-                  color="error"
-                  sx={{ ml: 1, fontSize: '0.85rem', fontWeight: 500 }}
-                >
+                <Typography sx={{ ml: 1, fontSize: '0.8rem', fontWeight: 600, color: '#c2185b' }}>
                   ({product.discount}% off)
                 </Typography>
               )}
@@ -278,21 +290,48 @@ const SamsungProductsSection = () => {
 
           {cartItem ? (
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 1.5, gap: 1.5 }}>
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleDecreaseQuantity(product.id); }}
-                sx={{ color: '#e91e63', border: '1px solid #e91e63', '&:hover': { backgroundColor: 'rgba(233,30,99,0.1)' }, width: 32, height: 32 }}>
+              <IconButton
+                size="small"
+                onClick={(e) => { e.stopPropagation(); handleDecreaseQuantity(product.id); }}
+                sx={{ color: '#c2185b', width: 32, height: 32 }}
+              >
                 <Remove sx={{ fontSize: 16 }} />
               </IconButton>
-              <Typography sx={{ fontWeight: 600, fontSize: '1rem', minWidth: 24, textAlign: 'center' }}>{cartItem.quantity}</Typography>
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleAddToCart(product); }}
+              <Typography sx={{ fontWeight: 700, fontSize: '1rem', minWidth: 24, textAlign: 'center' }}>
+                {cartItem.quantity}
+              </Typography>
+              <IconButton
+                size="small"
+                onClick={(e) => { e.stopPropagation(); handleAddToCart(product); }}
                 disabled={cartItem.quantity >= product.stock}
-                sx={{ color: '#e91e63', border: '1px solid #e91e63', '&:hover': { backgroundColor: 'rgba(233,30,99,0.1)' }, '&[disabled]': { color: '#ccc', borderColor: '#ccc' }, width: 32, height: 32 }}>
+                sx={{
+                  color: '#c2185b',
+                  
+                  width: 32,
+                  height: 32,
+                  '&[disabled]': { color: '#ccc' },
+                }}
+              >
                 <Add sx={{ fontSize: 16 }} />
               </IconButton>
             </Box>
           ) : (
-            <Button variant="contained" startIcon={<ShoppingCart sx={{ fontSize: 16 }} />} fullWidth
-              sx={{ backgroundColor: '#e91e63', color: '#fff', textTransform: 'none', fontSize: '0.9rem', mt: 1.5, py: 0.75, borderRadius: 0, '&:hover': { backgroundColor: '#c2185b' }, '&:disabled': { backgroundColor: '#ccc' } }}
-              onClick={(e) => { e.stopPropagation(); handleAddToCart(product); }} disabled={product.stock === 0}>
+            <Button
+              fullWidth
+              startIcon={<ShoppingCart sx={{ fontSize: 16 }} />}
+              onClick={(e) => { e.stopPropagation(); handleAddToCart(product); }}
+              disabled={product.stock === 0}
+              sx={{
+                bgcolor: '#c2185b',
+                color: '#fff',
+                textTransform: 'none',
+                fontSize: '0.9rem',
+                mt: 1.5,
+                py: 0.75,
+              
+                '&:disabled': { bgcolor: '#e0e0e0', color: '#999' },
+              }}
+            >
               Add to Cart
             </Button>
           )}
@@ -302,14 +341,24 @@ const SamsungProductsSection = () => {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, backgroundColor: '#fff' }}>
+    <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, bgcolor: '#fff' }}>
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: '#222', fontSize: '1.5rem' }}>
-          Samsung Products
-        </Typography>
-        <Button variant="contained" startIcon={<ShoppingCart sx={{ fontSize: 16 }} />} onClick={handleViewCart}
-          sx={{ backgroundColor: '#e91e63', color: '#fff', textTransform: 'none', fontSize: '0.9rem', py: 0.75, px: 2, borderRadius: 0, '&:hover': { backgroundColor: '#c2185b' } }}
-          disabled={getCartItemCount() === 0}>
+
+        <Button
+          startIcon={<ShoppingCart sx={{ fontSize: 16 }} />}
+          onClick={handleViewCart}
+          disabled={getCartItemCount() === 0}
+          sx={{
+            bgcolor: '#c2185b',
+            color: '#fff',
+            textTransform: 'none',
+            fontSize: '0.9rem',
+            py: 0.75,
+            px: 2,
+         
+            '&:disabled': { bgcolor: '#e0e0e0', color: '#999' },
+          }}
+        >
           View Cart ({getCartItemCount()})
         </Button>
       </Box>
@@ -341,7 +390,12 @@ const SamsungProductsSection = () => {
           : products.filter((p) => p.stock > 0).map(renderCard)}
       </Box>
 
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={handleCloseSnackbar} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
         <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
         </Alert>
