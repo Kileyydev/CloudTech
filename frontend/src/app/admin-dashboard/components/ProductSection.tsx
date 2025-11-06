@@ -16,9 +16,9 @@ import type { Product } from "@/app/types/products";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
 const API_PRODUCTS = `${API_BASE}/products/`;        // FIXED: no duplicate /products/
-const API_CATEGORIES = `${API_BASE}/products/categories/`;
-const API_BRANDS = `${API_BASE}/products/brands/`;
-const API_COLORS = `${API_BASE}/products/colors/`;
+const API_CATEGORIES = `${API_BASE}/categories/`;
+const API_BRANDS = `${API_BASE}/brands/`;
+const API_COLORS = `${API_BASE}/colors/`;
 const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || API_BASE;
 
 const storageOptions = [64, 128, 256, 512, 1024, 2048];
