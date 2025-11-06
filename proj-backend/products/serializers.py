@@ -75,11 +75,13 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     category_ids = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), many=True, write_only=True)
     color_id = serializers.PrimaryKeyRelatedField(queryset=Color.objects.all(), source='color', write_only=True, required=False, allow_null=True)
     
-    # FIXED: Use FileField for Cloudinary
     cover_image = serializers.FileField(write_only=True, required=False, allow_null=True)
     gallery = serializers.ListField(
         child=serializers.FileField(), write_only=True, required=False, allow_empty=True
     )
+
+    # ADD THIS
+    final_price = serializers.DecimalField(max_digits=10, decimal_places=2, write_only=True, required=False)
 
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
@@ -92,7 +94,8 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'price', 'stock', 'discount',
             'storage_gb', 'ram_gb', 'color', 'color_id', 'condition',
             'is_active', 'is_featured', 'brand', 'brand_id',
-            'categories', 'category_ids', 'cover_image', 'gallery', 'images'
+            'categories', 'category_ids', 'cover_image', 'gallery', 'images',
+            'final_price'
         ]
 
     def create(self, validated_data):
@@ -100,24 +103,24 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery', [])
 
-        logger.info(f"Creating product with data: {validated_data}")
-        logger.info(f"Cover file: {cover_file}")
-        logger.info(f"Gallery files: {len(gallery_files)}")
+        # CALCULATE final_price
+        price = validated_data.get('price', 0)
+        discount = validated_data.get('discount', 0)
+        final_price = price - (price * discount / 100) if discount > 0 else price
+        validated_data['final_price'] = round(final_price, 2)
 
+        logger.info(f"Creating product with data: {validated_data}")
         product = Product.objects.create(**validated_data)
         product.categories.set(category_ids)
 
-        # === UPLOAD COVER TO CLOUDINARY ===
         if cover_file:
             try:
                 upload_result = upload(cover_file, folder="products/cover")
                 product.cover_image = upload_result['public_id']
-                logger.info(f"Cover uploaded: {upload_result['public_id']}")
             except Exception as e:
                 logger.error(f"Cover upload failed: {e}")
                 raise serializers.ValidationError({"cover_image": "Upload failed"})
 
-        # === UPLOAD GALLERY ===
         for img_file in gallery_files:
             try:
                 upload_result = upload(img_file, folder="products/gallery")
@@ -126,10 +129,8 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                     image=upload_result['public_id'],
                     is_primary=False
                 )
-                logger.info(f"Gallery image uploaded: {upload_result['public_id']}")
             except Exception as e:
                 logger.error(f"Gallery upload failed: {e}")
-                # Don't fail entire product
                 continue
 
         product.save()
@@ -139,6 +140,12 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         category_ids = validated_data.pop('category_ids', None)
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery', None)
+
+        # RECALCULATE final_price
+        price = validated_data.get('price', instance.price)
+        discount = validated_data.get('discount', instance.discount or 0)
+        final_price = price - (price * discount / 100) if discount > 0 else price
+        validated_data['final_price'] = round(final_price, 2)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
