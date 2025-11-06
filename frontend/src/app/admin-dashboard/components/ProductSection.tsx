@@ -207,87 +207,94 @@ const ProductAdminPage: React.FC = () => {
   };
 
   // === FINAL FIXED SAVE PRODUCT ===
-  const saveProduct = async () => {
-    if (!token || !title || price === "" || !brandId) {
-      setSnack({ open: true, msg: "Fill required fields", sev: "error" });
-      return;
+const saveProduct = async () => {
+  if (!token || !title || price === "" || !brandId) {
+    setSnack({ open: true, msg: "Fill required fields", sev: "error" });
+    return;
+  }
+
+  const form = new FormData();
+  form.append("title", title);
+  form.append("description", description || "");
+  form.append("price", String(price));
+  form.append("stock", String(stock || 0));
+  form.append("discount", String(discount || 0));
+  form.append("is_active", String(isActive));
+  form.append("is_featured", String(isFeatured));
+  form.append("brand_id", brandId);
+
+  // Categories
+  selectedCats.forEach(id => {
+    form.append("category_ids[]", id);
+  });
+
+  // Final price (CRITICAL)
+  const final = Number(discount) > 0 
+    ? Number(price) - (Number(price) * Number(discount)) / 100 
+    : Number(price);
+  form.append("final_price", String(final.toFixed(2)));
+
+  const safeTrim = (val: string | number | undefined | null): string | null => {
+    if (val === null || val === undefined) return null;
+    const str = String(val);
+    return str.trim() ? str : null;
+  };
+
+  const colorIdStr = safeTrim(colorId);
+  const storageGBStr = safeTrim(storageGB);
+  const ramGBStr = safeTrim(ramGB);
+
+  if (colorIdStr) form.append("color_id", colorIdStr);
+  if (storageGBStr) form.append("storage_gb", storageGBStr);
+  if (ramGBStr) form.append("ram_gb", ramGBStr);
+  if (condition) form.append("condition", condition);
+
+  if (coverFile) form.append("cover_image", coverFile);
+  galleryFiles.forEach(f => form.append("gallery", f));
+
+  // Debug logs
+  console.log("SAVING PRODUCT...");
+  console.log("URL:", editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS);
+  console.log("FORM DATA:");
+  for (let [k, v] of form.entries()) {
+    if (v instanceof File) {
+      console.log(k, `(File: ${v.name}, ${v.size} bytes)`);
+    } else {
+      console.log(k, v);
     }
+  }
 
-    const form = new FormData();
-    form.append("title", title);
-    form.append("description", description || "");
-    form.append("price", String(price));
-    form.append("stock", String(stock || 0));
-    form.append("discount", String(discount || 0));
-    form.append("is_active", String(isActive));
-    form.append("is_featured", String(isFeatured));
-    form.append("brand_id", brandId);
-
-    // FIXED: Use [] syntax for many-to-many
-    selectedCats.forEach(id => {
-      form.append("category_ids[]", id);
+  setSaving(true);
+  try {
+    const url = editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS;
+    const res = await fetch(url, {
+      method: editId ? "PATCH" : "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form
     });
 
-    const safeTrim = (val: string | number | undefined | null): string | null => {
-      if (val === null || val === undefined) return null;
-      const str = String(val);
-      return str.trim() ? str : null;
-    };
+    const text = await res.text();
+    console.log("RESPONSE STATUS:", res.status);
+    console.log("RESPONSE BODY:", text);
 
-    const colorIdStr = safeTrim(colorId);
-    const storageGBStr = safeTrim(storageGB);
-    const ramGBStr = safeTrim(ramGB);
-
-    if (colorIdStr) form.append("color_id", colorIdStr);
-    if (storageGBStr) form.append("storage_gb", storageGBStr);
-    if (ramGBStr) form.append("ram_gb", ramGBStr);
-    if (condition) form.append("condition", condition);
-
-    if (coverFile) form.append("cover_image", coverFile);
-    galleryFiles.forEach(f => form.append("gallery", f));
-
-    console.log("SAVING PRODUCT...");
-    console.log("URL:", editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS);
-    console.log("FORM DATA:");
-    for (let [k, v] of form.entries()) {
-      if (v instanceof File) {
-        console.log(k, `(File: ${v.name}, ${v.size} bytes)`);
-      } else {
-        console.log(k, v);
-      }
+    if (res.ok) {
+      const data = JSON.parse(text);
+      console.log("SUCCESS:", data);
+      setSnack({ open: true, msg: editId ? "Updated!" : "Added!", sev: "success" });
+      resetForm();
+      fetchData();
+      setTab(1);
+    } else {
+      console.error("SAVE FAILED:", res.status, text);
+      setSnack({ open: true, msg: `Error ${res.status}: ${text.substring(0, 200)}`, sev: "error" });
     }
-
-    setSaving(true);
-    try {
-      const url = editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS;
-      const res = await fetch(url, {
-        method: editId ? "PATCH" : "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: form
-      });
-
-      const text = await res.text();
-      console.log("RESPONSE STATUS:", res.status);
-      console.log("RESPONSE BODY:", text);
-
-      if (res.ok) {
-        const data = JSON.parse(text);
-        console.log("SUCCESS:", data);
-        setSnack({ open: true, msg: editId ? "Updated!" : "Added!", sev: "success" });
-        resetForm();
-        fetchData();
-        setTab(1);
-      } else {
-        console.error("SAVE FAILED:", res.status, text);
-        setSnack({ open: true, msg: `Error ${res.status}: ${text.substring(0, 200)}`, sev: "error" });
-      }
-    } catch (err: any) {
-      console.error("NETWORK ERROR:", err);
-      setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
-    } finally {
-      setSaving(false);
-    }
-  };
+  } catch (err: any) {
+    console.error("NETWORK ERROR:", err);
+    setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
+  } finally {
+    setSaving(false);
+  }
+};
 
   const startEdit = (p: Product) => {
     const id = String(p.id);
