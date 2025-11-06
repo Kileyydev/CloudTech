@@ -173,7 +173,7 @@ const ProductAdminPage: React.FC = () => {
       setBrands(Array.isArray(bJson) ? bJson : bJson.results || []);
       setColors(Array.isArray(colJson) ? colJson : colJson.results || []);
     } catch (err) {
-      console.error("Fetch error:", err);
+      console.error("FETCH ERROR:", err);
       setSnack({ open: true, msg: "Failed to load data", sev: "error" });
     } finally {
       setLoading(false);
@@ -206,97 +206,136 @@ const ProductAdminPage: React.FC = () => {
     setIsActive(true); setIsFeatured(false);
   };
 
-  // === FINAL FIXED SAVE PRODUCT ===
-const saveProduct = async () => {
-  if (!token || !title || price === "" || !brandId) {
-    setSnack({ open: true, msg: "Fill required fields", sev: "error" });
-    return;
-  }
+  // === ULTRA-DETAILED SAVE PRODUCT WITH PRODUCTION DEBUGGING ===
+  const saveProduct = async () => {
+    console.log("=== SAVE PRODUCT STARTED ===");
+    console.log("editId:", editId);
+    console.log("token exists:", !!token);
+    console.log("API_PRODUCTS:", API_PRODUCTS);
 
-  const form = new FormData();
-  form.append("title", title);
-  form.append("description", description || "");
-  form.append("price", String(price));
-  form.append("stock", String(stock || 0));
-  form.append("discount", String(discount || 0));
-  form.append("is_active", String(isActive));
-  form.append("is_featured", String(isFeatured));
-  form.append("brand_id", brandId);
-
-  // Categories
-  selectedCats.forEach(id => {
-    form.append("category_ids[]", id);
-  });
-
-  // Final price (CRITICAL)
-  const final = Number(discount) > 0 
-    ? Number(price) - (Number(price) * Number(discount)) / 100 
-    : Number(price);
-  form.append("final_price", String(final.toFixed(2)));
-
-  const safeTrim = (val: string | number | undefined | null): string | null => {
-    if (val === null || val === undefined) return null;
-    const str = String(val);
-    return str.trim() ? str : null;
-  };
-
-  const colorIdStr = safeTrim(colorId);
-  const storageGBStr = safeTrim(storageGB);
-  const ramGBStr = safeTrim(ramGB);
-
-  if (colorIdStr) form.append("color_id", colorIdStr);
-  if (storageGBStr) form.append("storage_gb", storageGBStr);
-  if (ramGBStr) form.append("ram_gb", ramGBStr);
-  if (condition) form.append("condition", condition);
-
-  if (coverFile) form.append("cover_image", coverFile);
-  galleryFiles.forEach(f => form.append("gallery", f));
-
-  // Debug logs
-  console.log("SAVING PRODUCT...");
-  console.log("URL:", editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS);
-  console.log("FORM DATA:");
-  for (let [k, v] of form.entries()) {
-    if (v instanceof File) {
-      console.log(k, `(File: ${v.name}, ${v.size} bytes)`);
-    } else {
-      console.log(k, v);
+    if (!token) {
+      console.error("NO TOKEN — USER NOT LOGGED IN");
+      setSnack({ open: true, msg: "Not authenticated", sev: "error" });
+      return;
     }
-  }
 
-  setSaving(true);
-  try {
-    const url = editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS;
-    const res = await fetch(url, {
-      method: editId ? "PATCH" : "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form
+    if (!title || price === "" || !brandId) {
+      console.warn("VALIDATION FAILED: Missing required fields");
+      setSnack({ open: true, msg: "Fill required fields", sev: "error" });
+      return;
+    }
+
+    const form = new FormData();
+    form.append("title", title);
+    form.append("description", description || "");
+    form.append("price", String(price));
+    form.append("stock", String(stock || 0));
+    form.append("discount", String(discount || 0));
+    form.append("is_active", String(isActive));
+    form.append("is_featured", String(isFeatured));
+    form.append("brand_id", brandId);
+
+    // Categories
+    selectedCats.forEach(id => {
+      form.append("category_ids[]", id);
     });
 
-    const text = await res.text();
-    console.log("RESPONSE STATUS:", res.status);
-    console.log("RESPONSE BODY:", text);
+    // Final price
+    const final = Number(discount) > 0 
+      ? Number(price) - (Number(price) * Number(discount)) / 100 
+      : Number(price);
+    form.append("final_price", String(final.toFixed(2)));
 
-    if (res.ok) {
-      const data = JSON.parse(text);
-      console.log("SUCCESS:", data);
-      setSnack({ open: true, msg: editId ? "Updated!" : "Added!", sev: "success" });
-      resetForm();
-      fetchData();
-      setTab(1);
-    } else {
-      console.error("SAVE FAILED:", res.status, text);
-      setSnack({ open: true, msg: `Error ${res.status}: ${text.substring(0, 200)}`, sev: "error" });
+    const safeTrim = (val: string | number | undefined | null): string | null => {
+      if (val === null || val === undefined) return null;
+      const str = String(val);
+      return str.trim() ? str : null;
+    };
+
+    const colorIdStr = safeTrim(colorId);
+    const storageGBStr = safeTrim(storageGB);
+    const ramGBStr = safeTrim(ramGB);
+
+    if (colorIdStr) form.append("color_id", colorIdStr);
+    if (storageGBStr) form.append("storage_gb", storageGBStr);
+    if (ramGBStr) form.append("ram_gb", ramGBStr);
+    if (condition) form.append("condition", condition);
+
+    if (coverFile) form.append("cover_image", coverFile);
+    galleryFiles.forEach(f => form.append("gallery", f));
+
+    // === DETAILED FORM DATA LOG ===
+    console.log("FORM DATA BEING SENT:");
+    for (let [k, v] of form.entries()) {
+      if (v instanceof File) {
+        console.log(`  ${k}: (File) ${v.name} | ${v.size} bytes | type: ${v.type}`);
+      } else {
+        console.log(`  ${k}: "${v}"`);
+      }
     }
-  } catch (err: any) {
-    console.error("NETWORK ERROR:", err);
-    setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
-  } finally {
-    setSaving(false);
-  }
-};
+
+    setSaving(true);
+    const url = editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS;
+    console.log("REQUEST URL:", url);
+    console.log("METHOD:", editId ? "PATCH" : "POST");
+
+    try {
+      const res = await fetch(url, {
+        method: editId ? "PATCH" : "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      });
+
+      const responseText = await res.text();
+      console.log("RESPONSE STATUS:", res.status);
+      console.log("RESPONSE HEADERS:", Object.fromEntries(res.headers.entries()));
+      console.log("RESPONSE BODY (first 1000 chars):", responseText.substring(0, 1000));
+
+      if (res.ok) {
+        let data;
+        try {
+          data = JSON.parse(responseText);
+          console.log("PARSED JSON RESPONSE:", data);
+        } catch (e) {
+          console.warn("Response is not JSON:", responseText);
+        }
+
+        setSnack({ open: true, msg: editId ? "Updated!" : "Added!", sev: "success" });
+        resetForm();
+        fetchData();
+        setTab(1);
+      } else {
+        console.error("SERVER ERROR RESPONSE:", {
+          status: res.status,
+          statusText: res.statusText,
+          body: responseText
+        });
+
+        let errorMsg = `Error ${res.status}`;
+        try {
+          const err = JSON.parse(responseText);
+          errorMsg += `: ${JSON.stringify(err)}`;
+        } catch {
+          errorMsg += `: ${responseText.substring(0, 200)}`;
+        }
+
+        setSnack({ open: true, msg: errorMsg, sev: "error" });
+      }
+    } catch (err: any) {
+      console.error("FATAL NETWORK ERROR:", {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+      setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
+    } finally {
+      setSaving(false);
+      console.log("=== SAVE PRODUCT ENDED ===");
+    }
+  };
 
   const startEdit = (p: Product) => {
+    console.log("EDITING PRODUCT:", p.id);
     const id = String(p.id);
     setEditId(id);
     setTitle(p.title || "");
@@ -525,8 +564,187 @@ const saveProduct = async () => {
       )}
 
       {/* ALL PRODUCTS & DISCOUNTED TABLE */}
-      {/* (Same as before — no changes needed) */}
-      {/* ... UI remains identical ... */}
+      {tab === 1 && (
+        <Box>
+          <Tabs value={categoryFilter} onChange={(_, v) => setCategoryFilter(v)} variant={isMobile ? "scrollable" : "standard"} sx={{ mb: 3 }}>
+            <Tab label="All" value="all" />
+            {categories.map(c => <Tab key={c.id} label={c.name} value={c.id} />)}
+          </Tabs>
+
+          {loading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+              <CircularProgress size={60} thickness={5} sx={{ color: "#DC1A8A" }} />
+            </Box>
+          ) : filtered.length === 0 ? (
+            <Typography textAlign="center" color="text.secondary" py={8}>No products found</Typography>
+          ) : (
+            <Box sx={{
+              display: isMobile ? "flex" : "grid",
+              overflowX: isMobile ? "auto" : "unset",
+              gap: 3,
+              gridTemplateColumns: { md: "repeat(3, 1fr)", lg: "repeat(4, 1fr)" },
+              pb: 2,
+            }}>
+              {filtered.map(p => (
+                <StyledCard key={p.id}>
+                  {p.discount && p.discount > 0 && (
+                    <DiscountBadge>{p.discount}% OFF</DiscountBadge>
+                  )}
+                  <Box onClick={() => startEdit(p)} sx={{ height: 200, cursor: "pointer", overflow: "hidden" }}>
+                    <CardMedia
+                      component="img"
+                      image={getProductImageSrc(p)}
+                      sx={{ width: "100%", height: "100%", objectFit: "cover", transition: "0.3s", "&:hover": { transform: "scale(1.05)" } }}
+                    />
+                  </Box>
+                  <CardContent sx={{ p: 2.5 }}>
+                    <Typography variant="h6" noWrap sx={{ fontWeight: 700, color: "#222" }}>
+                      {p.title}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                      {p.storage_gb && `${p.storage_gb >= 1024 ? `${p.storage_gb / 1024}TB` : `${p.storage_gb}GB`}`}
+                      {p.ram_gb && ` • ${p.ram_gb}GB RAM`}
+                      {p.color && ` • ${p.color.name}`}
+                      {p.condition && ` • ${p.condition === 'ex_dubai' ? 'Ex-Dubai' : 'New'}`}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: "#666", mb: 1.5, height: 40, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                      {p.description}
+                    </Typography>
+                    <Box sx={{ mb: 2 }}>
+                      {p.discount && p.discount > 0 && (
+                        <Typography sx={{ textDecoration: "line-through", color: "#999", fontSize: "0.9rem" }}>
+                          KES {p.price?.toLocaleString()}
+                        </Typography>
+                      )}
+                      <Typography sx={{ fontWeight: 700, color: "#DC1A8A", fontSize: "1.1rem" }}>
+                        KES {(p.final_price ?? p.price)?.toLocaleString()}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      <StyledButton size="small" startIcon={<Edit />} onClick={() => startEdit(p)}>
+                        Edit
+                      </StyledButton>
+                      <StyledButton size="small" className="danger" startIcon={<Delete />} onClick={() => confirmDel(String(p.id))}>
+                        Delete
+                      </StyledButton>
+                    </Box>
+                  </CardContent>
+                </StyledCard>
+              ))}
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {tab === 2 && (
+        <StyledPaper elevation={0}>
+          <Box sx={{ p: { xs: 3, md: 4 } }}>
+            <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: "#222" }}>
+              Discounted Products
+            </Typography>
+
+            {loading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
+                <CircularProgress size={50} sx={{ color: "#DC1A8A" }} />
+              </Box>
+            ) : discounted.length === 0 ? (
+              <Typography textAlign="center" color="text.secondary" py={6}>No discounted products</Typography>
+            ) : (
+              <Table sx={{ minWidth: 650 }}>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: alpha("#DC1A8A", 0.05) }}>
+                    <TableCell><strong>Image</strong></TableCell>
+                    <TableCell><strong>Title</strong></TableCell>
+                    <TableCell><strong>Specs</strong></TableCell>
+                    <TableCell><strong>Original</strong></TableCell>
+                    <TableCell><strong>Discount %</strong></TableCell>
+                    <TableCell><strong>Final Price</strong></TableCell>
+                    <TableCell><strong>Brand</strong></TableCell>
+                    <TableCell><strong>Action</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {discounted.map(p => (
+                    <TableRow key={p.id} hover>
+                      <TableCell>
+                        <img src={getProductImageSrc(p)} width={60} height={60} style={{ objectFit: "cover", border: "2px solid #eee" }} />
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{p.title}</TableCell>
+                      <TableCell sx={{ fontSize: "0.8rem" }}>
+                        {p.storage_gb && `${p.storage_gb >= 1024 ? `${p.storage_gb / 1024}TB` : `${p.storage_gb}GB`}`}
+                        {p.ram_gb && ` • ${p.ram_gb}GB`}
+                        {p.color && ` • ${p.color.name}`}
+                        {p.condition && ` • ${p.condition === 'ex_dubai' ? 'Ex-Dubai' : 'New'}`}
+                      </TableCell>
+                      <TableCell>
+                        <Typography sx={{ textDecoration: "line-through", color: "#999" }}>
+                          KES {p.price?.toLocaleString()}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <TextField
+                          type="number"
+                          size="small"
+                          value={p.discount ?? 0}
+                          onChange={e => setProducts(prev => prev.map(x => x.id === p.id ? { ...x, discount: Number(e.target.value) } : x))}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: "#DC1A8A" }}>
+                        KES {(p.price! - (p.price! * (p.discount || 0)) / 100).toFixed(0)}
+                      </TableCell>
+                      <TableCell>{p.brand?.name || "—"}</TableCell>
+                      <TableCell>
+                        <StyledButton
+                          size="small"
+                          className="primary"
+                          onClick={() => updateDiscount(p)}
+                          disabled={savingId === p.id}
+                        >
+                          {savingId === p.id ? "..." : "Update"}
+                        </StyledButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Box>
+        </StyledPaper>
+      )}
+
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <DialogTitle sx={{ fontWeight: 700 }}>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Typography>This action cannot be undone. Are you sure?</Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, gap: 1 }}>
+          <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
+          <StyledButton className="danger" onClick={doDelete} variant="contained">
+            Delete
+          </StyledButton>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={6000}
+        onClose={() => setSnack(s => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnack(s => ({ ...s, open: false }))}
+          severity={snack.sev}
+          sx={{
+            width: "100%",
+            fontWeight: 600,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+            ...(snack.sev === "success" && { bgcolor: "#4caf50", color: "#fff" }),
+            ...(snack.sev === "error" && { bgcolor: "#f44336", color: "#fff" }),
+          }}
+        >
+          {snack.msg}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
