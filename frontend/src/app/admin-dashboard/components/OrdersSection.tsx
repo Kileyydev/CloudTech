@@ -1,13 +1,10 @@
-// src/app/admin/orders/page.tsx
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Container,
   Typography,
-  Paper,
-  Stack,
   Card,
   CardContent,
   Chip,
@@ -18,23 +15,31 @@ import {
   Select,
   FormControl,
   InputLabel,
-} from '@mui/material';
+  Stack,
+  Snackbar,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
+  IconButton,
+  Tooltip,
+} from "@mui/material";
 import {
+  CheckCircle,
   Inventory,
   AccessTime,
   LocalShipping,
   DoneAll,
-  CheckCircle,
-} from '@mui/icons-material';
-import axios from 'axios';
-import TickerBar from '../../components/TickerBar';
-import TopNavBar from '../../components/TopNavBar';
-import MainNavBar from '../../components/MainNavBar';
+  Refresh,
+} from "@mui/icons-material";
+import axios from "axios";
 
 const API_BASE =
-  process.env.NODE_ENV === 'development'
-    ? 'http://localhost:8000/api'
-    : 'https://api.cloudtechstore.net/api';
+  process.env.NEXT_PUBLIC_API_BASE ||
+  (process.env.NODE_ENV === "development"
+    ? "http://localhost:8000/api"
+    : "https://api.cloudtechstore.net/api");
 
 interface OrderItem {
   product_id: string;
@@ -59,251 +64,229 @@ interface OrderData {
 }
 
 const STATUS_STEPS = [
-  { key: 'confirmed', label: 'Confirmed', icon: <CheckCircle />, color: '#e91e63' },
-  { key: 'received', label: 'Received', icon: <Inventory />, color: '#ff9800' },
-  { key: 'processing', label: 'Processing', icon: <AccessTime />, color: '#2196f3' },
-  { key: 'packaging', label: 'Packaging', icon: <Inventory />, color: '#9c27b0' },
-  { key: 'dispatched', label: 'Dispatched', icon: <LocalShipping />, color: '#4caf50' },
-  { key: 'delivered', label: 'Delivered', icon: <DoneAll />, color: '#2e7d32' },
+  { key: "confirmed", label: "Confirmed", icon: <CheckCircle />, color: "#e91e63" },
+  { key: "received", label: "Received", icon: <Inventory />, color: "#ff9800" },
+  { key: "processing", label: "Processing", icon: <AccessTime />, color: "#2196f3" },
+  { key: "packaging", label: "Packaging", icon: <Inventory />, color: "#9c27b0" },
+  { key: "dispatched", label: "Dispatched", icon: <LocalShipping />, color: "#4caf50" },
+  { key: "delivered", label: "Delivered", icon: <DoneAll />, color: "#2e7d32" },
 ];
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [updating, setUpdating] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [snack, setSnack] = useState<{
+    open: boolean;
+    msg: string;
+    severity: "success" | "error";
+  }>({ open: false, msg: "", severity: "success" });
   const [nextUrl, setNextUrl] = useState<string | null>(null);
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  // Auth: Bearer token from localStorage ("access")
+  const token = typeof window !== "undefined" ? localStorage.getItem("access") : null;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
-  // --------------------------------------------------------------
-  // 1. FETCH (ALL) ORDERS – admin token only, no device_id filter
-  // --------------------------------------------------------------
+  // Fetch all orders
   const fetchOrders = async (url: string = `${API_BASE}/purchases/`) => {
     if (!token) {
-      setError('Admin token missing – please log in.');
+      setSnack({ open: true, msg: "Admin access required", severity: "error" });
       setLoading(false);
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
-      setError('');
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error("Failed to fetch orders");
 
-      const headers = { Authorization: `Token ${token}` };
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : data.results || [];
 
-      const res = await axios.get(url, { headers });
-
-      const raw = res.data;
-      const newOrders: OrderData[] = Array.isArray(raw)
-        ? raw
-        : raw.results || [];
-
-      // Append if paginating, otherwise replace
-      setOrders((prev) => (url.includes('page=') ? [...prev, ...newOrders] : newOrders));
-
-      // Pagination handling
-      setNextUrl(raw.next || null);
-      setHasMore(!!raw.next);
-    } catch (err: any) {
-      console.error('Failed to fetch admin orders:', err);
-      setError(
-        err.response?.data?.detail ||
-          'Failed to load orders. Check your connection or token.'
+      setOrders((prev) =>
+        url.includes("page=") ? [...prev, ...list] : list
       );
+      setNextUrl(data.next || null);
+    } catch (err: any) {
+      console.error(err);
+      setSnack({ open: true, msg: err.message || "Error loading orders", severity: "error" });
     } finally {
       setLoading(false);
     }
   };
 
-  // Initial load
   useEffect(() => {
     fetchOrders();
   }, []);
 
-  // Load more (if API uses pagination)
-  const loadMore = () => {
-    if (nextUrl && !loading) fetchOrders(nextUrl);
-  };
-
-  // --------------------------------------------------------------
-  // 2. UPDATE STATUS – PATCH /purchases/:id/
-  // --------------------------------------------------------------
-  const handleStatusChange = async (orderId: string, newStatus: string) => {
-    if (!token) return;
-
+  // Update status
+  const updateStatus = async (id: string, status: string) => {
+    setSavingId(id);
     try {
-      setUpdating(orderId);
-      const headers = { Authorization: `Token ${token}` };
-
-      await axios.patch(
-        `${API_BASE}/purchases/${orderId}/`,
-        { status: newStatus },
-        { headers }
-      );
+      const res = await fetch(`${API_BASE}/purchases/${id}/`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Failed to update status");
 
       setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+        prev.map((o) => (o.id === id ? { ...o, status } : o))
       );
-    } catch (err) {
-      console.error('Status update error:', err);
-      alert('Could not update status. Try again.');
+      setSnack({ open: true, msg: "Status updated", severity: "success" });
+    } catch (err: any) {
+      console.error(err);
+      setSnack({ open: true, msg: err.message || "Update failed", severity: "error" });
     } finally {
-      setUpdating(null);
+      setSavingId(null);
     }
   };
 
-  // --------------------------------------------------------------
-  // 3. Helpers
-  // --------------------------------------------------------------
   const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleString('en-KE', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    new Date(dateStr).toLocaleString("en-KE", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
 
   const getStep = (status: string) =>
     STATUS_STEPS.find((s) => s.key === status) ?? STATUS_STEPS[0];
 
-  // --------------------------------------------------------------
-  // 4. UI
-  // --------------------------------------------------------------
-  if (loading && orders.length === 0) {
-    return (
-      <Box sx={{ minHeight: '100vh', bgcolor: '#fafafa', textAlign: 'center', pt: 10 }}>
-        <CircularProgress size={60} />
-        <Typography sx={{ mt: 2 }}>Loading all orders…</Typography>
-      </Box>
-    );
-  }
-
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: '#f9f9f9' }}>
-      <TickerBar />
-      <TopNavBar />
-      <MainNavBar />
-
-      <Container maxWidth="lg" sx={{ py: 6 }}>
-        <Typography variant="h4" sx={{ mb: 4, fontWeight: 700, color: '#e91e63' }}>
-          Admin Dashboard — Orders Management
+    <Box sx={{ minHeight: "100vh", bgcolor: "#f9f9f9", py: 4 }}>
+      <Container maxWidth="lg">
+        <Typography
+          variant="h4"
+          sx={{ mb: 4, fontWeight: 700, color: "#e91e63", textAlign: "center" }}
+        >
+          Admin — Orders Management
         </Typography>
 
-        {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-
-        {orders.length === 0 ? (
-          <Paper sx={{ p: 6, textAlign: 'center' }}>
-            <Typography>No orders found in the database.</Typography>
-          </Paper>
-        ) : (
-          <Stack spacing={3}>
-            {orders.map((order) => {
-              const step = getStep(order.status);
-
-              return (
-                <Card
-                  key={order.id}
-                  sx={{
-                    borderRadius: 2,
-                    boxShadow: '0 3px 10px rgba(0,0,0,0.1)',
-                    transition: '0.2s',
-                    '&:hover': { boxShadow: '0 6px 18px rgba(0,0,0,0.15)' },
-                  }}
-                >
-                  <CardContent>
-                    {/* Header – ID, date, customer */}
-                    <Stack
-                      direction={{ xs: 'column', md: 'row' }}
-                      justifyContent="space-between"
-                      alignItems={{ xs: 'flex-start', md: 'center' }}
-                      spacing={2}
-                    >
-                      <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                          Order #{order.id}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {formatDate(order.date)}
-                        </Typography>
-                        <Typography variant="body2" sx={{ mt: 1 }}>
-                          <strong>{order.name}</strong> — {order.phone}
+        <Card>
+          <CardContent>
+            {loading && orders.length === 0 ? (
+              <Box sx={{ textAlign: "center", py: 4 }}>
+                <CircularProgress />
+                <Typography sx={{ mt: 2 }}>Loading orders...</Typography>
+              </Box>
+            ) : (
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell><strong>Order ID</strong></TableCell>
+                    <TableCell><strong>Customer</strong></TableCell>
+                    <TableCell><strong>Date</strong></TableCell>
+                    <TableCell><strong>Total</strong></TableCell>
+                    <TableCell><strong>Items</strong></TableCell>
+                    <TableCell><strong>Payment</strong></TableCell>
+                    <TableCell><strong>Status</strong></TableCell>
+                    <TableCell align="center"><strong>Actions</strong></TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {orders.map((order) => {
+                    const step = getStep(order.status);
+                    return (
+                      <TableRow key={order.id} hover>
+                        <TableCell>#{order.id}</TableCell>
+                        <TableCell>
+                          <strong>{order.name}</strong>
                           <br />
-                          {order.city}, {order.address}
-                        </Typography>
-                      </Box>
+                          <Typography variant="body2" color="text.secondary">
+                            {order.phone}
+                            <br />
+                            {order.city}, {order.address}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{formatDate(order.date)}</TableCell>
+                        <TableCell>
+                          <Typography fontWeight={600} color="#e91e63">
+                            KES {order.total.toLocaleString()}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>{order.items.length} item{order.items.length > 1 ? "s" : ""}</TableCell>
+                        <TableCell>{order.payment.toUpperCase()}</TableCell>
+                        <TableCell>
+                          <FormControl size="small" fullWidth>
+                            <Select
+                              value={order.status}
+                              onChange={(e) => updateStatus(order.id, e.target.value)}
+                              disabled={savingId === order.id}
+                              sx={{
+                                "& .MuiSelect-select": {
+                                  py: 0.5,
+                                  fontSize: "0.875rem",
+                                },
+                              }}
+                            >
+                              {STATUS_STEPS.map((s) => (
+                                <MenuItem key={s.key} value={s.key}>
+                                  <Chip
+                                    label={s.label}
+                                    icon={s.icon}
+                                    size="small"
+                                    sx={{
+                                      bgcolor: `${s.color}20`,
+                                      color: s.color,
+                                      fontWeight: 600,
+                                    }}
+                                  />
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="Refresh">
+                            <IconButton
+                              size="small"
+                              onClick={() => fetchOrders()}
+                              disabled={loading}
+                            >
+                              <Refresh />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
 
-                      <Box textAlign={{ xs: 'left', md: 'right' }}>
-                        <Typography variant="h6" sx={{ color: '#e91e63', fontWeight: 700 }}>
-                          KES {order.total.toLocaleString()}
-                        </Typography>
-                        <Chip
-                          label={step.label}
-                          icon={step.icon}
-                          sx={{
-                            bgcolor: `${step.color}20`,
-                            color: step.color,
-                            fontWeight: 600,
-                            mt: 1,
-                          }}
-                        />
-                      </Box>
-                    </Stack>
-
-                    {/* Items + payment */}
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                      {order.items.length} item{order.items.length > 1 ? 's' : ''} •{' '}
-                      Payment: {order.payment.toUpperCase()}
-                    </Typography>
-
-                    {/* Status dropdown */}
-                    <FormControl fullWidth sx={{ mt: 2 }}>
-                      <InputLabel>Update Order Status</InputLabel>
-                      <Select
-                        value={order.status}
-                        label="Update Order Status"
-                        onChange={(e) => handleStatusChange(order.id, e.target.value as string)}
-                        disabled={updating === order.id}
-                      >
-                        {STATUS_STEPS.map((s) => (
-                          <MenuItem key={s.key} value={s.key}>
-                            {s.label}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-
-                    {/* Refresh button (per card) */}
-                    <Box sx={{ mt: 2, textAlign: 'right' }}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => fetchOrders()}
-                      >
-                        Refresh
-                      </Button>
-                    </Box>
-                  </CardContent>
-                </Card>
-              );
-            })}
-
-            {/* Load-more if paginated */}
-            {hasMore && (
-              <Box textAlign="center" mt={2}>
+            {/* Load More */}
+            {nextUrl && (
+              <Box sx={{ textAlign: "center", mt: 3 }}>
                 <Button
-                  variant="contained"
-                  onClick={loadMore}
+                  variant="outlined"
+                  onClick={() => fetchOrders(nextUrl)}
                   disabled={loading}
                 >
-                  {loading ? <CircularProgress size={20} /> : 'Load More'}
+                  {loading ? <CircularProgress size={20} /> : "Load More"}
                 </Button>
               </Box>
             )}
-          </Stack>
-        )}
+          </CardContent>
+        </Card>
+
+        {/* Snackbar */}
+        <Snackbar
+          open={snack.open}
+          autoHideDuration={3000}
+          onClose={() => setSnack((s) => ({ ...s, open: false }))}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <Alert severity={snack.severity} onClose={() => setSnack((s) => ({ ...s, open: false }))}>
+            {snack.msg}
+          </Alert>
+        </Snackbar>
       </Container>
     </Box>
   );
