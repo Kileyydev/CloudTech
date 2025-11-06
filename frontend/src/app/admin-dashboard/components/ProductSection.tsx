@@ -240,16 +240,23 @@ const ProductAdminPage: React.FC = () => {
     setSelectedRam(p.ram_options?.map((o: any) => o.id.toString()) ?? []);
     setSelectedStorage(p.storage_options?.map((o: any) => o.id.toString()) ?? []);
     setSelectedColors(p.colors?.map((o: any) => o.id.toString()) ?? []);
-    setTagNames(p.tags?.map((t: any) => t.name) ?? []);
+    setTagNames(p.tags?.map((t: any) => t.name).filter(Boolean) ?? []);
     setIsActive(p.is_active ?? true);
     setIsFeatured(p.is_featured ?? false);
     setCoverPreview(p.cover_image?.url ?? p.cover_image ?? null);
-    setGalleryPreviews(p.images?.map((i: any) => i.image?.url ?? i.image) ?? []);
+    setGalleryPreviews(p.images?.map((i: any) => i.image?.url ?? i.image).filter(Boolean) ?? []);
     setVariants(p.variants?.map((v: any) => ({
-      ...v,
-      price: v.price ?? "",
-      compare_at_price: v.compare_at_price ?? "",
-      stock: v.stock ?? ""
+      id: v.id,
+      sku: v.sku || "",
+      color: v.color || "",
+      ram: v.ram || "",
+      storage: v.storage || "",
+      processor: v.processor || "",
+      size: v.size || "",
+      price: v.price || "",
+      compare_at_price: v.compare_at_price || "",
+      stock: v.stock || "",
+      is_active: v.is_active ?? true
     })) ?? []);
     setTab(0);
   };
@@ -257,80 +264,90 @@ const ProductAdminPage: React.FC = () => {
   /* ------------------------------------------------------------------ */
   /*  SAVE (CREATE / UPDATE) - FIXED                                    */
   /* ------------------------------------------------------------------ */
-const saveProduct = async () => {
-  if (!token || !title || price === "" || !brandId) {
-    setSnack({ open: true, msg: "Fill required fields", sev: "error" });
-    return;
-  }
-
-  const form = new FormData();
-  form.append("title", title);
-  form.append("description", description);
-  form.append("price", String(price));
-  form.append("stock", String(stock || 0));
-  form.append("discount", String(discount));
-  form.append("is_active", isActive ? "true" : "false");
-  form.append("is_featured", isFeatured ? "true" : "false");
-  form.append("brand_id", brandId);
-
-  selectedCats.map(Number).forEach(id => form.append("category_ids", String(id)));
-  selectedRam.map(Number).forEach(id => form.append("ram_option_ids", String(id)));
-  selectedStorage.map(Number).forEach(id => form.append("storage_option_ids", String(id)));
-  selectedColors.map(Number).forEach(id => form.append("color_option_ids", String(id)));
-  tagNames.forEach(tag => form.append("tag_names", tag));
-  variants.forEach((v, i) => {
-  for (const key in v) {
-    if (v.hasOwnProperty(key)) {
-      form.append(`variants[${i}][${key}]`, String(v[key] ?? ""));
+  const saveProduct = async () => {
+    if (!token || !title || price === "" || !brandId) {
+      setSnack({ open: true, msg: "Fill required fields", sev: "error" });
+      return;
     }
-  }
-});
 
-  if (coverFile) form.append("cover_image", coverFile);
-  galleryFiles.forEach(f => form.append("gallery", f));
+    const form = new FormData();
+    form.append("title", title);
+    form.append("description", description);
+    form.append("price", String(price));
+    form.append("stock", String(stock || 0));
+    form.append("discount", String(discount));
+    form.append("is_active", isActive ? "true" : "false");
+    form.append("is_featured", isFeatured ? "true" : "false");
+    form.append("brand_id", brandId);
 
-  // ADD THIS LOG BLOCK
-  console.log("Sending to:", editId ? "PATCH" : "POST", editId ? `${API_BASE}${editId}/` : API_BASE);
-  console.log("FORM DATA:");
-  for (const [key, value] of form.entries()) {
-    if (value instanceof File) {
-      console.log(`  ${key}: [File] ${value.name} (${value.size} bytes)`);
-    } else {
-      console.log(`  ${key}:`, value);
+    selectedCats.map(Number).forEach(id => form.append("category_ids", String(id)));
+    selectedRam.map(Number).forEach(id => form.append("ram_option_ids", String(id)));
+    selectedStorage.map(Number).forEach(id => form.append("storage_option_ids", String(id)));
+    selectedColors.map(Number).forEach(id => form.append("color_option_ids", String(id)));
+
+    // FIXED: Filter out undefined/empty tags
+    tagNames
+      .filter(tag => tag && tag.trim() !== "" && tag !== "undefined")
+      .forEach(tag => form.append("tag_names", tag.trim()));
+
+    // FIXED: Send variants as JSON string
+    form.append("variants", JSON.stringify(variants.map(v => ({
+      id: v.id,
+      sku: v.sku || "",
+      color: v.color || "",
+      ram: v.ram || "",
+      storage: v.storage || "",
+      processor: v.processor || "",
+      size: v.size || "",
+      price: v.price || 0,
+      compare_at_price: v.compare_at_price || 0,
+      stock: v.stock || 0,
+      is_active: v.is_active ?? true
+    }))));
+
+    if (coverFile) form.append("cover_image", coverFile);
+    galleryFiles.forEach(f => form.append("gallery", f));
+
+    // DEBUG LOG
+    console.log("Sending to:", editId ? "PATCH" : "POST", editId ? `${API_BASE}${editId}/` : API_BASE);
+    console.log("FORM DATA:");
+    for (const [key, value] of form.entries()) {
+      if (value instanceof File) {
+        console.log(`  ${key}: [File] ${value.name} (${value.size} bytes)`);
+      } else {
+        console.log(`  ${key}:`, value);
+      }
     }
-  }
-  // END LOG BLOCK
 
-  setSaving(true);
-  try {
-    const url = editId ? `${API_BASE}${editId}/` : API_BASE;
-    const method = editId ? "PATCH" : "POST";
-    const res = await fetch(url, {
-      method,
-      headers: { Authorization: `Bearer ${token}` },
-      body: form
-    });
+    setSaving(true);
+    try {
+      const url = editId ? `${API_BASE}${editId}/` : API_BASE;
+      const method = editId ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      });
 
-    // ADD THIS: Log response status + body
-    console.log("Response status:", res.status);
-    const responseText = await res.text();
-    console.log("Response body:", responseText);
+      console.log("Response status:", res.status);
+      const responseText = await res.text();
+      console.log("Response body:", responseText);
 
-    if (res.ok) {
-      setSnack({ open: true, msg: editId ? "Updated" : "Created", sev: "success" });
-      resetForm();
-      fetchAll();
-      setTab(1);
-    } else {
-      setSnack({ open: true, msg: `Save failed: ${responseText}`, sev: "error" });
+      if (res.ok) {
+        setSnack({ open: true, msg: editId ? "Updated!" : "Created!", sev: "success" });
+        resetForm();
+        fetchAll();
+        setTab(1);
+      } else {
+        setSnack({ open: true, msg: `Failed: ${responseText.slice(0, 200)}`, sev: "error" });
+      }
+    } catch (err: any) {
+      console.error("Fetch error:", err);
+      setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
+    } finally {
+      setSaving(false);
     }
-  } catch (err: any) {
-    console.error("Fetch error:", err);
-    setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
   /* ------------------------------------------------------------------ */
   /*  DELETE                                                            */
@@ -343,7 +360,7 @@ const saveProduct = async () => {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSnack({ open: true, msg: "Deleted", sev: "success" });
+      setSnack({ open: true, msg: "Deleted!", sev: "success" });
       fetchAll();
     } catch {
       setSnack({ open: true, msg: "Delete failed", sev: "error" });
@@ -392,7 +409,7 @@ const saveProduct = async () => {
   const addVariant = () => {
     setVariants(prev => [...prev, {
       sku: "", color: "", ram: "", storage: "", processor: "", size: "",
-      price: "", compare_at_price: "", stock: ""
+      price: "", compare_at_price: "", stock: "", is_active: true
     }]);
   };
   const updateVariant = (idx: number, field: string, value: any) => {
@@ -553,7 +570,7 @@ const saveProduct = async () => {
                 <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>Variants</Typography>
                 <Button variant="outlined" size="small" onClick={addVariant} sx={{ mb: 2 }}>Add Variant</Button>
                 {variants.map((v, idx) => (
-                  <Stack key={idx} direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                  <Stack key={idx} direction="row" spacing={1} alignItems="center" sx={{ mb: 1, flexWrap: "wrap" }}>
                     <TextField size="small" label="SKU" value={v.sku} onChange={e => updateVariant(idx, "sku", e.target.value)} />
                     <TextField size="small" label="Color" value={v.color} onChange={e => updateVariant(idx, "color", e.target.value)} />
                     <TextField size="small" label="RAM" value={v.ram} onChange={e => updateVariant(idx, "ram", e.target.value)} />
