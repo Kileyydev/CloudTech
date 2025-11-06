@@ -10,13 +10,12 @@ import {
   Chip,
   Button,
   CircularProgress,
-  Alert,
   MenuItem,
   Select,
   FormControl,
-  InputLabel,
   Stack,
   Snackbar,
+  Alert,
   Table,
   TableHead,
   TableRow,
@@ -33,7 +32,6 @@ import {
   DoneAll,
   Refresh,
 } from "@mui/icons-material";
-import axios from "axios";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ||
@@ -83,19 +81,17 @@ export default function AdminOrdersPage() {
   }>({ open: false, msg: "", severity: "success" });
   const [nextUrl, setNextUrl] = useState<string | null>(null);
 
-  // Auth: Bearer token from localStorage ("access")
+  // ----- AUTH -----
   const token = typeof window !== "undefined" ? localStorage.getItem("access") : null;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  // Fetch all orders
+  // ----- FETCH ALL ORDERS -----
   const fetchOrders = async (url: string = `${API_BASE}/purchases/`) => {
     if (!token) {
-      setSnack({ open: true, msg: "Admin access required", severity: "error" });
+      setSnack({ open: true, msg: "Login as admin first", severity: "error" });
       setLoading(false);
       return;
     }
@@ -103,18 +99,31 @@ export default function AdminOrdersPage() {
     setLoading(true);
     try {
       const res = await fetch(url, { headers });
-      if (!res.ok) throw new Error("Failed to fetch orders");
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`HTTP ${res.status}: ${txt || "Unknown error"}`);
+      }
 
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : data.results || [];
+      const raw = await res.json();
+      console.log("RAW API RESPONSE:", raw); // <-- DEBUG: see exactly what Django returns
 
-      setOrders((prev) =>
-        url.includes("page=") ? [...prev, ...list] : list
-      );
-      setNextUrl(data.next || null);
+      // ---- NORMALISE PAYLOAD ----
+      let list: OrderData[] = [];
+
+      if (Array.isArray(raw)) {
+        list = raw;
+      } else if (raw.results && Array.isArray(raw.results)) {
+        list = raw.results;
+      } else if (raw.id) {
+        // single object returned
+        list = [raw];
+      }
+
+      setOrders((prev) => (url.includes("page=") ? [...prev, ...list] : list));
+      setNextUrl(raw.next || null);
     } catch (err: any) {
-      console.error(err);
-      setSnack({ open: true, msg: err.message || "Error loading orders", severity: "error" });
+      console.error("Fetch error:", err);
+      setSnack({ open: true, msg: err.message || "Failed to load orders", severity: "error" });
     } finally {
       setLoading(false);
     }
@@ -124,7 +133,7 @@ export default function AdminOrdersPage() {
     fetchOrders();
   }, []);
 
-  // Update status
+  // ----- UPDATE STATUS -----
   const updateStatus = async (id: string, status: string) => {
     setSavingId(id);
     try {
@@ -133,22 +142,22 @@ export default function AdminOrdersPage() {
         headers,
         body: JSON.stringify({ status }),
       });
-      if (!res.ok) throw new Error("Failed to update status");
+      if (!res.ok) throw new Error("Failed to update");
 
       setOrders((prev) =>
         prev.map((o) => (o.id === id ? { ...o, status } : o))
       );
       setSnack({ open: true, msg: "Status updated", severity: "success" });
     } catch (err: any) {
-      console.error(err);
       setSnack({ open: true, msg: err.message || "Update failed", severity: "error" });
     } finally {
       setSavingId(null);
     }
   };
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleString("en-KE", {
+  // ----- HELPERS -----
+  const formatDate = (d: string) =>
+    new Date(d).toLocaleString("en-KE", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -159,6 +168,7 @@ export default function AdminOrdersPage() {
   const getStep = (status: string) =>
     STATUS_STEPS.find((s) => s.key === status) ?? STATUS_STEPS[0];
 
+  // ----- UI -----
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#f9f9f9", py: 4 }}>
       <Container maxWidth="lg">
@@ -172,22 +182,26 @@ export default function AdminOrdersPage() {
         <Card>
           <CardContent>
             {loading && orders.length === 0 ? (
-              <Box sx={{ textAlign: "center", py: 4 }}>
+              <Box textAlign="center" py={4}>
                 <CircularProgress />
-                <Typography sx={{ mt: 2 }}>Loading orders...</Typography>
+                <Typography mt={2}>Loading orders…</Typography>
               </Box>
+            ) : orders.length === 0 ? (
+              <Typography textAlign="center" color="text.secondary" py={4}>
+                No orders found in the database.
+              </Typography>
             ) : (
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell><strong>Order ID</strong></TableCell>
+                    <TableCell><strong>ID</strong></TableCell>
                     <TableCell><strong>Customer</strong></TableCell>
                     <TableCell><strong>Date</strong></TableCell>
                     <TableCell><strong>Total</strong></TableCell>
                     <TableCell><strong>Items</strong></TableCell>
                     <TableCell><strong>Payment</strong></TableCell>
                     <TableCell><strong>Status</strong></TableCell>
-                    <TableCell align="center"><strong>Actions</strong></TableCell>
+                    <TableCell align="center"><strong>Refresh</strong></TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -219,12 +233,7 @@ export default function AdminOrdersPage() {
                               value={order.status}
                               onChange={(e) => updateStatus(order.id, e.target.value)}
                               disabled={savingId === order.id}
-                              sx={{
-                                "& .MuiSelect-select": {
-                                  py: 0.5,
-                                  fontSize: "0.875rem",
-                                },
-                              }}
+                              sx={{ "& .MuiSelect-select": { py: 0.5, fontSize: "0.875rem" } }}
                             >
                               {STATUS_STEPS.map((s) => (
                                 <MenuItem key={s.key} value={s.key}>
@@ -244,12 +253,8 @@ export default function AdminOrdersPage() {
                           </FormControl>
                         </TableCell>
                         <TableCell align="center">
-                          <Tooltip title="Refresh">
-                            <IconButton
-                              size="small"
-                              onClick={() => fetchOrders()}
-                              disabled={loading}
-                            >
+                          <Tooltip title="Refresh list">
+                            <IconButton size="small" onClick={() => fetchOrders()}>
                               <Refresh />
                             </IconButton>
                           </Tooltip>
@@ -263,7 +268,7 @@ export default function AdminOrdersPage() {
 
             {/* Load More */}
             {nextUrl && (
-              <Box sx={{ textAlign: "center", mt: 3 }}>
+              <Box textAlign="center" mt={3}>
                 <Button
                   variant="outlined"
                   onClick={() => fetchOrders(nextUrl)}
@@ -283,7 +288,7 @@ export default function AdminOrdersPage() {
           onClose={() => setSnack((s) => ({ ...s, open: false }))}
           anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         >
-          <Alert severity={snack.severity} onClose={() => setSnack((s) => ({ ...s, open: false }))}>
+          <Alert severity={snack.severity}>
             {snack.msg}
           </Alert>
         </Snackbar>
