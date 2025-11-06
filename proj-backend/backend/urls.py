@@ -23,8 +23,8 @@ urlpatterns = [
     path('api/repairs/', include('repairs.urls')),
     path('api/health', health_check, name='health'),
     path('api/accounts/', include('accounts.urls')),
-    path('api/purchases/', include('purchases.urls')),
-    #path("api/orders/", include("orders.urls")),
+    path('api/orders/', include('purchases.urls')),
+    
 ]
 
 if settings.DEBUG:

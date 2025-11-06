@@ -122,10 +122,7 @@ export default function AdminOrdersPage() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f9f9f9' }}>
-      <TickerBar />
-      <TopNavBar />
-      <MainNavBar />
-
+     
       <Container maxWidth="lg" sx={{ py: 6 }}>
         <Typography variant="h4" sx={{ mb: 4, fontWeight: 700, color: '#e91e63' }}>
           Admin Dashboard — Orders Management
