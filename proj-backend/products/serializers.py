@@ -94,7 +94,7 @@ class ProductListSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT CREATE / UPDATE — FULL CRUD (FIXED)
+# PRODUCT CREATE / UPDATE — FULL CRUD (SAFE + STABLE)
 # ===================================================================
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     brand_id = serializers.PrimaryKeyRelatedField(
@@ -149,11 +149,11 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['final_price', 'id', 'slug']
 
+
     # ===================================================================
-    # CREATE — FIXED
+    # CREATE — SAFE VERSION
     # ===================================================================
     def create(self, validated_data):
-        print("POOKIE: CREATE METHOD RUNNING WITH .set(color_ids)")
         category_ids = validated_data.pop('category_ids', [])
         tag_names = validated_data.pop('tag_names', [])
         cover_file = validated_data.pop('cover_image', None)
@@ -166,12 +166,15 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         # Create product
         product = Product.objects.create(**validated_data)
 
-        # M2M: Use .set()
-        product.categories.set(category_ids)
-        product.ram_options.set(ram_ids)
-        product.storage_options.set(storage_ids)
-        product.colors.set(color_ids)
-        
+        # Safe M2M sets
+        if category_ids:
+            product.categories.set(category_ids)
+        if ram_ids:
+            product.ram_options.set(ram_ids)
+        if storage_ids:
+            product.storage_options.set(storage_ids)
+        if color_ids:
+            product.colors.set(color_ids)
 
         # Tags
         for name in tag_names:
@@ -184,6 +187,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         # Images
         if cover_file:
             product.cover_image = cover_file
+            product.save(update_fields=['cover_image'])
         for img_file in gallery_files:
             ProductImage.objects.create(product=product, image=img_file)
 
@@ -197,8 +201,9 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         return product
 
+
     # ===================================================================
-    # UPDATE — FIXED
+    # UPDATE — SAFE VERSION
     # ===================================================================
     def update(self, instance, validated_data):
         category_ids = validated_data.pop('category_ids', None)
@@ -217,7 +222,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         if 'title' in validated_data:
             instance.slug = slugify(validated_data['title'])
 
-        # M2M: Use .set() if provided
+        # Safe M2M updates
         if category_ids is not None:
             instance.categories.set(category_ids)
         if ram_ids is not None:
@@ -225,7 +230,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         if storage_ids is not None:
             instance.storage_options.set(storage_ids)
         if color_ids is not None:
-            instance.colors.set(color_ids)  # FIXED
+            instance.colors.set(color_ids)
 
         # Tags
         if tag_names is not None:
@@ -247,7 +252,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             for img_file in gallery_files:
                 ProductImage.objects.create(product=instance, image=img_file)
 
-        # Variants — full replace
+        # Variants — replace all
         if variants_data is not None:
             instance.variants.all().delete()
             for var in variants_data:
@@ -258,6 +263,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         instance.save()
 
         return instance
+
 
     # ===================================================================
     # PRICE CALC
