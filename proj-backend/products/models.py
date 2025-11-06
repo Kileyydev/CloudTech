@@ -3,7 +3,7 @@ from django.db import models
 from django.utils.text import slugify
 import uuid
 from cloudinary.models import CloudinaryField
-from decimal import Decimal  # ADD THIS
+from decimal import Decimal
 
 # ================== STORAGE & RAM CHOICES ==================
 STORAGE_CHOICES = [
@@ -35,7 +35,6 @@ class Color(models.Model):
     def __str__(self):
         return self.name
 
-
 # ================== CATEGORY ==================
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -53,7 +52,6 @@ class Category(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
-
 # ================== BRAND ==================
 class Brand(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -67,7 +65,6 @@ class Brand(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
-
 # ================== TAG ==================
 class Tag(models.Model):
     name = models.CharField(max_length=60, unique=True)
@@ -80,7 +77,6 @@ class Tag(models.Model):
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
-
 
 # ================== PRODUCT ==================
 class Product(models.Model):
@@ -127,14 +123,13 @@ class Product(models.Model):
                 i += 1
             self.slug = slug
 
-        # FIXED: Use Decimal for final_price
+        # Calculate final_price
         if self.discount and self.discount > Decimal('0'):
             self.final_price = (self.price * (Decimal('100') - self.discount)) / Decimal('100')
         else:
             self.final_price = self.price
 
         super().save(*args, **kwargs)
-
 
 # ================== PRODUCT VARIANT ==================
 class ProductVariant(models.Model):
@@ -157,7 +152,6 @@ class ProductVariant(models.Model):
     def __str__(self):
         return f"{self.product.title} — {self.sku}"
 
-
 # ================== PRODUCT IMAGE ==================
 class ProductImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -176,6 +170,6 @@ class ProductImage(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+        # Avoid recursive save
         if self.is_primary and self.product.cover_image != self.image:
-            self.product.cover_image = self.image
-            self.product.save(update_fields=['cover_image'])
+            Product.objects.filter(pk=self.product.pk).update(cover_image=self.image)

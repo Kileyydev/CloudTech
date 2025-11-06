@@ -24,7 +24,7 @@ urlpatterns = [
     path('api/health', health_check, name='health'),
     path('api/accounts/', include('accounts.urls')),
     path('api/purchases/', include('purchases.urls')),
-    path('api/products/', include('products.urls')),
+    path('api/', include('products.urls')),
 ]
 
 if settings.DEBUG:

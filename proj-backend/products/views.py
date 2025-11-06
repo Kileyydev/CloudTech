@@ -1,5 +1,6 @@
 # products/views.py
 from rest_framework import viewsets, permissions, filters
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -8,6 +9,7 @@ from django.utils.decorators import method_decorator
 from django.core.cache import cache
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
+import logging
 
 from .models import Product, ProductVariant, Category, Brand, ProductImage, Color
 from .serializers import (
@@ -20,6 +22,7 @@ from .serializers import (
     ColorSerializer
 )
 
+logger = logging.getLogger(__name__)
 
 # ===================================================================
 # CUSTOM PERMISSION: Admin can write, anyone can read
@@ -30,21 +33,15 @@ class IsAdminOrReadOnly(permissions.BasePermission):
             return True
         return bool(request.user and request.user.is_staff)
 
-
 # ===================================================================
 # COLOR VIEWSET — PUBLIC READ
 # ===================================================================
 class ColorViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    List all colors: GET /api/products/colors/
-    Public access
-    """
     queryset = Color.objects.all().order_by('name')
     serializer_class = ColorSerializer
-    permission_classes = [permissions.AllowAny]  # FIXED: PUBLIC
+    permission_classes = [permissions.AllowAny]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name']
-
 
 # ===================================================================
 # PRODUCT VIEWSET — FULLY OPTIMIZED
@@ -66,26 +63,20 @@ class ProductViewSet(viewsets.ModelViewSet):
         return ProductCreateUpdateSerializer
 
     def get_queryset(self):
-        # Build cache key
         category_slug = self.request.query_params.get('category')
         is_featured = self.request.query_params.get('is_featured') == 'true'
         cache_key = f"products_v3_{category_slug or 'all'}_featured_{is_featured}"
 
-        # Try cache first
         cached_qs = cache.get(cache_key)
         if cached_qs is not None:
             return cached_qs
 
-        # Base queryset
         queryset = Product.objects.filter(is_active=True).select_related('brand', 'color')
-
-        # Apply filters
         if category_slug:
             queryset = queryset.filter(categories__slug=category_slug)
         if is_featured:
             queryset = queryset.filter(is_featured=True)
 
-        # OPTIMIZED PREFETCH
         queryset = queryset.prefetch_related(
             'tags',
             'categories',
@@ -93,7 +84,6 @@ class ProductViewSet(viewsets.ModelViewSet):
             Prefetch('images', queryset=ProductImage.objects.all(), to_attr='gallery_images')
         )
 
-        # Cache for 5 minutes
         cache.set(cache_key, queryset, timeout=60 * 5)
         return queryset
 
@@ -102,16 +92,35 @@ class ProductViewSet(viewsets.ModelViewSet):
         context.update({"request": self.request})
         return context
 
-    # ===================================================================
-    # CUSTOM ACTION: GET /api/products/featured/
-    # ===================================================================
+    def create(self, request, *args, **kwargs):
+        logger.info(f"=== PRODUCT CREATE STARTED ===\nDATA: {request.data}\nFILES: {request.FILES}")
+        try:
+            # Handle category_ids[] from frontend
+            data = request.data.copy()
+            category_ids = request.data.getlist('category_ids[]') or request.data.getlist('category_ids')
+            if category_ids:
+                data.setlist('category_ids', category_ids)
+
+            serializer = self.get_serializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            product = serializer.save()
+            headers = self.get_success_headers(serializer.data)
+            logger.info(f"PRODUCT CREATED: {product.id}")
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+        except Exception as e:
+            logger.error(f"PRODUCT CREATE FAILED: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Failed to create product", "details": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     @action(detail=False, methods=['get'], url_path='featured', url_name='featured')
     @method_decorator(cache_page(60 * 5))
     def featured(self, request):
         queryset = self.get_queryset().filter(is_featured=True)[:12]
         serializer = ProductListSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
-
 
 # ===================================================================
 # PRODUCT VARIANT VIEWSET
@@ -128,17 +137,15 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
     ordering_fields = ['price', 'stock', 'created_at']
     ordering = ['-created_at']
 
-
 # ===================================================================
 # CATEGORY VIEWSET
 # ===================================================================
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Category.objects.all().order_by('name')
     serializer_class = CategorySerializer
-    permission_classes = [permissions.AllowAny]  # Public
+    permission_classes = [permissions.AllowAny]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'slug']
-
 
 # ===================================================================
 # BRAND VIEWSET
@@ -146,13 +153,12 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
 class BrandViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Brand.objects.all().order_by('name')
     serializer_class = BrandSerializer
-    permission_classes = [permissions.AllowAny]  # Public
+    permission_classes = [permissions.AllowAny]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'slug']
 
-
 # ===================================================================
-# PRODUCT IMAGE VIEWSET (Optional)
+# PRODUCT IMAGE VIEWSET
 # ===================================================================
 class ProductImageViewSet(viewsets.ModelViewSet):
     queryset = ProductImage.objects.select_related('product', 'variant').all()

@@ -15,7 +15,7 @@ import { getProductImageSrc } from "@/app/utils/image";
 import type { Product } from "@/app/types/products";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
-const API_PRODUCTS = `${API_BASE}/products/products/`;
+const API_PRODUCTS = `${API_BASE}/products/`;        // FIXED: no duplicate /products/
 const API_CATEGORIES = `${API_BASE}/products/categories/`;
 const API_BRANDS = `${API_BASE}/products/brands/`;
 const API_COLORS = `${API_BASE}/products/colors/`;
@@ -158,7 +158,7 @@ const ProductAdminPage: React.FC = () => {
       ]);
 
       if (!pRes.ok || !cRes.ok || !bRes.ok || !colRes.ok) {
-        throw new Error(`HTTP ${pRes.status} ${cRes.status} ${bRes.status} ${colRes.status}`);
+        throw new Error(`HTTP ${pRes.status}`);
       }
 
       const [pJson, cJson, bJson, colJson] = await Promise.all([
@@ -206,7 +206,7 @@ const ProductAdminPage: React.FC = () => {
     setIsActive(true); setIsFeatured(false);
   };
 
-  // === ULTRA-DETAILED SAVE PRODUCT WITH PRODUCTION DEBUGGING ===
+  // === SAVE PRODUCT — FINAL VERSION ===
   const saveProduct = async () => {
     console.log("=== SAVE PRODUCT STARTED ===");
     console.log("editId:", editId);
@@ -214,13 +214,11 @@ const ProductAdminPage: React.FC = () => {
     console.log("API_PRODUCTS:", API_PRODUCTS);
 
     if (!token) {
-      console.error("NO TOKEN — USER NOT LOGGED IN");
       setSnack({ open: true, msg: "Not authenticated", sev: "error" });
       return;
     }
 
     if (!title || price === "" || !brandId) {
-      console.warn("VALIDATION FAILED: Missing required fields");
       setSnack({ open: true, msg: "Fill required fields", sev: "error" });
       return;
     }
@@ -235,31 +233,17 @@ const ProductAdminPage: React.FC = () => {
     form.append("is_featured", String(isFeatured));
     form.append("brand_id", brandId);
 
-    // Categories
-    selectedCats.forEach(id => {
-      form.append("category_ids[]", id);
-    });
+    // FIXED: category_ids (not category_ids[])
+    selectedCats.forEach(id => form.append("category_ids", id));
 
-
-    const safeTrim = (val: string | number | undefined | null): string | null => {
-      if (val === null || val === undefined) return null;
-      const str = String(val);
-      return str.trim() ? str : null;
-    };
-
-    const colorIdStr = safeTrim(colorId);
-    const storageGBStr = safeTrim(storageGB);
-    const ramGBStr = safeTrim(ramGB);
-
-    if (colorIdStr) form.append("color_id", colorIdStr);
-    if (storageGBStr) form.append("storage_gb", storageGBStr);
-    if (ramGBStr) form.append("ram_gb", ramGBStr);
+    if (colorId) form.append("color_id", colorId);
+    if (storageGB) form.append("storage_gb", storageGB);
+    if (ramGB) form.append("ram_gb", ramGB);
     if (condition) form.append("condition", condition);
 
     if (coverFile) form.append("cover_image", coverFile);
     galleryFiles.forEach(f => form.append("gallery", f));
 
-    // === DETAILED FORM DATA LOG ===
     console.log("FORM DATA BEING SENT:");
     for (let [k, v] of form.entries()) {
       if (v instanceof File) {
@@ -271,57 +255,41 @@ const ProductAdminPage: React.FC = () => {
 
     setSaving(true);
     const url = editId ? `${API_PRODUCTS}${editId}/` : API_PRODUCTS;
+    const method = editId ? "PATCH" : "POST";
+
     console.log("REQUEST URL:", url);
-    console.log("METHOD:", editId ? "PATCH" : "POST");
+    console.log("METHOD:", method);
 
     try {
       const res = await fetch(url, {
-        method: editId ? "PATCH" : "POST",
+        method,
         headers: { Authorization: `Bearer ${token}` },
         body: form
       });
 
-      const responseText = await res.text();
+      const text = await res.text();
       console.log("RESPONSE STATUS:", res.status);
-      console.log("RESPONSE HEADERS:", Object.fromEntries(res.headers.entries()));
-      console.log("RESPONSE BODY (first 1000 chars):", responseText.substring(0, 1000));
+      console.log("RESPONSE BODY (first 1000):", text.substring(0, 1000));
 
       if (res.ok) {
         let data;
-        try {
-          data = JSON.parse(responseText);
-          console.log("PARSED JSON RESPONSE:", data);
-        } catch (e) {
-          console.warn("Response is not JSON:", responseText);
-        }
-
+        try { data = JSON.parse(text); } catch {}
         setSnack({ open: true, msg: editId ? "Updated!" : "Added!", sev: "success" });
         resetForm();
         fetchData();
         setTab(1);
       } else {
-        console.error("SERVER ERROR RESPONSE:", {
-          status: res.status,
-          statusText: res.statusText,
-          body: responseText
-        });
-
         let errorMsg = `Error ${res.status}`;
         try {
-          const err = JSON.parse(responseText);
+          const err = JSON.parse(text);
           errorMsg += `: ${JSON.stringify(err)}`;
         } catch {
-          errorMsg += `: ${responseText.substring(0, 200)}`;
+          errorMsg += `: ${text.substring(0, 200)}`;
         }
-
         setSnack({ open: true, msg: errorMsg, sev: "error" });
       }
     } catch (err: any) {
-      console.error("FATAL NETWORK ERROR:", {
-        message: err.message,
-        stack: err.stack,
-        name: err.name
-      });
+      console.error("NETWORK ERROR:", err);
       setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
     } finally {
       setSaving(false);
@@ -330,7 +298,6 @@ const ProductAdminPage: React.FC = () => {
   };
 
   const startEdit = (p: Product) => {
-    console.log("EDITING PRODUCT:", p.id);
     const id = String(p.id);
     setEditId(id);
     setTitle(p.title || "");
@@ -412,6 +379,7 @@ const ProductAdminPage: React.FC = () => {
         <Tab label="Discounted" />
       </Tabs>
 
+      {/* === ADD / EDIT FORM === */}
       {tab === 0 && (
         <StyledPaper elevation={0}>
           <Box sx={{ p: { xs: 3, md: 5 } }}>
@@ -558,7 +526,7 @@ const ProductAdminPage: React.FC = () => {
         </StyledPaper>
       )}
 
-      {/* ALL PRODUCTS & DISCOUNTED TABLE */}
+      {/* === ALL PRODUCTS GRID === */}
       {tab === 1 && (
         <Box>
           <Tabs value={categoryFilter} onChange={(_, v) => setCategoryFilter(v)} variant={isMobile ? "scrollable" : "standard"} sx={{ mb: 3 }}>
@@ -631,6 +599,7 @@ const ProductAdminPage: React.FC = () => {
         </Box>
       )}
 
+      {/* === DISCOUNTED TABLE === */}
       {tab === 2 && (
         <StyledPaper elevation={0}>
           <Box sx={{ p: { xs: 3, md: 4 } }}>
@@ -707,6 +676,7 @@ const ProductAdminPage: React.FC = () => {
         </StyledPaper>
       )}
 
+      {/* === DELETE CONFIRM === */}
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle sx={{ fontWeight: 700 }}>Confirm Delete</DialogTitle>
         <DialogContent>
@@ -720,6 +690,7 @@ const ProductAdminPage: React.FC = () => {
         </DialogActions>
       </Dialog>
 
+      {/* === SNACKBAR === */}
       <Snackbar
         open={snack.open}
         autoHideDuration={6000}
