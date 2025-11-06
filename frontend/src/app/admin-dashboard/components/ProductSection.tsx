@@ -7,7 +7,7 @@ import {
   DialogContent, DialogActions, Card, CardContent, CardMedia,
   Stack, Snackbar, Alert, Table, TableHead, TableRow,
   TableCell, TableBody, useTheme, useMediaQuery, styled, alpha,
-  IconButton, Tooltip
+  IconButton
 } from "@mui/material";
 import {
   Edit, Delete, AddPhotoAlternate, Image as ImageIcon,
@@ -23,7 +23,7 @@ const API_CATS  = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
 const API_BRANDS= `${process.env.NEXT_PUBLIC_API_BASE}/brands/`;
 
 /* ------------------------------------------------------------------ */
-/*  STYLED COMPONENTS (unchanged)                                     */
+/*  STYLED COMPONENTS                                                 */
 /* ------------------------------------------------------------------ */
 const StyledPaper = styled(Paper)(({ theme }) => ({
   overflow: "hidden",
@@ -89,7 +89,7 @@ const GalleryPreview = styled(Box)(({ theme }) => ({
 }));
 
 /* ------------------------------------------------------------------ */
-/*  HELPERS                                                            */
+/*  HELPERS                                                           */
 /* ------------------------------------------------------------------ */
 const getCoverSrc = (p: any) => {
   if (p.cover_image?.url) return p.cover_image.url;
@@ -98,13 +98,13 @@ const getCoverSrc = (p: any) => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  MAIN COMPONENT                                                     */
+/*  MAIN COMPONENT                                                    */
 /* ------------------------------------------------------------------ */
 const ProductAdminPage: React.FC = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-  /* ---------- GLOBAL STATE ---------- */
+  /* ---------- STATE ---------- */
   const [tab, setTab] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState<number | "all">("all");
   const [products, setProducts] = useState<any[]>([]);
@@ -115,7 +115,6 @@ const ProductAdminPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  /* ---------- FORM STATE ---------- */
   const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -135,13 +134,10 @@ const ProductAdminPage: React.FC = () => {
   const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
   const [isFeatured, setIsFeatured] = useState(false);
-  const [variants, setVariants] = useState<any[]>([]); // [{sku,color,ram,storage,processor,size,price,compare_at_price,stock}]
+  const [variants, setVariants] = useState<any[]>([]);
 
-  /* ---------- DELETE DIALOG ---------- */
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-
-  /* ---------- SNACKBAR ---------- */
   const [snack, setSnack] = useState<{ open: boolean; msg: string; sev: "success" | "error" }>({
     open: false, msg: "", sev: "success"
   });
@@ -149,7 +145,7 @@ const ProductAdminPage: React.FC = () => {
   const token = typeof window !== "undefined" ? localStorage.getItem("access") : null;
 
   /* ------------------------------------------------------------------ */
-  /*  CALC FINAL PRICE (client side)                                    */
+  /*  CALC FINAL PRICE                                                  */
   /* ------------------------------------------------------------------ */
   useEffect(() => {
     if (price !== "" && discount !== "") {
@@ -202,12 +198,14 @@ const ProductAdminPage: React.FC = () => {
     setCoverFile(f);
     setCoverPreview(URL.createObjectURL(f));
   };
+
   const handleGallery = (files: FileList | null) => {
     if (!files) { setGalleryFiles([]); setGalleryPreviews([]); return; }
     const arr = Array.from(files);
     setGalleryFiles(arr);
     setGalleryPreviews(arr.map(f => URL.createObjectURL(f)));
   };
+
   const removeGallery = (idx: number) => {
     setGalleryFiles(prev => prev.filter((_, i) => i !== idx));
     setGalleryPreviews(prev => prev.filter((_, i) => i !== idx));
@@ -257,61 +255,60 @@ const ProductAdminPage: React.FC = () => {
   };
 
   /* ------------------------------------------------------------------ */
-  /*  SAVE (CREATE / UPDATE)                                            */
+  /*  SAVE (CREATE / UPDATE) - FIXED                                    */
   /* ------------------------------------------------------------------ */
-const saveProduct = async () => {
-  if (!token || !title || price === "" || !brandId) {
-    setSnack({ open: true, msg: "Fill required fields", sev: "error" });
-    return;
-  }
-
-  const form = new FormData();
-  form.append("title", title);
-  form.append("description", description);
-  form.append("price", String(price));
-  form.append("stock", String(stock || 0));
-  form.append("discount", String(discount));
-  form.append("is_active", isActive ? "true" : "false");
-  form.append("is_featured", isFeatured ? "true" : "false");
-  form.append("brand_id", brandId);
-
-  form.append("category_ids", JSON.stringify(selectedCats.map(Number)));
-  form.append("ram_option_ids", JSON.stringify(selectedRam.map(Number)));
-  form.append("storage_option_ids", JSON.stringify(selectedStorage.map(Number)));
-  form.append("color_option_ids", JSON.stringify(selectedColors.map(Number)));
-  form.append("tag_names", JSON.stringify(tagNames));
-
-  form.append("variants", JSON.stringify(variants));
-
-  if (coverFile) form.append("cover_image", coverFile);
-  galleryFiles.forEach(f => form.append("gallery", f));
-
-  setSaving(true);
-  try {
-    const url = editId ? `${API_BASE}${editId}/` : API_BASE;
-    const method = editId ? "PATCH" : "POST";
-    const res = await fetch(url, {
-      method,
-      headers: { Authorization: `Bearer ${token}` }, // do NOT set Content-Type; browser handles multipart
-      body: form
-    });
-
-    if (res.ok) {
-      setSnack({ open: true, msg: editId ? "Updated" : "Created", sev: "success" });
-      resetForm();
-      fetchAll();
-      setTab(1);
-    } else {
-      const err = await res.text();
-      setSnack({ open: true, msg: `Save failed: ${err}`, sev: "error" });
+  const saveProduct = async () => {
+    if (!token || !title || price === "" || !brandId) {
+      setSnack({ open: true, msg: "Fill required fields", sev: "error" });
+      return;
     }
-  } catch {
-    setSnack({ open: true, msg: "Network error", sev: "error" });
-  } finally {
-    setSaving(false);
-  }
-};
 
+    const form = new FormData();
+    form.append("title", title);
+    form.append("description", description);
+    form.append("price", String(price));
+    form.append("stock", String(stock || 0));
+    form.append("discount", String(discount));
+    form.append("is_active", isActive ? "true" : "false");
+    form.append("is_featured", isFeatured ? "true" : "false");
+    form.append("brand_id", brandId);
+
+    // Send arrays as JSON strings
+    form.append("category_ids", JSON.stringify(selectedCats.map(Number)));
+    form.append("ram_option_ids", JSON.stringify(selectedRam.map(Number)));
+    form.append("storage_option_ids", JSON.stringify(selectedStorage.map(Number)));
+    form.append("color_option_ids", JSON.stringify(selectedColors.map(Number)));
+    form.append("tag_names", JSON.stringify(tagNames));
+    form.append("variants", JSON.stringify(variants));
+
+    if (coverFile) form.append("cover_image", coverFile);
+    galleryFiles.forEach(f => form.append("gallery", f));
+
+    setSaving(true);
+    try {
+      const url = editId ? `${API_BASE}${editId}/` : API_BASE;
+      const method = editId ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { Authorization: `Bearer ${token}` }, // NO Content-Type!
+        body: form
+      });
+
+      if (res.ok) {
+        setSnack({ open: true, msg: editId ? "Updated" : "Created", sev: "success" });
+        resetForm();
+        fetchAll();
+        setTab(1);
+      } else {
+        const err = await res.text();
+        setSnack({ open: true, msg: `Save failed: ${err}`, sev: "error" });
+      }
+    } catch (err: any) {
+      setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   /* ------------------------------------------------------------------ */
   /*  DELETE                                                            */
@@ -335,7 +332,7 @@ const saveProduct = async () => {
   };
 
   /* ------------------------------------------------------------------ */
-  /*  QUICK DISCOUNT UPDATE (table tab)                                 */
+  /*  QUICK DISCOUNT UPDATE                                             */
   /* ------------------------------------------------------------------ */
   const updateDiscount = async (p: any) => {
     if (!token) return;
@@ -389,28 +386,13 @@ const saveProduct = async () => {
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#f8f9fa", p: { xs: 2, md: 4 } }}>
       {/* TABS */}
-      <Tabs
-        value={tab}
-        onChange={(_, v) => setTab(v)}
-        centered
-        sx={{
-          mb: 4,
-          "& .MuiTab-root": {
-            textTransform: "none",
-            fontWeight: 600,
-            fontSize: "1.1rem",
-            color: "#666",
-            "&.Mui-selected": { color: "#DC1A8A" },
-          },
-          "& .MuiTabs-indicator": { backgroundColor: "#DC1A8A", height: 3 },
-        }}
-      >
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} centered sx={{ mb: 4 }}>
         <Tab label={editId ? "Edit Product" : "Add Product"} />
         <Tab label="All Products" />
         <Tab label="Discounted" />
       </Tabs>
 
-      {/* ==================== FORM TAB ==================== */}
+      {/* FORM TAB */}
       {tab === 0 && (
         <StyledPaper elevation={0}>
           <Box sx={{ p: { xs: 3, md: 5 } }}>
@@ -418,7 +400,6 @@ const saveProduct = async () => {
               {editId ? "Edit Product" : "Add New Product"}
             </Typography>
             <Stack spacing={4}>
-              {/* BASIC FIELDS */}
               <TextField label="Title *" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
               <TextField label="Description" value={description} onChange={e => setDescription(e.target.value)} multiline rows={4} fullWidth />
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
@@ -431,8 +412,7 @@ const saveProduct = async () => {
               {/* CATEGORIES */}
               <FormControl fullWidth>
                 <InputLabel>Categories</InputLabel>
-                <Select multiple value={selectedCats}
-                  onChange={e => setSelectedCats(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
+                <Select multiple value={selectedCats} onChange={e => setSelectedCats(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
                   renderValue={sel => (
                     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                       {(sel as string[]).map(v => {
@@ -462,74 +442,43 @@ const saveProduct = async () => {
                 </Select>
               </FormControl>
 
-              {/* GLOBAL OPTIONS */}
-              <FormControl fullWidth>
-                <InputLabel>RAM Options</InputLabel>
-                <Select multiple value={selectedRam}
-                  onChange={e => setSelectedRam(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
-                  renderValue={sel => (
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                      {(sel as string[]).map(v => {
-                        const o = options.find(o => o.id.toString() === v);
-                        return <Chip key={v} label={o?.value} size="small" sx={{ bgcolor: "#DC1A8A", color: "#fff" }} />;
-                      })}
-                    </Box>
-                  )}
-                >
-                  {options.filter(o => o.type === "RAM").map(o => (
-                    <MenuItem key={o.id} value={o.id.toString()}>
-                      <Checkbox checked={selectedRam.includes(o.id.toString())} />
-                      {o.value}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              {/* OPTIONS */}
+              {["RAM", "STORAGE", "COLOR"].map(type => (
+                <FormControl key={type} fullWidth>
+                  <InputLabel>{type === "COLOR" ? "Colors" : `${type} Options`}</InputLabel>
+                  <Select
+                    multiple
+                    value={type === "RAM" ? selectedRam : type === "STORAGE" ? selectedStorage : selectedColors}
+                    onChange={e => {
+                      const val = typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value;
+                      if (type === "RAM") setSelectedRam(val);
+                      else if (type === "STORAGE") setSelectedStorage(val);
+                      else setSelectedColors(val);
+                    }}
+                    renderValue={sel => (
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                        {(sel as string[]).map(v => {
+                          const o = options.find(o => o.id.toString() === v);
+                          return <Chip key={v} label={o?.value} size="small" sx={{ bgcolor: "#DC1A8A", color: "#fff" }} />;
+                        })}
+                      </Box>
+                    )}
+                  >
+                    {options.filter(o => o.type === type).map(o => (
+                      <MenuItem key={o.id} value={o.id.toString()}>
+                        <Checkbox checked={
+                          type === "RAM" ? selectedRam.includes(o.id.toString()) :
+                          type === "STORAGE" ? selectedStorage.includes(o.id.toString()) :
+                          selectedColors.includes(o.id.toString())
+                        } />
+                        {o.value}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              ))}
 
-              <FormControl fullWidth>
-                <InputLabel>Storage Options</InputLabel>
-                <Select multiple value={selectedStorage}
-                  onChange={e => setSelectedStorage(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
-                  renderValue={sel => (
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                      {(sel as string[]).map(v => {
-                        const o = options.find(o => o.id.toString() === v);
-                        return <Chip key={v} label={o?.value} size="small" sx={{ bgcolor: "#DC1A8A", color: "#fff" }} />;
-                      })}
-                    </Box>
-                  )}
-                >
-                  {options.filter(o => o.type === "STORAGE").map(o => (
-                    <MenuItem key={o.id} value={o.id.toString()}>
-                      <Checkbox checked={selectedStorage.includes(o.id.toString())} />
-                      {o.value}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl fullWidth>
-                <InputLabel>Colors</InputLabel>
-                <Select multiple value={selectedColors}
-                  onChange={e => setSelectedColors(typeof e.target.value === "string" ? e.target.value.split(",") : e.target.value)}
-                  renderValue={sel => (
-                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                      {(sel as string[]).map(v => {
-                        const o = options.find(o => o.id.toString() === v);
-                        return <Chip key={v} label={o?.value} size="small" sx={{ bgcolor: "#DC1A8A", color: "#fff" }} />;
-                      })}
-                    </Box>
-                  )}
-                >
-                  {options.filter(o => o.type === "COLOR").map(o => (
-                    <MenuItem key={o.id} value={o.id.toString()}>
-                      <Checkbox checked={selectedColors.includes(o.id.toString())} />
-                      {o.value}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {/* TAGS (free-text) */}
+              {/* TAGS */}
               <TextField
                 label="Tags (comma separated)"
                 value={tagNames.join(", ")}
@@ -538,7 +487,7 @@ const saveProduct = async () => {
                 helperText="Separate tags with commas"
               />
 
-              {/* COVER IMAGE */}
+              {/* COVER */}
               <Box>
                 <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 600 }}>Cover Image</Typography>
                 <ImageUpload>
@@ -597,13 +546,11 @@ const saveProduct = async () => {
                 ))}
               </Box>
 
-              {/* FLAGS */}
               <Stack direction="row" spacing={3}>
                 <FormControlLabel control={<Checkbox checked={isActive} onChange={e => setIsActive(e.target.checked)} />} label="Active" />
                 <FormControlLabel control={<Checkbox checked={isFeatured} onChange={e => setIsFeatured(e.target.checked)} />} label="Featured" />
               </Stack>
 
-              {/* SUBMIT */}
               <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
                 <StyledButton className="primary" onClick={saveProduct} disabled={saving}>
                   {saving ? "Saving…" : editId ? "Update Product" : "Add Product"}
@@ -614,24 +561,10 @@ const saveProduct = async () => {
         </StyledPaper>
       )}
 
-      {/* ==================== ALL PRODUCTS TAB ==================== */}
+      {/* ALL PRODUCTS TAB */}
       {tab === 1 && (
         <Box>
-          <Tabs
-            value={categoryFilter}
-            onChange={(_, v) => setCategoryFilter(v)}
-            variant={isMobile ? "scrollable" : "standard"}
-            sx={{
-              mb: 3,
-              "& .MuiTab-root": {
-                textTransform: "none",
-                fontWeight: 600,
-                color: "#666",
-                "&.Mui-selected": { color: "#DC1A8A" },
-              },
-              "& .MuiTabs-indicator": { backgroundColor: "#DC1A8A" },
-            }}
-          >
+          <Tabs value={categoryFilter} onChange={(_, v) => setCategoryFilter(v)} variant={isMobile ? "scrollable" : "standard"} sx={{ mb: 3 }}>
             <Tab label="All" value="all" />
             {categories.map(c => <Tab key={c.id} label={c.name} value={c.id} />)}
           </Tabs>
@@ -656,19 +589,11 @@ const saveProduct = async () => {
                     <DiscountBadge>{p.discount}% OFF</DiscountBadge>
                   )}
                   <Box onClick={() => startEdit(p)} sx={{ height: 200, cursor: "pointer", overflow: "hidden" }}>
-                    <CardMedia
-                      component="img"
-                      image={getCoverSrc(p)}
-                      sx={{ width: "100%", height: "100%", objectFit: "cover", transition: "0.3s", "&:hover": { transform: "scale(1.05)" } }}
-                    />
+                    <CardMedia component="img" image={getCoverSrc(p)} sx={{ width: "100%", height: "100%", objectFit: "cover", transition: "0.3s", "&:hover": { transform: "scale(1.05)" } }} />
                   </Box>
                   <CardContent sx={{ p: 2.5 }}>
-                    <Typography variant="h6" noWrap sx={{ fontWeight: 700, color: "#222" }}>
-                      {p.title}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: "#666", mb: 1.5, height: 40, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
-                      {p.description}
-                    </Typography>
+                    <Typography variant="h6" noWrap sx={{ fontWeight: 700, color: "#222" }}>{p.title}</Typography>
+                    <Typography variant="body2" sx={{ color: "#666", mb: 1.5, height: 40, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{p.description}</Typography>
                     <Box sx={{ mb: 2 }}>
                       {p.discount && p.discount > 0 && (
                         <Typography sx={{ textDecoration: "line-through", color: "#999", fontSize: "0.9rem" }}>
@@ -691,13 +616,11 @@ const saveProduct = async () => {
         </Box>
       )}
 
-      {/* ==================== DISCOUNTED TABLE TAB ==================== */}
+      {/* DISCOUNTED TABLE */}
       {tab === 2 && (
         <StyledPaper elevation={0}>
           <Box sx={{ p: { xs: 3, md: 4 } }}>
-            <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: "#222" }}>
-              Discounted Products
-            </Typography>
+            <Typography variant="h5" sx={{ mb: 3, fontWeight: 700, color: "#222" }}>Discounted Products</Typography>
             {loading ? (
               <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
                 <CircularProgress size={50} sx={{ color: "#DC1A8A" }} />
@@ -720,20 +643,11 @@ const saveProduct = async () => {
                 <TableBody>
                   {discounted.map(p => (
                     <TableRow key={p.id} hover>
-                      <TableCell>
-                        <img src={getCoverSrc(p)} width={60} height={60} style={{ objectFit: "cover", border: "2px solid #eee" }} />
-                      </TableCell>
+                      <TableCell><img src={getCoverSrc(p)} width={60} height={60} style={{ objectFit: "cover", border: "2px solid #eee" }} /></TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>{p.title}</TableCell>
+                      <TableCell><Typography sx={{ textDecoration: "line-through", color: "#999" }}>KES {p.price?.toLocaleString()}</Typography></TableCell>
                       <TableCell>
-                        <Typography sx={{ textDecoration: "line-through", color: "#999" }}>
-                          KES {p.price?.toLocaleString()}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <TextField
-                          type="number"
-                          size="small"
-                          value={p.discount ?? 0}
+                        <TextField type="number" size="small" value={p.discount ?? 0}
                           onChange={e => setProducts(prev => prev.map(x => x.id === p.id ? { ...x, discount: Number(e.target.value) } : x))}
                         />
                       </TableCell>
@@ -742,12 +656,7 @@ const saveProduct = async () => {
                       </TableCell>
                       <TableCell>{p.brand?.name || "—"}</TableCell>
                       <TableCell>
-                        <StyledButton
-                          size="small"
-                          className="primary"
-                          onClick={() => updateDiscount(p)}
-                          disabled={savingId === p.id}
-                        >
+                        <StyledButton size="small" className="primary" onClick={() => updateDiscount(p)} disabled={savingId === p.id}>
                           {savingId === p.id ? "…" : "Update"}
                         </StyledButton>
                       </TableCell>
@@ -760,34 +669,21 @@ const saveProduct = async () => {
         </StyledPaper>
       )}
 
-      {/* ==================== DELETE DIALOG ==================== */}
+      {/* DELETE DIALOG */}
       <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <DialogTitle sx={{ fontWeight: 700 }}>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <Typography>This action cannot be undone. Are you sure?</Typography>
-        </DialogContent>
+        <DialogContent><Typography>This action cannot be undone. Are you sure?</Typography></DialogContent>
         <DialogActions sx={{ p: 3, gap: 1 }}>
           <Button onClick={() => setConfirmOpen(false)}>Cancel</Button>
-          <StyledButton className="danger" onClick={doDelete} variant="contained">
-            Delete
-          </StyledButton>
+          <StyledButton className="danger" onClick={doDelete} variant="contained">Delete</StyledButton>
         </DialogActions>
       </Dialog>
 
-      {/* ==================== SNACKBAR ==================== */}
-      <Snackbar
-        open={snack.open}
-        autoHideDuration={3000}
-        onClose={() => setSnack(s => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert
-          onClose={() => setSnack(s => ({ ...s, open: false }))}
-          severity={snack.sev}
+      {/* SNACKBAR */}
+      <Snackbar open={snack.open} autoHideDuration={3000} onClose={() => setSnack(s => ({ ...s, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        <Alert onClose={() => setSnack(s => ({ ...s, open: false }))} severity={snack.sev}
           sx={{
-            width: "100%",
-            fontWeight: 600,
-            boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
+            width: "100%", fontWeight: 600, boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
             ...(snack.sev === "success" && { bgcolor: "#4caf50", color: "#fff" }),
             ...(snack.sev === "error" && { bgcolor: "#f44336", color: "#fff" }),
           }}
