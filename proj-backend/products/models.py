@@ -3,6 +3,7 @@ from django.db import models
 from django.utils.text import slugify
 import uuid
 from cloudinary.models import CloudinaryField
+from decimal import Decimal  # ADD THIS
 
 # ================== STORAGE & RAM CHOICES ==================
 STORAGE_CHOICES = [
@@ -99,7 +100,6 @@ class Product(models.Model):
     discount = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     final_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
-    # NEW FIELDS
     storage_gb = models.IntegerField(choices=STORAGE_CHOICES, null=True, blank=True)
     ram_gb = models.IntegerField(choices=RAM_CHOICES, null=True, blank=True)
     color = models.ForeignKey(Color, on_delete=models.SET_NULL, null=True, blank=True)
@@ -127,9 +127,9 @@ class Product(models.Model):
                 i += 1
             self.slug = slug
 
-        # Calculate final_price
-        if self.discount and self.discount > 0:
-            self.final_price = round(self.price * (1 - self.discount / 100), 2)
+        # FIXED: Use Decimal for final_price
+        if self.discount and self.discount > Decimal('0'):
+            self.final_price = (self.price * (Decimal('100') - self.discount)) / Decimal('100')
         else:
             self.final_price = self.price
 
