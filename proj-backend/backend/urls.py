@@ -14,18 +14,22 @@ urlpatterns = [
     path('', views.home, name='home'),
     path('admin/', admin.site.urls),
 
+    # === AUTH ===
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
-   # path('api/', include('products.urls')),
+    # === API APPS (GROUPED) ===
+    path('api/', include('products.urls')),        # ← MOVED TO TOP!
     path('api/', include('contact.urls')),
     path('api/', include('testimonials.urls')),
     path('api/repairs/', include('repairs.urls')),
-    path('api/health', health_check, name='health'),
     path('api/accounts/', include('accounts.urls')),
     path('api/purchases/', include('purchases.urls')),
-    path('api/', include('products.urls')),
+
+    # === HEALTH ===
+    path('api/health', health_check, name='health'),
 ]
 
+# Serve media in dev
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
