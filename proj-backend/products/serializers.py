@@ -101,7 +101,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         queryset=Brand.objects.all(), source='brand', write_only=True
     )
     category_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(), many=True, write_only=True
+        queryset=Category.objects.all(), many=True, write_only=True, source='categories'
     )
     tag_names = serializers.ListField(
         child=serializers.CharField(max_length=60),
@@ -118,15 +118,15 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
     ram_option_ids = serializers.PrimaryKeyRelatedField(
         queryset=GlobalOption.objects.filter(type='RAM'),
-        many=True, required=False, write_only=True
+        many=True, required=False, write_only=True, source='ram_options'
     )
     storage_option_ids = serializers.PrimaryKeyRelatedField(
         queryset=GlobalOption.objects.filter(type='STORAGE'),
-        many=True, required=False, write_only=True
+        many=True, required=False, write_only=True, source='storage_options'
     )
     color_option_ids = serializers.PrimaryKeyRelatedField(
         queryset=GlobalOption.objects.filter(type='COLOR'),
-        many=True, required=False, write_only=True
+        many=True, required=False, write_only=True, source='colors'
     )
 
     variants = ProductVariantSerializer(many=True, required=False)
