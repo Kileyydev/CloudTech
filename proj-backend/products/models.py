@@ -4,6 +4,8 @@ from django.utils.text import slugify
 import uuid
 from cloudinary.models import CloudinaryField
 from django.core.validators import MinValueValidator, MaxValueValidator
+from decimal import Decimal
+from django.db import transaction
 
 
 # ===================================================================
@@ -148,9 +150,10 @@ class Product(models.Model):
                 i += 1
             self.slug = slug
 
-        # Auto-calculate final price
+        # SAFE Decimal math — NO float conversion
         if self.discount > 0:
-            self.final_price = round(float(self.price) * (1 - self.discount / 100), 2)
+            discount_factor = self.discount / Decimal('100')
+            self.final_price = (self.price * (Decimal('1') - discount_factor)).quantize(Decimal('0.01'))
         else:
             self.final_price = self.price
 
@@ -221,10 +224,19 @@ class ProductImage(models.Model):
     def __str__(self):
         return f"Image for {self.product.title}"
 
+    @transaction.atomic
     def save(self, *args, **kwargs):
-        if self.is_primary:
-            ProductImage.objects.filter(product=self.product, is_primary=True).update(is_primary=False)
-            if self.product.cover_image != self.image:
-                self.product.cover_image = self.image
-                self.product.save(update_fields=['cover_image'])
+        # Only run primary logic on save (not delete)
+        if self.pk is None or self.is_primary:
+            # Demote other primary images
+            ProductImage.objects.filter(product=self.product, is_primary=True) \
+                              .exclude(pk=self.pk) \
+                              .update(is_primary=False)
+
+            # Update cover_image ONLY if this is primary and different
+            if self.is_primary:
+                if not self.product.cover_image or self.product.cover_image != self.image:
+                    # Avoid triggering Product.save() → use update()
+                    Product.objects.filter(pk=self.product.pk).update(cover_image=self.image)
+
         super().save(*args, **kwargs)

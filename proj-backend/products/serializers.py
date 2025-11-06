@@ -1,8 +1,14 @@
 from rest_framework import serializers
 from django.utils.text import slugify
+from django.db import transaction
+from decimal import Decimal, InvalidOperation
+import logging
+
 from .models import (
     Category, Brand, Tag, Product, ProductVariant, ProductImage, GlobalOption
 )
+
+logger = logging.getLogger(__name__)
 
 
 # ===================================================================
@@ -36,7 +42,7 @@ class TagSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT IMAGE — CLOUDINARY URL
+# PRODUCT IMAGE — CLOUDINARY SECURE URL
 # ===================================================================
 class ProductImageSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
@@ -46,7 +52,11 @@ class ProductImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'image', 'alt_text', 'is_primary']
 
     def get_image(self, obj):
-        return obj.image.url if obj.image else None
+        if not obj.image:
+            return None
+        # Force HTTPS for Cloudinary
+        url = obj.image.url
+        return url.replace('http://', 'https://') if url else None
 
 
 # ===================================================================
@@ -90,14 +100,14 @@ class ProductListSerializer(serializers.ModelSerializer):
         ]
 
     def get_cover_image(self, obj):
-        return obj.cover_image.url if obj.cover_image else None
+        if not obj.cover_image:
+            return None
+        url = obj.cover_image.url
+        return url.replace('http://', 'https://') if url else None
 
 
 # ===================================================================
 # PRODUCT CREATE / UPDATE — FULL CRUD (SAFE + STABLE)
-# ===================================================================
-# ===================================================================
-# PRODUCT CREATE / UPDATE — FIXED & STABLE
 # ===================================================================
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     # === WRITE-ONLY: Accept IDs as lists ===
@@ -124,7 +134,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     )
 
     # === NESTED WRITE ===
-    variants = ProductVariantSerializer(many=True, required=False)
+    variants = ProductVariantSerializer(many=True, required=False, write_only=True)
 
     # === READ-ONLY ===
     brand = BrandSerializer(read_only=True)
@@ -148,9 +158,28 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['final_price', 'id', 'slug']
 
+    # === VALIDATION: Ensure discount & price are Decimal-safe ===
+    def validate(self, data):
+        price = data.get('price')
+        discount = data.get('discount')
+
+        if price is not None:
+            try:
+                data['price'] = Decimal(str(price))
+            except (InvalidOperation, TypeError, ValueError):
+                raise serializers.ValidationError({"price": "Must be a valid decimal number."})
+
+        if discount is not None:
+            try:
+                data['discount'] = Decimal(str(discount))
+            except (InvalidOperation, TypeError, ValueError):
+                raise serializers.ValidationError({"discount": "Must be a valid decimal number."})
+
+        return data
+
     # === CREATE ===
+    @transaction.atomic
     def create(self, validated_data):
-        # Pop M2M IDs
         category_ids = validated_data.pop('category_ids', [])
         ram_ids = validated_data.pop('ram_option_ids', [])
         storage_ids = validated_data.pop('storage_option_ids', [])
@@ -163,45 +192,18 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         # Create product
         product = Product.objects.create(**validated_data)
 
-        # === SET M2M USING .set() + Queryset ===
-        if category_ids:
-            product.categories.set(Category.objects.filter(id__in=category_ids))
-        if ram_ids:
-            product.ram_options.set(GlobalOption.objects.filter(id__in=ram_ids, type='RAM'))
-        if storage_ids:
-            product.storage_options.set(GlobalOption.objects.filter(id__in=storage_ids, type='STORAGE'))
-        if color_ids:
-            product.colors.set(GlobalOption.objects.filter(id__in=color_ids, type='COLOR'))
+        self._update_m2m_relations(product, category_ids, ram_ids, storage_ids, color_ids, tag_names)
+        self._update_images(product, cover_file, gallery_files)
+        self._update_variants(product, variants_data)
 
-        # === TAGS ===
-        for name in tag_names:
-            tag, _ = Tag.objects.get_or_create(
-                name=name.strip().lower(),
-                defaults={'slug': slugify(name)}
-            )
-            product.tags.add(tag)
-
-        # === COVER & GALLERY ===
-        if cover_file:
-            product.cover_image = cover_file
-            product.save(update_fields=['cover_image'])
-
-        for img_file in gallery_files:
-            ProductImage.objects.create(product=product, image=img_file)
-
-        # === VARIANTS ===
-        for var in variants_data:
-            ProductVariant.objects.create(product=product, **var)
-
-        # === FINAL PRICE ===
         product.final_price = self._calc_final_price(product)
-        product.save()
+        product.save(update_fields=['final_price'])
 
         return product
 
     # === UPDATE ===
+    @transaction.atomic
     def update(self, instance, validated_data):
-        # Pop M2M
         category_ids = validated_data.pop('category_ids', None)
         ram_ids = validated_data.pop('ram_option_ids', None)
         storage_ids = validated_data.pop('storage_option_ids', None)
@@ -212,54 +214,82 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         gallery_files = validated_data.pop('gallery', None)
 
         # Update scalar fields
+        title_changed = 'title' in validated_data
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        if 'title' in validated_data:
+
+        if title_changed:
             instance.slug = slugify(validated_data['title'])
 
-        # === M2M SET ===
+        # Conditional updates
         if category_ids is not None:
-            instance.categories.set(Category.objects.filter(id__in=category_ids))
+            self._update_categories(instance, category_ids)
         if ram_ids is not None:
-            instance.ram_options.set(GlobalOption.objects.filter(id__in=ram_ids))
+            self._update_ram_options(instance, ram_ids)
         if storage_ids is not None:
-            instance.storage_options.set(GlobalOption.objects.filter(id__in=storage_ids))
+            self._update_storage_options(instance, storage_ids)
         if color_ids is not None:
-            instance.colors.set(GlobalOption.objects.filter(id__in=color_ids))
-
-        # === TAGS ===
+            self._update_colors(instance, color_ids)
         if tag_names is not None:
-            instance.tags.clear()
-            for name in tag_names:
-                tag, _ = Tag.objects.get_or_create(
-                    name=name.strip().lower(),
-                    defaults={'slug': slugify(name)}
-                )
-                instance.tags.add(tag)
-
-        # === COVER ===
-        if cover_file is not None:
-            instance.cover_image = cover_file
-
-        # === GALLERY REPLACE ===
-        if gallery_files is not None:
-            instance.images.all().delete()
-            for img_file in gallery_files:
-                ProductImage.objects.create(product=instance, image=img_file)
-
-        # === VARIANTS REPLACE ===
+            self._update_tags(instance, tag_names)
+        if cover_file is not None or gallery_files is not None:
+            self._update_images(instance, cover_file, gallery_files)
         if variants_data is not None:
-            instance.variants.all().delete()
-            for var in variants_data:
-                ProductVariant.objects.create(product=instance, **var)
+            self._update_variants(instance, variants_data)
 
-        # === FINAL PRICE ===
         instance.final_price = self._calc_final_price(instance)
         instance.save()
 
         return instance
 
+    # === HELPER: M2M Relations ===
+    def _update_m2m_relations(self, product, category_ids, ram_ids, storage_ids, color_ids, tag_names):
+        if category_ids:
+            product.categories.set(Category.objects.filter(id__in=category_ids))
+        if ram_ids:
+            product.ram_options.set(GlobalOption.objects.filter(id__in=ram_ids, type='RAM'))
+        if storage_ids:
+            product.storage_options.set(GlobalOption.objects.filter(id__in=storage_ids, type='STORAGE'))
+        if color_ids:
+            product.colors.set(GlobalOption.objects.filter(id__in=color_ids, type='COLOR'))
+        if tag_names:
+            product.tags.clear()
+            for name in tag_names:
+                tag, _ = Tag.objects.get_or_create(
+                    name=name.strip().lower(),
+                    defaults={'slug': slugify(name)}
+                )
+                product.tags.add(tag)
+
+    # === HELPER: Images ===
+    def _update_images(self, product, cover_file, gallery_files):
+        if cover_file is not None:
+            product.cover_image = cover_file
+            product.save(update_fields=['cover_image'])
+
+        if gallery_files is not None:
+            product.images.all().delete()
+            for img_file in gallery_files:
+                ProductImage.objects.create(product=product, image=img_file)
+
+    # === HELPER: Variants ===
+    def _update_variants(self, product, variants_data):
+        product.variants.all().delete()
+        for var in variants_data:
+            ProductVariant.objects.create(product=product, **var)
+
+    # === HELPER: Final Price (SAFE DECIMAL MATH) ===
     def _calc_final_price(self, obj):
+        if not obj.price:
+            return Decimal('0.00')
+
         if obj.discount and obj.discount > 0:
-            return round(obj.price * (1 - obj.discount / 100), 2)
-        return obj.price
+            try:
+                discount_factor = obj.discount / Decimal('100')
+                discounted = obj.price * (Decimal('1') - discount_factor)
+                return discounted.quantize(Decimal('0.01'))  # Round to 2 decimals
+            except (InvalidOperation, TypeError) as e:
+                logger.error(f"Discount calculation failed: {e}")
+                return obj.price
+
+        return obj.price.quantize(Decimal('0.01'))
