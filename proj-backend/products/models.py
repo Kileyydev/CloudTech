@@ -3,7 +3,7 @@ from django.db import models
 from django.utils.text import slugify
 import uuid
 from cloudinary.models import CloudinaryField
-from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 # ===================================================================
@@ -96,7 +96,12 @@ class Product(models.Model):
 
     price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     stock = models.PositiveIntegerField(default=0)
-    discount = models.DecimalField(max_digits=5, decimal_places=2, default=0, validators=[models.MinValueValidator(0), models.MaxValueValidator(100)])
+    discount = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
     final_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
 
     ram_options = models.ManyToManyField(
@@ -151,10 +156,6 @@ class Product(models.Model):
 
         super().save(*args, **kwargs)
 
-    def clean(self):
-        if self.discount < 0 or self.discount > 100:
-            raise ValidationError("Discount must be between 0 and 100.")
-
 
 # ===================================================================
 # PRODUCT VARIANT
@@ -174,11 +175,11 @@ class ProductVariant(models.Model):
     compare_at_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     stock = models.PositiveIntegerField(default=0)
 
-    is_active = models.BooleanField(default=False)  # Default False — force admin to enable
+    is_active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('product', 'color', 'ram', 'storage')  # Better than just SKU
+        unique_together = ('product', 'color', 'ram', 'storage')
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['sku']),
@@ -191,12 +192,6 @@ class ProductVariant(models.Model):
         if self.ram: parts.append(self.ram)
         if self.storage: parts.append(self.storage)
         return " — ".join(parts)
-
-    def clean(self):
-        if not self.sku:
-            raise ValidationError("SKU is required.")
-        if self.price < 0:
-            raise ValidationError("Price cannot be negative.")
 
 
 # ===================================================================
@@ -227,15 +222,9 @@ class ProductImage(models.Model):
         return f"Image for {self.product.title}"
 
     def save(self, *args, **kwargs):
-        # Ensure only one primary per product
         if self.is_primary:
             ProductImage.objects.filter(product=self.product, is_primary=True).update(is_primary=False)
-            # Sync cover image
             if self.product.cover_image != self.image:
                 self.product.cover_image = self.image
                 self.product.save(update_fields=['cover_image'])
         super().save(*args, **kwargs)
-
-    def clean(self):
-        if self.is_primary and self.variant:
-            raise ValidationError("Primary image cannot be tied to a variant.")
