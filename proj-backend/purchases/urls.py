@@ -6,7 +6,9 @@ urlpatterns = [
     # 1. LIST & CREATE ORDERS (for admin/auth)
     path('', OrderListCreateView.as_view(), name='order-list-create'),
 
-    # 2. CRUD BY ID (for admin/auth) — e.g. /api/purchases/CT123/
-    path('<str:id>/', OrderDetailView.as_view(), name='order-detail-crud'),
+    # 2. PUBLIC DETAIL (accessible without auth)
     path('order/<str:id>/', OrderPublicDetailView.as_view(), name='order-public-detail'),
+
+    # 3. ADMIN CRUD BY ID
+    path('<str:id>/', OrderDetailView.as_view(), name='order-detail-crud'),
 ]
