@@ -259,53 +259,59 @@ const ProductAdminPage: React.FC = () => {
   /* ------------------------------------------------------------------ */
   /*  SAVE (CREATE / UPDATE)                                            */
   /* ------------------------------------------------------------------ */
-  const saveProduct = async () => {
-    if (!token || !title || price === "" || !brandId) {
-      setSnack({ open: true, msg: "Fill required fields", sev: "error" });
-      return;
-    }
-    const form = new FormData();
-    form.append("title", title);
-    form.append("description", description);
-    form.append("price", String(price));
-    form.append("stock", String(stock || 0));
-    form.append("discount", String(discount));
-    form.append("is_active", String(isActive));
-    form.append("is_featured", String(isFeatured));
-    selectedCats.forEach(id => form.append("category_ids", id));
-    form.append("brand_id", brandId);
-    selectedRam.forEach(id => form.append("ram_option_ids", id));
-    selectedStorage.forEach(id => form.append("storage_option_ids", id));
-    selectedColors.forEach(id => form.append("color_option_ids", id));
-    tagNames.forEach(name => form.append("tag_names", name));
-    if (coverFile) form.append("cover_image", coverFile);
-    galleryFiles.forEach(f => form.append("gallery", f));
-    variants.forEach(v => form.append("variants", JSON.stringify(v)));
+const saveProduct = async () => {
+  if (!token || !title || price === "" || !brandId) {
+    setSnack({ open: true, msg: "Fill required fields", sev: "error" });
+    return;
+  }
 
-    setSaving(true);
-    try {
-      const url = editId ? `${API_BASE}${editId}/` : API_BASE;
-      const method = editId ? "PATCH" : "POST";
-      const res = await fetch(url, {
-        method,
-        headers: { Authorization: `Bearer ${token}` },
-        body: form
-      });
-      if (res.ok) {
-        setSnack({ open: true, msg: editId ? "Updated" : "Created", sev: "success" });
-        resetForm();
-        fetchAll();
-        setTab(1);
-      } else {
-        const err = await res.text();
-        setSnack({ open: true, msg: `Save failed: ${err}`, sev: "error" });
-      }
-    } catch {
-      setSnack({ open: true, msg: "Network error", sev: "error" });
-    } finally {
-      setSaving(false);
+  const form = new FormData();
+  form.append("title", title);
+  form.append("description", description);
+  form.append("price", String(price));
+  form.append("stock", String(stock || 0));
+  form.append("discount", String(discount));
+  form.append("is_active", isActive ? "true" : "false");
+  form.append("is_featured", isFeatured ? "true" : "false");
+  form.append("brand_id", brandId);
+
+  form.append("category_ids", JSON.stringify(selectedCats.map(Number)));
+  form.append("ram_option_ids", JSON.stringify(selectedRam.map(Number)));
+  form.append("storage_option_ids", JSON.stringify(selectedStorage.map(Number)));
+  form.append("color_option_ids", JSON.stringify(selectedColors.map(Number)));
+  form.append("tag_names", JSON.stringify(tagNames));
+
+  form.append("variants", JSON.stringify(variants));
+
+  if (coverFile) form.append("cover_image", coverFile);
+  galleryFiles.forEach(f => form.append("gallery", f));
+
+  setSaving(true);
+  try {
+    const url = editId ? `${API_BASE}${editId}/` : API_BASE;
+    const method = editId ? "PATCH" : "POST";
+    const res = await fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${token}` }, // do NOT set Content-Type; browser handles multipart
+      body: form
+    });
+
+    if (res.ok) {
+      setSnack({ open: true, msg: editId ? "Updated" : "Created", sev: "success" });
+      resetForm();
+      fetchAll();
+      setTab(1);
+    } else {
+      const err = await res.text();
+      setSnack({ open: true, msg: `Save failed: ${err}`, sev: "error" });
     }
-  };
+  } catch {
+    setSnack({ open: true, msg: "Network error", sev: "error" });
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   /* ------------------------------------------------------------------ */
   /*  DELETE                                                            */
