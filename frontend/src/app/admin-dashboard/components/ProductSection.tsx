@@ -278,7 +278,13 @@ const saveProduct = async () => {
   selectedStorage.map(Number).forEach(id => form.append("storage_option_ids", String(id)));
   selectedColors.map(Number).forEach(id => form.append("color_option_ids", String(id)));
   tagNames.forEach(tag => form.append("tag_names", tag));
-  form.append("variants", JSON.stringify(variants));
+  variants.forEach((v, i) => {
+  for (const key in v) {
+    if (v.hasOwnProperty(key)) {
+      form.append(`variants[${i}][${key}]`, String(v[key] ?? ""));
+    }
+  }
+});
 
   if (coverFile) form.append("cover_image", coverFile);
   galleryFiles.forEach(f => form.append("gallery", f));
