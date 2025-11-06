@@ -14,20 +14,25 @@ class OrderListCreateView(generics.ListCreateAPIView):
         """
         GUEST: Filter by device_id
         LOGGED IN: Filter by user
+        ADMIN: SHOW ALL ORDERS
         """
-        queryset = Order.objects.all().order_by('-date')
         user = self.request.user
+        queryset = Order.objects.all().order_by('-date')
 
-        # LOGGED IN → show only their orders
+        # ADMIN → SEE ALL
+        if user.is_authenticated and (user.is_staff or user.is_superuser):
+            return queryset
+
+        # LOGGED IN USER → THEIR ORDERS
         if user.is_authenticated:
             return queryset.filter(user=user)
 
-        # GUEST → show only device_id
+        # GUEST → device_id only
         device_id = self.request.query_params.get('device_id')
         if device_id:
             return queryset.filter(device_id=device_id)
 
-        # NO ACCESS IF NO ID
+        # DEFAULT: NO ACCESS
         return queryset.none()
 
     def create(self, request, *args, **kwargs):
@@ -46,11 +51,12 @@ class OrderDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     lookup_field = 'id'
-    permission_classes = [permissions.IsAuthenticated]  # Only logged-in
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         """
-        Admin can see all, but restrict non-admin to own orders
+        ADMIN: See all
+        USER: See only own
         """
         user = self.request.user
         if user.is_staff or user.is_superuser:
