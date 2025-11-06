@@ -240,11 +240,6 @@ const ProductAdminPage: React.FC = () => {
       form.append("category_ids[]", id);
     });
 
-    // Final price
-    const final = Number(discount) > 0 
-      ? Number(price) - (Number(price) * Number(discount)) / 100 
-      : Number(price);
-    form.append("final_price", String(final.toFixed(2)));
 
     const safeTrim = (val: string | number | undefined | null): string | null => {
       if (val === null || val === undefined) return null;
