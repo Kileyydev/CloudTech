@@ -23,6 +23,26 @@ import TickerBar from '../../components/TickerBar';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
+// === ADD THIS: generateStaticParams ===
+export async function generateStaticParams() {
+  // In static export, we can't read localStorage at runtime
+  // But we can assume orders are known or provide a fallback
+  // Option 1: Return empty → no pre-render (not ideal)
+  // Option 2: Return sample slugs (for demo)
+  // Option 3: Use a build script to populate (advanced)
+
+  // For now, return nothing → pages will be client-side only
+  // But to avoid error, return at least one
+  return [{ slug: 'demo-order-123' }];
+}
+
+// If you want to pre-render real orders:
+// 1. Create a JSON file with order IDs at build time
+// 2. Or use getServerSideProps (but not with `output: export`)
+
+// For now, we allow client-side fetching
+// So we keep `use client` and fetch at runtime
+
 const StyledPaper = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(5),
   boxShadow: '0 12px 40px rgba(0,0,0,0.1)',
@@ -145,7 +165,7 @@ export default function OrderSlugPage() {
               </Typography>
             </Box>
 
-            <StyledPaper sx={{ width: '100%' }}>
+            <StyledPaper sx={{ width: '100%' }} ref={pdfRef}>
               <Stack spacing={4}>
                 {/* Customer */}
                 <Box>
@@ -239,8 +259,8 @@ export default function OrderSlugPage() {
         </Container>
       </Box>
 
-      {/* Hidden PDF */}
-      <Box sx={{ position: 'absolute', left: '-9999px' }} ref={pdfRef}>
+      {/* Hidden PDF Content */}
+      <Box sx={{ position: 'absolute', left: '-9999px', top: 0 }} ref={pdfRef}>
         <Box sx={{ p: 8, bgcolor: '#fff', width: 600, fontFamily: 'Arial', color: '#000' }}>
           <Box textAlign="center" mb={4}>
             <img src="/logo.jpeg" alt="CloudTech" style={{ height: 80 }} />
