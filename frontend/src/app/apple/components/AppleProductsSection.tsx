@@ -63,7 +63,7 @@ const ProductCategorySection = () => {
           }
         }
 
-        const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/?category=Apple`;
+        const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/?category=apple`;
         const res = await fetch(API_BASE, { cache: 'no-store' });
         if (!res.ok) throw new Error('Failed to fetch category products');
         const data = await res.json();
