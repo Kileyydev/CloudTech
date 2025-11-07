@@ -1,3 +1,4 @@
+# products/serializers.py
 from rest_framework import serializers
 from django.utils.text import slugify
 from django.db import transaction
@@ -13,31 +14,47 @@ class GlobalOptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = GlobalOption
         fields = ['id', 'type', 'value']
+        extra_kwargs = {
+            'type': {'required': False, 'allow_null': True},
+            'value': {'required': False, 'allow_null': True},
+        }
 
 
 # ===================================================================
-# BASIC SERIALIZERS
+# BASIC SERIALIZERS — ALL OPTIONAL, NO allow_blank
 # ===================================================================
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ['id', 'name', 'slug']
+        extra_kwargs = {
+            'name': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'slug': {'required': False, 'allow_blank': True, 'allow_null': True},
+        }
 
 
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
         fields = ['id', 'name', 'slug']
+        extra_kwargs = {
+            'name': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'slug': {'required': False, 'allow_blank': True, 'allow_null': True},
+        }
 
 
 class TagSerializer(serializers.ModelSerializer):
     class Meta:
         model = Tag
         fields = ['id', 'name', 'slug']
+        extra_kwargs = {
+            'name': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'slug': {'required': False, 'allow_blank': True, 'allow_null': True},
+        }
 
 
 # ===================================================================
-# PRODUCT IMAGE — CLOUDINARY URL
+# PRODUCT IMAGE
 # ===================================================================
 class ProductImageSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
@@ -45,13 +62,17 @@ class ProductImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductImage
         fields = ['id', 'image', 'alt_text', 'is_primary']
+        extra_kwargs = {
+            'alt_text': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'is_primary': {'required': False, 'allow_null': True},
+        }
 
     def get_image(self, obj):
         return obj.image.url if obj.image else None
 
 
 # ===================================================================
-# PRODUCT VARIANT
+# PRODUCT VARIANT — NO allow_blank ON NON-CHAR FIELDS
 # ===================================================================
 class ProductVariantSerializer(serializers.ModelSerializer):
     class Meta:
@@ -61,17 +82,30 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             'processor', 'size', 'price', 'compare_at_price',
             'stock', 'is_active', 'created_at'
         ]
+        extra_kwargs = {
+            'sku': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'color': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'storage': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'ram': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'processor': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'size': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'price': {'required': False, 'allow_null': True},
+            'compare_at_price': {'required': False, 'allow_null': True},
+            'stock': {'required': False, 'allow_null': True},
+            'is_active': {'required': False, 'allow_null': True},
+        }
 
-    # Allow partial updates
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.context.get('partial'):
-            for field in self.fields.values():
-                field.required = False
+        for field in self.fields.values():
+            field.required = False
+            field.allow_null = True
+            if isinstance(field, serializers.CharField):
+                field.allow_blank = True
 
 
 # ===================================================================
-# PRODUCT LIST / DETAIL (READ)
+# PRODUCT LIST / DETAIL
 # ===================================================================
 class ProductListSerializer(serializers.ModelSerializer):
     brand = BrandSerializer(read_only=True)
@@ -102,10 +136,10 @@ class ProductListSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT CREATE / UPDATE — FULL CRUD (SAFE + STABLE + OPTIONAL FIELDS)
+# PRODUCT CREATE / UPDATE — FULLY OPTIONAL
 # ===================================================================
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
-    # === WRITE-ONLY: Accept IDs as lists ===
+    brand_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     category_ids = serializers.ListField(
         child=serializers.IntegerField(), write_only=True, required=False, allow_empty=True
     )
@@ -122,56 +156,49 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         child=serializers.CharField(max_length=60), write_only=True, required=False, allow_empty=True
     )
 
-    # === FILES ===
     cover_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
     gallery = serializers.ListField(
         child=serializers.ImageField(), write_only=True, required=False, allow_empty=True
     )
 
-    # === NESTED WRITE ===
     variants = ProductVariantSerializer(many=True, required=False, allow_empty=True)
 
-    # === READ-ONLY ===
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
     ram_options = GlobalOptionSerializer(many=True, read_only=True)
     storage_options = GlobalOptionSerializer(many=True, read_only=True)
     colors = GlobalOptionSerializer(many=True, read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
         fields = [
             'id', 'title', 'description', 'price', 'stock', 'discount',
-            'final_price', 'is_active', 'is_featured',
+            'final_price', 'is_active', 'is_featured', 'slug',
             'brand', 'brand_id',
             'categories', 'category_ids',
             'ram_options', 'ram_option_ids',
             'storage_options', 'storage_option_ids',
             'colors', 'color_option_ids',
-            'tag_names', 'cover_image', 'gallery', 'images', 'variants'
+            'tag_names', 'cover_image', 'gallery', 'images', 'variants', 'tags'
         ]
         read_only_fields = ['final_price', 'id', 'slug']
+        extra_kwargs = {
+            'title': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'description': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'price': {'required': False, 'allow_null': True},
+            'stock': {'required': False, 'allow_null': True},
+            'discount': {'required': False, 'allow_null': True},
+            'is_active': {'required': False, 'allow_null': True},
+            'is_featured': {'required': False, 'allow_null': True},
+        }
 
-    # === VALIDATION: Only required on CREATE ===
     def validate(self, data):
-        request = self.context.get('request')
-        is_create = self.instance is None
+        return data  # No validation
 
-        if is_create:
-            if not data.get('title'):
-                raise serializers.ValidationError({"title": "This field is required."})
-            if 'price' not in data or data['price'] is None:
-                raise serializers.ValidationError({"price": "This field is required."})
-            if not data.get('brand_id'):
-                raise serializers.ValidationError({"brand_id": "This field is required."})
-
-        return data
-
-    # === CREATE ===
     @transaction.atomic
     def create(self, validated_data):
-        # Pop M2M & nested
         category_ids = validated_data.pop('category_ids', [])
         ram_ids = validated_data.pop('ram_option_ids', [])
         storage_ids = validated_data.pop('storage_option_ids', [])
@@ -181,31 +208,24 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery', [])
 
-        # Create product
         product = Product.objects.create(**validated_data)
 
-        # === M2M RELATIONS ===
         if category_ids:
             product.categories.set(Category.objects.filter(id__in=category_ids))
         if ram_ids:
-            product.ram_options.set(GlobalOption.objects.filter(id__in=ram_ids, type='RAM'))
+            product.ram_options.set(GlobalOption.objects.filter(id__in=ram_ids))
         if storage_ids:
-            product.storage_options.set(GlobalOption.objects.filter(id__in=storage_ids, type='STORAGE'))
+            product.storage_options.set(GlobalOption.objects.filter(id__in=storage_ids))
         if color_ids:
-            product.colors.set(GlobalOption.objects.filter(id__in=color_ids, type='COLOR'))
+            product.colors.set(GlobalOption.objects.filter(id__in=color_ids))
 
-        # === TAGS ===
         if tag_names:
             for name in tag_names:
-                tag_name = name.strip().lower()
-                if tag_name:
-                    tag, _ = Tag.objects.get_or_create(
-                        name=tag_name,
-                        defaults={'slug': slugify(tag_name)}
-                    )
+                name = name.strip()
+                if name:
+                    tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
                     product.tags.add(tag)
 
-        # === COVER & GALLERY ===
         if cover_file:
             product.cover_image = cover_file
             product.save(update_fields=['cover_image'])
@@ -214,21 +234,17 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             for img_file in gallery_files:
                 ProductImage.objects.create(product=product, image=img_file)
 
-        # === VARIANTS ===
         if variants_data:
             for var in variants_data:
                 ProductVariant.objects.create(product=product, **var)
 
-        # === FINAL PRICE ===
         product.final_price = self._calc_final_price(product)
-        product.save()
+        product.save(update_fields=['final_price'])
 
         return product
 
-    # === UPDATE (PATCH) ===
     @transaction.atomic
     def update(self, instance, validated_data):
-        # Pop M2M & nested
         category_ids = validated_data.pop('category_ids', None)
         ram_ids = validated_data.pop('ram_option_ids', None)
         storage_ids = validated_data.pop('storage_option_ids', None)
@@ -238,59 +254,48 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery', None)
 
-        # Update scalar fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        if 'title' in validated_data:
+        if 'title' in validated_data and validated_data['title']:
             instance.slug = slugify(validated_data['title'])
 
-        # === M2M: Only update if provided ===
         if category_ids is not None:
-            instance.categories.set(Category.objects.filter(id__in=category_ids))
+            instance.categories.set(Category.objects.filter(id__in=category_ids) if category_ids else [])
         if ram_ids is not None:
-            instance.ram_options.set(GlobalOption.objects.filter(id__in=ram_ids, type='RAM'))
+            instance.ram_options.set(GlobalOption.objects.filter(id__in=ram_ids) if ram_ids else [])
         if storage_ids is not None:
-            instance.storage_options.set(GlobalOption.objects.filter(id__in=storage_ids, type='STORAGE'))
+            instance.storage_options.set(GlobalOption.objects.filter(id__in=storage_ids) if storage_ids else [])
         if color_ids is not None:
-            instance.colors.set(GlobalOption.objects.filter(id__in=color_ids, type='COLOR'))
+            instance.colors.set(GlobalOption.objects.filter(id__in=color_ids) if color_ids else [])
 
-        # === TAGS: Replace if provided ===
         if tag_names is not None:
             instance.tags.clear()
             for name in tag_names:
-                tag_name = name.strip().lower()
-                if tag_name:
-                    tag, _ = Tag.objects.get_or_create(
-                        name=tag_name,
-                        defaults={'slug': slugify(tag_name)}
-                    )
+                name = name.strip()
+                if name:
+                    tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
                     instance.tags.add(tag)
 
-        # === COVER: Replace if provided ===
         if cover_file is not None:
             instance.cover_image = cover_file
 
-        # === GALLERY: Replace if provided ===
         if gallery_files is not None:
             instance.images.all().delete()
             for img_file in gallery_files:
                 ProductImage.objects.create(product=instance, image=img_file)
 
-        # === VARIANTS: Replace if provided ===
         if variants_data is not None:
             instance.variants.all().delete()
             for var in variants_data:
                 ProductVariant.objects.create(product=instance, **var)
 
-        # === FINAL PRICE ===
         instance.final_price = self._calc_final_price(instance)
         instance.save()
 
         return instance
 
-    # === HELPER ===
     def _calc_final_price(self, obj):
-        if obj.discount and obj.discount > 0:
-            return round(obj.price * (1 - obj.discount / 100), 2)
+        if obj.price is not None and obj.discount is not None and obj.discount > 0:
+            return round(float(obj.price) * (1 - obj.discount / 100), 2)
         return obj.price

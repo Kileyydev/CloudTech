@@ -10,19 +10,19 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 # CATEGORY
 # ===================================================================
 class Category(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=120, unique=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    name = models.CharField(max_length=100, unique=True, blank=True, null=True)
+    slug = models.SlugField(max_length=120, unique=True, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
 
     class Meta:
         ordering = ['name']
         verbose_name_plural = 'Categories'
 
     def __str__(self):
-        return self.name
+        return self.name or "Unnamed Category"
 
     def save(self, *args, **kwargs):
-        if not self.slug:
+        if self.name and not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
@@ -31,14 +31,14 @@ class Category(models.Model):
 # BRAND
 # ===================================================================
 class Brand(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=120, unique=True, blank=True)
+    name = models.CharField(max_length=100, unique=True, blank=True, null=True)
+    slug = models.SlugField(max_length=120, unique=True, blank=True, null=True)
 
     def __str__(self):
-        return self.name
+        return self.name or "Unnamed Brand"
 
     def save(self, *args, **kwargs):
-        if not self.slug:
+        if self.name and not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
@@ -47,14 +47,14 @@ class Brand(models.Model):
 # TAG
 # ===================================================================
 class Tag(models.Model):
-    name = models.CharField(max_length=60, unique=True)
-    slug = models.SlugField(max_length=80, unique=True, blank=True)
+    name = models.CharField(max_length=60, unique=True, blank=True, null=True)
+    slug = models.SlugField(max_length=80, unique=True, blank=True, null=True)
 
     def __str__(self):
-        return self.name
+        return self.name or "Unnamed Tag"
 
     def save(self, *args, **kwargs):
-        if not self.slug:
+        if self.name and not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
@@ -68,15 +68,15 @@ class GlobalOption(models.Model):
         ('STORAGE', 'Storage'),
         ('COLOR', 'Color'),
     ]
-    type = models.CharField(max_length=20, choices=OPTION_TYPES)
-    value = models.CharField(max_length=50)
+    type = models.CharField(max_length=20, choices=OPTION_TYPES, blank=True, null=True)
+    value = models.CharField(max_length=50, blank=True, null=True)
 
     class Meta:
-        unique_together = ('type', 'value')
+        unique_together = ()  # Removed to allow duplicates if needed
         ordering = ['type', 'value']
 
     def __str__(self):
-        return f"{self.get_type_display()}: {self.value}"
+        return f"{self.get_type_display()}: {self.value}" if self.type and self.value else "Empty Option"
 
 
 # ===================================================================
@@ -84,22 +84,24 @@ class GlobalOption(models.Model):
 # ===================================================================
 class Product(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    title = models.CharField(max_length=255)
-    slug = models.SlugField(max_length=300, unique=True, blank=True)
-    description = models.TextField(blank=True)
+    title = models.CharField(max_length=255, blank=True, null=True)
+    slug = models.SlugField(max_length=300, unique=True, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
 
     categories = models.ManyToManyField('Category', related_name='products', blank=True)
-    brand = models.ForeignKey('Brand', on_delete=models.SET_NULL, null=True, related_name='products')
+    brand = models.ForeignKey('Brand', on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     tags = models.ManyToManyField('Tag', blank=True, related_name='products')
 
     cover_image = CloudinaryField('image', blank=True, null=True)
 
-    price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    stock = models.PositiveIntegerField(default=0)
+    price = models.DecimalField(max_digits=12, decimal_places=2, default=0, blank=True, null=True)
+    stock = models.PositiveIntegerField(default=0, blank=True, null=True)
     discount = models.DecimalField(
         max_digits=5,
         decimal_places=2,
         default=0,
+        blank=True,
+        null=True,
         validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
     final_price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
@@ -120,10 +122,10 @@ class Product(models.Model):
     condition_options = models.JSONField(blank=True, null=True)
     features = models.JSONField(blank=True, null=True)
 
-    is_active = models.BooleanField(default=True)
-    is_featured = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True, blank=True, null=True)
+    is_featured = models.BooleanField(default=False, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True, blank=True, null=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -135,11 +137,11 @@ class Product(models.Model):
         ]
 
     def __str__(self):
-        return self.title
+        return self.title or f"Product {self.id}"
 
     def save(self, *args, **kwargs):
-        # Generate unique slug
-        if not self.slug:
+        # Only generate slug if title exists
+        if self.title and not self.slug:
             base = slugify(self.title)[:240]
             slug = base
             i = 1
@@ -148,8 +150,8 @@ class Product(models.Model):
                 i += 1
             self.slug = slug
 
-        # Auto-calculate final price
-        if self.discount > 0:
+        # Auto-calculate final_price only if price and discount exist
+        if self.price is not None and self.discount is not None and self.discount > 0:
             self.final_price = round(float(self.price) * (1 - self.discount / 100), 2)
         else:
             self.final_price = self.price
@@ -162,8 +164,8 @@ class Product(models.Model):
 # ===================================================================
 class ProductVariant(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants')
-    sku = models.CharField(max_length=120, unique=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='variants', null=True, blank=True)
+    sku = models.CharField(max_length=120, unique=True, blank=True, null=True)
 
     color = models.CharField(max_length=80, blank=True, null=True)
     ram = models.CharField(max_length=80, blank=True, null=True)
@@ -171,15 +173,15 @@ class ProductVariant(models.Model):
     processor = models.CharField(max_length=200, blank=True, null=True)
     size = models.CharField(max_length=80, blank=True, null=True)
 
-    price = models.DecimalField(max_digits=12, decimal_places=2)
+    price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     compare_at_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    stock = models.PositiveIntegerField(default=0)
+    stock = models.PositiveIntegerField(default=0, blank=True, null=True)
 
-    is_active = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=False, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
 
     class Meta:
-        unique_together = ('product', 'color', 'ram', 'storage')
+        unique_together = ()  # Removed to allow duplicates
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['sku']),
@@ -187,11 +189,11 @@ class ProductVariant(models.Model):
         ]
 
     def __str__(self):
-        parts = [self.product.title]
+        parts = [self.product.title if self.product else "No Product"]
         if self.color: parts.append(self.color)
         if self.ram: parts.append(self.ram)
         if self.storage: parts.append(self.storage)
-        return " — ".join(parts)
+        return " — ".join(parts) if len(parts) > 1 else "Empty Variant"
 
 
 # ===================================================================
@@ -200,17 +202,17 @@ class ProductVariant(models.Model):
 class ProductImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     product = models.ForeignKey(
-        Product, on_delete=models.CASCADE, related_name='images'
+        Product, on_delete=models.CASCADE, related_name='images', null=True, blank=True
     )
     variant = models.ForeignKey(
         ProductVariant, on_delete=models.CASCADE, related_name='images',
         null=True, blank=True
     )
 
-    image = CloudinaryField('image')
-    alt_text = models.CharField(max_length=255, blank=True)
-    is_primary = models.BooleanField(default=False)
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+    image = CloudinaryField('image', blank=True, null=True)
+    alt_text = models.CharField(max_length=255, blank=True, null=True)
+    is_primary = models.BooleanField(default=False, blank=True, null=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
 
     class Meta:
         ordering = ['-is_primary', 'uploaded_at']
@@ -219,10 +221,10 @@ class ProductImage(models.Model):
         ]
 
     def __str__(self):
-        return f"Image for {self.product.title}"
+        return f"Image for {self.product.title if self.product else 'No Product'}"
 
     def save(self, *args, **kwargs):
-        if self.is_primary:
+        if self.is_primary and self.product and self.image:
             ProductImage.objects.filter(product=self.product, is_primary=True).update(is_primary=False)
             if self.product.cover_image != self.image:
                 self.product.cover_image = self.image

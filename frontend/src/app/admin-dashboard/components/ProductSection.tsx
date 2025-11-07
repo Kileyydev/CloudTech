@@ -34,7 +34,6 @@ const PageContainer = styled(Box)(({ theme }) => ({
 }));
 
 const FormCard = styled(Paper)(({ theme }) => ({
-
   overflow: "hidden",
   background: "#fff",
   boxShadow: "0 12px 40px rgba(0,0,0,0.08)",
@@ -57,7 +56,6 @@ const SectionHeader = styled(Typography)(({ theme }) => ({
 
 const StyledTextField = styled(TextField)(({ theme }) => ({
   '& .MuiOutlinedInput-root': {
-
     backgroundColor: alpha("#DC1A8A", 0.02),
     transition: "all 0.2s ease",
     '&:hover': { backgroundColor: alpha("#DC1A8A", 0.05) },
@@ -70,7 +68,6 @@ const StyledTextField = styled(TextField)(({ theme }) => ({
 
 const UploadBox = styled(Box)(({ theme }) => ({
   border: `2.5px dashed ${alpha("#DC1A8A", 0.3)}`,
-
   padding: theme.spacing(4),
   textAlign: "center",
   cursor: "pointer",
@@ -88,7 +85,6 @@ const GalleryThumb = styled(Box)(({ theme }) => ({
   position: "relative",
   width: 90,
   height: 90,
-
   overflow: "hidden",
   border: `2px solid ${alpha("#DC1A8A", 0.25)}`,
   transition: "all 0.2s",
@@ -97,7 +93,6 @@ const GalleryThumb = styled(Box)(({ theme }) => ({
 }));
 
 const SaveButton = styled(Button)(({ theme }) => ({
-
   textTransform: "none",
   fontWeight: 700,
   fontSize: "1rem",
@@ -119,7 +114,6 @@ const SaveButton = styled(Button)(({ theme }) => ({
 }));
 
 const ProductCard = styled(Card)(({ theme }) => ({
-
   overflow: "hidden",
   transition: "all 0.3s ease",
   boxShadow: "0 6px 20px rgba(0,0,0,0.06)",
@@ -139,7 +133,6 @@ const DiscountBadge = styled(Box)(({ theme }) => ({
   fontSize: "0.8rem",
   px: 2,
   py: 0.8,
-
   boxShadow: "0 4px 12px rgba(233, 30, 99, 0.4)",
   zIndex: 2,
   letterSpacing: "0.5px"
@@ -293,34 +286,47 @@ const ProductAdminPage: React.FC = () => {
   };
 
   /* ------------------------------------------------------------------ */
-  /*  SAVE PRODUCT                                                      */
+  /*  SAVE PRODUCT — NO VALIDATION, EVERYTHING OPTIONAL */
   /* ------------------------------------------------------------------ */
   const saveProduct = async () => {
-    if (!token || !title.trim() || price === "" || !brandId) {
-      setSnack({ open: true, msg: "Title, Price & Brand are required", sev: "error" });
+    if (!token) {
+      setSnack({ open: true, msg: "No token", sev: "error" });
       return;
     }
 
     const form = new FormData();
-    form.append("title", title.trim());
+
+    // Only append if value exists
+    if (title) form.append("title", title.trim());
     if (description) form.append("description", description);
-    form.append("price", String(price));
-    if (stock) form.append("stock", String(stock));
-    if (discount) form.append("discount", String(discount));
-    form.append("is_active", String(isActive));
-    form.append("is_featured", String(isFeatured));
-    form.append("brand_id", brandId);
+    if (price !== "" && price !== null) form.append("price", String(price));
+    if (stock !== "" && stock !== null) form.append("stock", String(stock));
+    if (discount !== "" && discount !== null) form.append("discount", String(discount));
+    if (isActive !== null) form.append("is_active", String(isActive));
+    if (isFeatured !== null) form.append("is_featured", String(isFeatured));
+    if (brandId) form.append("brand_id", brandId);
 
     selectedCats.forEach(id => form.append("category_ids", id));
     selectedRam.forEach(id => form.append("ram_option_ids", id));
     selectedStorage.forEach(id => form.append("storage_option_ids", id));
     selectedColors.forEach(id => form.append("color_option_ids", id));
     tagNames.filter(t => t.trim()).forEach(t => form.append("tag_names", t.trim()));
-    form.append("variants", JSON.stringify(variants.map(v => ({
-      id: v.id, sku: v.sku || "", color: v.color || "", ram: v.ram || "",
-      storage: v.storage || "", processor: v.processor || "", size: v.size || "",
-      price: v.price || 0, compare_at_price: v.compare_at_price || 0, stock: v.stock || 0, is_active: v.is_active ?? true
-    }))));
+
+    if (variants.length > 0) {
+      form.append("variants", JSON.stringify(variants.map(v => ({
+        id: v.id,
+        sku: v.sku || "",
+        color: v.color || "",
+        ram: v.ram || "",
+        storage: v.storage || "",
+        processor: v.processor || "",
+        size: v.size || "",
+        price: v.price !== "" ? Number(v.price) : null,
+        compare_at_price: v.compare_at_price !== "" ? Number(v.compare_at_price) : null,
+        stock: v.stock !== "" ? Number(v.stock) : null,
+        is_active: v.is_active ?? true
+      }))));
+    }
 
     if (coverFile) form.append("cover_image", coverFile);
     galleryFiles.forEach(f => form.append("gallery", f));
@@ -338,7 +344,7 @@ const ProductAdminPage: React.FC = () => {
         setSnack({ open: true, msg: `Error: ${err.slice(0, 120)}`, sev: "error" });
       }
     } catch (err: any) {
-      setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
+        setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
     } finally {
       setSaving(false);
     }
@@ -360,7 +366,7 @@ const ProductAdminPage: React.FC = () => {
 
   const updateDiscount = async (p: any) => {
     if (!token) return;
-    const final = Math.round(p.price * (1 - (p.discount ?? 0) / 100) * 100) / 100;
+    const final = p.price && p.discount ? Math.round(p.price * (1 - p.discount / 100) * 100) / 100 : p.price;
     try {
       await fetch(`${API_BASE}${p.id}/`, {
         method: "PATCH",
@@ -409,10 +415,10 @@ const ProductAdminPage: React.FC = () => {
               <Box>
                 <SectionHeader><Category className="icon" /> Basic Information</SectionHeader>
                 <Stack spacing={3}>
-                  <StyledTextField label="Title *" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
+                  <StyledTextField label="Title" value={title} onChange={e => setTitle(e.target.value)} fullWidth />
                   <StyledTextField label="Description" value={description} onChange={e => setDescription(e.target.value)} multiline rows={3} fullWidth />
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                    <StyledTextField label="Price (KES) *" type="number" value={price} onChange={e => setPrice(Number(e.target.value) || "")} sx={{ flex: 1 }} />
+                    <StyledTextField label="Price (KES)" type="number" value={price} onChange={e => setPrice(Number(e.target.value) || "")} sx={{ flex: 1 }} />
                     <StyledTextField label="Discount %" type="number" value={discount} onChange={e => setDiscount(Number(e.target.value) || 0)} sx={{ flex: 1 }} />
                     <StyledTextField label="Final Price" value={finalPrice} disabled sx={{ flex: 1 }} />
                   </Stack>
@@ -427,9 +433,9 @@ const ProductAdminPage: React.FC = () => {
                 <SectionHeader><Business className="icon" /> Brand & Category</SectionHeader>
                 <Stack direction={{ xs: "column", md: "row" }} spacing={3}>
                   <FormControl sx={{ flex: 1 }}>
-                    <InputLabel>Brand *</InputLabel>
-                    <Select value={brandId} onChange={e => setBrandId(e.target.value)} label="Brand *">
-                      <MenuItem value="">Select Brand</MenuItem>
+                    <InputLabel>Brand</InputLabel>
+                    <Select value={brandId} onChange={e => setBrandId(e.target.value)} label="Brand">
+                      <MenuItem value="">None</MenuItem>
                       {brands.map(b => <MenuItem key={b.id} value={b.id.toString()}>{b.name}</MenuItem>)}
                     </Select>
                   </FormControl>
@@ -617,16 +623,16 @@ const ProductAdminPage: React.FC = () => {
                       <CardMedia component="img" image={getCoverSrc(p)} sx={{ width: "100%", height: "100%", objectFit: "cover", transition: "0.3s", "&:hover": { transform: "scale(1.06)" } }} />
                     </Box>
                     <CardContent sx={{ p: 3 }}>
-                      <Typography variant="h6" noWrap sx={{ fontWeight: 700, mb: 1 }}>{p.title}</Typography>
-                      <Typography variant="body2" sx={{ color: "#666", mb: 2, height: 44, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{p.description}</Typography>
+                      <Typography variant="h6" noWrap sx={{ fontWeight: 700, mb: 1 }}>{p.title || "Untitled"}</Typography>
+                      <Typography variant="body2" sx={{ color: "#666", mb: 2, height: 44, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{p.description || "No description"}</Typography>
                       <Box sx={{ mb: 2 }}>
                         {p.discount > 0 && (
                           <Typography sx={{ textDecoration: "line-through", color: "#999", fontSize: "0.9rem" }}>
-                            KES {p.price?.toLocaleString()}
+                            KES {p.price?.toLocaleString() || "—"}
                           </Typography>
                         )}
                         <Typography sx={{ fontWeight: 700, color: "#DC1A8A", fontSize: "1.2rem" }}>
-                          KES {(p.final_price ?? p.price)?.toLocaleString()}
+                          KES {(p.final_price ?? p.price)?.toLocaleString() || "—"}
                         </Typography>
                       </Box>
                       <Stack direction="row" spacing={1}>
@@ -648,7 +654,7 @@ const ProductAdminPage: React.FC = () => {
 
       {/* DISCOUNTED TABLE */}
       {tab === 2 && (
-        <Paper elevation={0} sx={{  overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.08)" }}>
+        <Paper elevation={0} sx={{ overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.08)" }}>
           <Box sx={{ p: { xs: 3, md: 5 } }}>
             <Typography variant="h5" sx={{ mb: 4, fontWeight: 700, color: "#222" }}>Discounted Products</Typography>
             {loading ? (
@@ -674,8 +680,8 @@ const ProductAdminPage: React.FC = () => {
                   {discounted.map(p => (
                     <TableRow key={p.id} hover>
                       <TableCell><img src={getCoverSrc(p)} width={60} height={60} style={{ objectFit: "cover", border: "2px solid #eee" }} /></TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>{p.title}</TableCell>
-                      <TableCell><Typography sx={{ textDecoration: "line-through", color: "#999" }}>KES {p.price?.toLocaleString()}</Typography></TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>{p.title || "Untitled"}</TableCell>
+                      <TableCell><Typography sx={{ textDecoration: "line-through", color: "#999" }}>KES {p.price?.toLocaleString() || "—"}</Typography></TableCell>
                       <TableCell>
                         <TextField type="number" size="small" value={p.discount ?? 0}
                           onChange={e => setProducts(prev => prev.map(x => x.id === p.id ? { ...x, discount: Number(e.target.value) } : x))}

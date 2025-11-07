@@ -6,7 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from django.core.cache import cache
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch
 
 from .models import (
     Product, ProductVariant, Category, Brand, ProductImage, GlobalOption
@@ -23,12 +23,9 @@ from .serializers import (
 
 
 # ===================================================================
-# GLOBAL OPTION VIEWSET
+# GLOBAL OPTION VIEWSET — READ-ONLY, NO FILTERS NEEDED
 # ===================================================================
 class GlobalOptionViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    Read-only for frontend. Admins can manage via admin panel.
-    """
     queryset = GlobalOption.objects.all().order_by('type', 'value')
     serializer_class = GlobalOptionSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
@@ -37,8 +34,14 @@ class GlobalOptionViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # ===================================================================
-# CUSTOM PERMISSION: Admin can write, anyone can read
+# PERMISSION: ANYONE CAN DO ANYTHING (OR KEEP IsAdminOrReadOnly)
 # ===================================================================
+class AllowAll(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return True  # No restrictions
+
+
+# OR keep IsAdminOrReadOnly if you want admin-only write
 class IsAdminOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
@@ -47,12 +50,13 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 
 
 # ===================================================================
-# PRODUCT VIEWSET — FULLY OPTIMIZED & FIXED
+# PRODUCT VIEWSET — FULLY OPTIONAL, NO FILTERS, NO VALIDATION
 # ===================================================================
 class ProductViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAdminOrReadOnly]
+    # Uncomment one:
+    permission_classes = [AllowAll]  # OR [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['brand__id', 'categories__id', 'is_active', 'is_featured']
+    filterset_fields = ['brand__id', 'categories__id']  # Removed is_active, is_featured
     search_fields = ['title', 'description', 'brand__name', 'tags__name']
     ordering_fields = ['price', 'created_at', 'discount', 'final_price']
     ordering = ['-created_at']
@@ -60,43 +64,34 @@ class ProductViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ['list', 'retrieve', 'featured']:
             return ProductListSerializer
-        return ProductCreateUpdateSerializer  # For create, update, partial_update
+        return ProductCreateUpdateSerializer
 
     # ===================================================================
-    # OPTIMIZED + CACHED QUERYSET
+    # NO FILTERING ON is_active — SHOW ALL PRODUCTS
     # ===================================================================
     def get_queryset(self):
-        # Build cache key
-        category_slug = self.request.query_params.get('category')
-        brand_id = self.request.query_params.get('brand')
-        is_featured = self.request.query_params.get('is_featured')
-        cache_key = f"products_qs_{category_slug or 'all'}_{brand_id or 'all'}_{is_featured or 'all'}"
-
+        # Optional: cache per query params
+        cache_key = f"products_all_{hash(frozenset(self.request.query_params.items()))}"
         cached_qs = cache.get(cache_key)
         if cached_qs is not None:
             return cached_qs
 
-        # Base queryset — only active products
-        queryset = Product.objects.filter(is_active=True).select_related('brand').prefetch_related(
+        queryset = Product.objects.select_related('brand').prefetch_related(
             'tags',
             'categories',
             'ram_options',
             'storage_options',
             'colors',
-            Prefetch(
-                'images',
-                queryset=ProductImage.objects.filter(is_primary=True),
-                to_attr='primary_image_list'
-            ),
-            Prefetch(
-                'images',
-                queryset=ProductImage.objects.filter(is_primary=False),
-                to_attr='gallery_images_list'
-            ),
+            Prefetch('images', queryset=ProductImage.objects.filter(is_primary=True), to_attr='primary_image_list'),
+            Prefetch('images', queryset=ProductImage.objects.filter(is_primary=False), to_attr='gallery_images_list'),
             'variants'
         )
 
-        # Filters
+        # Apply optional filters
+        category_slug = self.request.query_params.get('category')
+        brand_id = self.request.query_params.get('brand')
+        is_featured = self.request.query_params.get('is_featured')
+
         if category_slug:
             queryset = queryset.filter(categories__slug=category_slug)
         if brand_id:
@@ -104,7 +99,6 @@ class ProductViewSet(viewsets.ModelViewSet):
         if is_featured is not None:
             queryset = queryset.filter(is_featured=(is_featured.lower() == 'true'))
 
-        # Cache for 5 minutes
         cache.set(cache_key, queryset, timeout=60 * 5)
         return queryset
 
@@ -114,7 +108,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         return context
 
     # ===================================================================
-    # CUSTOM ACTION: /api/products/featured/
+    # FEATURED — STILL WORKS, BUT OPTIONAL
     # ===================================================================
     @action(detail=False, methods=['get'], url_path='featured')
     @method_decorator(cache_page(60 * 5))
@@ -124,7 +118,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     # ===================================================================
-    # OVERRIDE PERFORM CREATE/UPDATE TO ENSURE FINAL PRICE
+    # FINAL PRICE — ONLY IF PRICE & DISCOUNT EXIST
     # ===================================================================
     def perform_create(self, serializer):
         product = serializer.save()
@@ -137,27 +131,27 @@ class ProductViewSet(viewsets.ModelViewSet):
         product.save(update_fields=['final_price'])
 
     def _calc_final_price(self, product):
-        if product.discount and product.discount > 0:
-            return round(product.price * (1 - product.discount / 100), 2)
+        if product.price is not None and product.discount is not None and product.discount > 0:
+            return round(float(product.price) * (1 - product.discount / 100), 2)
         return product.price
 
 
 # ===================================================================
-# PRODUCT VARIANT VIEWSET
+# PRODUCT VARIANT VIEWSET — FULLY OPTIONAL
 # ===================================================================
 class ProductVariantViewSet(viewsets.ModelViewSet):
     queryset = ProductVariant.objects.select_related('product__brand').all()
     serializer_class = ProductVariantSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [AllowAll]  # or [IsAdminOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['product__id', 'color', 'storage', 'ram', 'processor', 'is_active']
+    filterset_fields = ['product__id', 'color', 'storage', 'ram', 'processor']
     search_fields = ['sku', 'processor', 'product__title']
     ordering_fields = ['price', 'stock', 'created_at']
     ordering = ['-created_at']
 
 
 # ===================================================================
-# CATEGORY VIEWSET
+# CATEGORY VIEWSET — READ-ONLY, NO RESTRICTIONS
 # ===================================================================
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Category.objects.all()
@@ -167,7 +161,7 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # ===================================================================
-# BRAND VIEWSET
+# BRAND VIEWSET — READ-ONLY
 # ===================================================================
 class BrandViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Brand.objects.all()
@@ -177,11 +171,11 @@ class BrandViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # ===================================================================
-# PRODUCT IMAGE VIEWSET
+# PRODUCT IMAGE VIEWSET — FULLY OPTIONAL
 # ===================================================================
 class ProductImageViewSet(viewsets.ModelViewSet):
     queryset = ProductImage.objects.select_related('product').all()
     serializer_class = ProductImageSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [AllowAll] 
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['product__id', 'is_primary']
+    filterset_fields = ['product__id']
