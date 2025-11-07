@@ -172,7 +172,7 @@ export default function Footer() {
           {/* Logo & Brand */}
           <LogoSection>
             <Logo
-              src="/images/logo.png"
+              src="/images/logo1.jpg"
               alt="CloudTech Logo"
             />
             <BrandName>

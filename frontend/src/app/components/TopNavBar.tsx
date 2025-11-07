@@ -158,7 +158,6 @@ const TopNavBar = () => {
           {/* Logo */}
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-              <img src="/images/logo.jpeg" alt="CloudTech" onError={e => ((e.target as HTMLImageElement).src = '/images/fallback-logo.png')} style={{ height: 'clamp(22px,5.5vw,28px)', objectFit: 'contain' }} />
               <Typography variant="h6" sx={{ ml: { sm: 1 }, color: '#000', fontWeight: 'bold', fontSize: 'clamp(0.85rem,1.8vw,0.95rem)' }}>
                 <PinkCloud>CLOUD</PinkCloud>TECH
               </Typography>

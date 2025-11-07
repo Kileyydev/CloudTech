@@ -14,7 +14,16 @@ export default function Header() {
         p: 1 
       }}>
         {/* Fixed Logo on Left */}
-
+        <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          <Image
+            src="/logo1.jpg" // Your PNG in /public
+            alt="CloudTech Logo"
+            width={130}  // Adjust to your PNG's width
+            height={60}  // Adjust to your PNG's height
+            priority
+            style={{ objectFit: 'contain' }}
+          />
+        </Box>
 
         {/* Your TickerBar: Scrolls in the main space */}
         <Box sx={{ 
