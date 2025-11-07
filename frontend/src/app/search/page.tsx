@@ -314,7 +314,6 @@ const SearchResultsInner = () => {
 export default function SearchPage() {
   return (
     <>
-      <TickerBar />
       <TopNavBar />
       <MainNavBar />
       <Suspense fallback={

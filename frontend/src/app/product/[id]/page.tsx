@@ -194,7 +194,7 @@ const ProductDetailPage = () => {
   if (loading) {
     return (
       <Box sx={{ bgcolor: '#fff', minHeight: '100vh', width: '100%' }}>
-        <TickerBar/>
+       
         <TopNavBar />
         <MainNavBar />
         <Container maxWidth="lg" sx={{ py: 5 }}>
@@ -527,32 +527,38 @@ const ProductDetailPage = () => {
                 )}
               </Stack>
 
-              {/* Colors */}
-              {product.colors && product.colors.length > 0 && (
-                <Box mb={3}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, color: '#1a1a1a' }}>
-                    Color
-                  </Typography>
-                  <Stack direction="row" spacing={1.5}>
-                    {product.colors.map((c) => (
-                      <Box
-                        key={c}
-                        sx={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: '50%',
-                          bgcolor: c.toLowerCase(),
-                          border: '3px solid #fff',
-                          boxShadow: '0 0 0 1px #ddd',
-                          cursor: 'pointer',
-                          transition: 'transform 0.2s',
-                          '&:hover': { transform: 'scale(1.1)' },
-                        }}
-                      />
-                    ))}
-                  </Stack>
-                </Box>
-              )}
+{/* Colors */}
+{product.colors && product.colors.length > 0 && (
+  <Box mb={3}>
+    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5, color: '#1a1a1a' }}>
+      Color
+    </Typography>
+    <Stack direction="row" spacing={1.5}>
+      {product.colors
+        .filter((c): c is string => typeof c === 'string' && c.trim() !== '')
+        .map((color) => {
+          // Normalize color: hex → use as-is, named → lowercase
+          const displayColor = /^#/.test(color) ? color : color.toLowerCase();
+          return (
+            <Box
+              key={color}
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: '50%',
+                bgcolor: displayColor,
+                border: '3px solid #fff',
+                boxShadow: '0 0 0 1px #ddd',
+                cursor: 'pointer',
+                transition: 'transform 0.2s',
+                '&:hover': { transform: 'scale(1.1)' },
+              }}
+            />
+          );
+        })}
+    </Stack>
+  </Box>
+)}
 
               {/* Quantity */}
               <Stack direction="row" alignItems="center" spacing={2} mb={4}>

@@ -10,7 +10,7 @@ import AppleProductsSection from './components/AppleProductsSection';
 export default function Home() {
   return (
     <div>
-      <TickerBar/>
+
       <TopNavBar />
       <MainNavBar />
       <AppleProductsSection />

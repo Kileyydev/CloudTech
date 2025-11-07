@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.utils.text import slugify
+from django.db import transaction
 from .models import (
     Category, Brand, Tag, Product, ProductVariant, ProductImage, GlobalOption
 )
@@ -61,6 +62,13 @@ class ProductVariantSerializer(serializers.ModelSerializer):
             'stock', 'is_active', 'created_at'
         ]
 
+    # Allow partial updates
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.context.get('partial'):
+            for field in self.fields.values():
+                field.required = False
+
 
 # ===================================================================
 # PRODUCT LIST / DETAIL (READ)
@@ -94,37 +102,34 @@ class ProductListSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT CREATE / UPDATE — FULL CRUD (SAFE + STABLE)
-# ===================================================================
-# ===================================================================
-# PRODUCT CREATE / UPDATE — FIXED & STABLE
+# PRODUCT CREATE / UPDATE — FULL CRUD (SAFE + STABLE + OPTIONAL FIELDS)
 # ===================================================================
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     # === WRITE-ONLY: Accept IDs as lists ===
     category_ids = serializers.ListField(
-        child=serializers.IntegerField(), write_only=True, required=False
+        child=serializers.IntegerField(), write_only=True, required=False, allow_empty=True
     )
     ram_option_ids = serializers.ListField(
-        child=serializers.IntegerField(), write_only=True, required=False
+        child=serializers.IntegerField(), write_only=True, required=False, allow_empty=True
     )
     storage_option_ids = serializers.ListField(
-        child=serializers.IntegerField(), write_only=True, required=False
+        child=serializers.IntegerField(), write_only=True, required=False, allow_empty=True
     )
     color_option_ids = serializers.ListField(
-        child=serializers.IntegerField(), write_only=True, required=False
+        child=serializers.IntegerField(), write_only=True, required=False, allow_empty=True
     )
     tag_names = serializers.ListField(
-        child=serializers.CharField(max_length=60), write_only=True, required=False
+        child=serializers.CharField(max_length=60), write_only=True, required=False, allow_empty=True
     )
 
     # === FILES ===
     cover_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
     gallery = serializers.ListField(
-        child=serializers.ImageField(), write_only=True, required=False
+        child=serializers.ImageField(), write_only=True, required=False, allow_empty=True
     )
 
     # === NESTED WRITE ===
-    variants = ProductVariantSerializer(many=True, required=False)
+    variants = ProductVariantSerializer(many=True, required=False, allow_empty=True)
 
     # === READ-ONLY ===
     brand = BrandSerializer(read_only=True)
@@ -148,9 +153,25 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['final_price', 'id', 'slug']
 
+    # === VALIDATION: Only required on CREATE ===
+    def validate(self, data):
+        request = self.context.get('request')
+        is_create = self.instance is None
+
+        if is_create:
+            if not data.get('title'):
+                raise serializers.ValidationError({"title": "This field is required."})
+            if 'price' not in data or data['price'] is None:
+                raise serializers.ValidationError({"price": "This field is required."})
+            if not data.get('brand_id'):
+                raise serializers.ValidationError({"brand_id": "This field is required."})
+
+        return data
+
     # === CREATE ===
+    @transaction.atomic
     def create(self, validated_data):
-        # Pop M2M IDs
+        # Pop M2M & nested
         category_ids = validated_data.pop('category_ids', [])
         ram_ids = validated_data.pop('ram_option_ids', [])
         storage_ids = validated_data.pop('storage_option_ids', [])
@@ -163,7 +184,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         # Create product
         product = Product.objects.create(**validated_data)
 
-        # === SET M2M USING .set() + Queryset ===
+        # === M2M RELATIONS ===
         if category_ids:
             product.categories.set(Category.objects.filter(id__in=category_ids))
         if ram_ids:
@@ -174,24 +195,29 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             product.colors.set(GlobalOption.objects.filter(id__in=color_ids, type='COLOR'))
 
         # === TAGS ===
-        for name in tag_names:
-            tag, _ = Tag.objects.get_or_create(
-                name=name.strip().lower(),
-                defaults={'slug': slugify(name)}
-            )
-            product.tags.add(tag)
+        if tag_names:
+            for name in tag_names:
+                tag_name = name.strip().lower()
+                if tag_name:
+                    tag, _ = Tag.objects.get_or_create(
+                        name=tag_name,
+                        defaults={'slug': slugify(tag_name)}
+                    )
+                    product.tags.add(tag)
 
         # === COVER & GALLERY ===
         if cover_file:
             product.cover_image = cover_file
             product.save(update_fields=['cover_image'])
 
-        for img_file in gallery_files:
-            ProductImage.objects.create(product=product, image=img_file)
+        if gallery_files:
+            for img_file in gallery_files:
+                ProductImage.objects.create(product=product, image=img_file)
 
         # === VARIANTS ===
-        for var in variants_data:
-            ProductVariant.objects.create(product=product, **var)
+        if variants_data:
+            for var in variants_data:
+                ProductVariant.objects.create(product=product, **var)
 
         # === FINAL PRICE ===
         product.final_price = self._calc_final_price(product)
@@ -199,9 +225,10 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         return product
 
-    # === UPDATE ===
+    # === UPDATE (PATCH) ===
+    @transaction.atomic
     def update(self, instance, validated_data):
-        # Pop M2M
+        # Pop M2M & nested
         category_ids = validated_data.pop('category_ids', None)
         ram_ids = validated_data.pop('ram_option_ids', None)
         storage_ids = validated_data.pop('storage_option_ids', None)
@@ -214,40 +241,43 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         # Update scalar fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+
         if 'title' in validated_data:
             instance.slug = slugify(validated_data['title'])
 
-        # === M2M SET ===
+        # === M2M: Only update if provided ===
         if category_ids is not None:
             instance.categories.set(Category.objects.filter(id__in=category_ids))
         if ram_ids is not None:
-            instance.ram_options.set(GlobalOption.objects.filter(id__in=ram_ids))
+            instance.ram_options.set(GlobalOption.objects.filter(id__in=ram_ids, type='RAM'))
         if storage_ids is not None:
-            instance.storage_options.set(GlobalOption.objects.filter(id__in=storage_ids))
+            instance.storage_options.set(GlobalOption.objects.filter(id__in=storage_ids, type='STORAGE'))
         if color_ids is not None:
-            instance.colors.set(GlobalOption.objects.filter(id__in=color_ids))
+            instance.colors.set(GlobalOption.objects.filter(id__in=color_ids, type='COLOR'))
 
-        # === TAGS ===
+        # === TAGS: Replace if provided ===
         if tag_names is not None:
             instance.tags.clear()
             for name in tag_names:
-                tag, _ = Tag.objects.get_or_create(
-                    name=name.strip().lower(),
-                    defaults={'slug': slugify(name)}
-                )
-                instance.tags.add(tag)
+                tag_name = name.strip().lower()
+                if tag_name:
+                    tag, _ = Tag.objects.get_or_create(
+                        name=tag_name,
+                        defaults={'slug': slugify(tag_name)}
+                    )
+                    instance.tags.add(tag)
 
-        # === COVER ===
+        # === COVER: Replace if provided ===
         if cover_file is not None:
             instance.cover_image = cover_file
 
-        # === GALLERY REPLACE ===
+        # === GALLERY: Replace if provided ===
         if gallery_files is not None:
             instance.images.all().delete()
             for img_file in gallery_files:
                 ProductImage.objects.create(product=instance, image=img_file)
 
-        # === VARIANTS REPLACE ===
+        # === VARIANTS: Replace if provided ===
         if variants_data is not None:
             instance.variants.all().delete()
             for var in variants_data:
@@ -259,6 +289,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         return instance
 
+    # === HELPER ===
     def _calc_final_price(self, obj):
         if obj.discount and obj.discount > 0:
             return round(obj.price * (1 - obj.discount / 100), 2)

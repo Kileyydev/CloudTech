@@ -10,7 +10,7 @@ import TickerBar from '../components/TickerBar';
 export default function Home() {
   return (
     <div>
-      <TickerBar/>
+
       <TopNavBar />
       <MainNavBar />
       <GamingAccessoriesSection />

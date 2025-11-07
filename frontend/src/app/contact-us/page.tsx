@@ -33,6 +33,8 @@ const MapComponent = dynamic(() => import('@/app/components/MapComponent'), {
   ssr: false,
   loading: () => (
     <Box
+
+
       sx={{
         height: 400,
         bgcolor: 'grey.200',
@@ -74,7 +76,7 @@ const ContactUsPage = () => {
 
   return (
     <>
-    <TickerBar/>
+   
       <TopNavBar />
       <MainNavBar />
 

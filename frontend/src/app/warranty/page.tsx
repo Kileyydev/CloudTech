@@ -59,7 +59,7 @@ const WarrantyPolicy = () => {
 
   return (
     <>
-      <TickerBar />
+   
       <TopNavBar />
       <MainNavBar />
 

@@ -25,7 +25,6 @@ export default function AdminDashboardPageComponent() {
         flexDirection: "column",
       }}
     >
-      <TickerBar />
       <TopNavBar />
       <MainNavBar activeSection={activeSection} setActiveSection={setActiveSection} />
 

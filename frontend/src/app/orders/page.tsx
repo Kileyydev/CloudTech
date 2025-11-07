@@ -125,7 +125,7 @@ export default function OrdersPage() {
   if (loading) {
     return (
       <Box sx={{ minHeight: '100vh', bgcolor: '#f9f9f9' }}>
-        <TickerBar /><TopNavBar /><MainNavBar />
+       <TopNavBar /><MainNavBar />
         <Container sx={{ py: 6, textAlign: 'center' }}>
           <CircularProgress size={60} />
           <Typography sx={{ mt: 2 }}>Loading your orders...</Typography>
@@ -136,7 +136,7 @@ export default function OrdersPage() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f9f9f9' }}>
-      <TickerBar />
+   
       <TopNavBar />
       <MainNavBar />
 

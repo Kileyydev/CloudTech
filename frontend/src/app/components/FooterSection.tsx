@@ -52,7 +52,7 @@ const LogoSection = styled(Box)(({ theme }) => ({
 const Logo = styled('img')({
   height: '90px',
   width: 'auto',
-  boxShadow: '0 4px 16px rgba(219, 27, 136, 0.25)',
+  
 });
 
 // REDUCED FONT SIZE + BETTER BALANCE
@@ -172,7 +172,7 @@ export default function Footer() {
           {/* Logo & Brand */}
           <LogoSection>
             <Logo
-              src="/images/logo.jpeg"
+              src="/images/logo.png"
               alt="CloudTech Logo"
             />
             <BrandName>

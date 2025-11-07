@@ -21,28 +21,54 @@ interface OfficeHoursWidgetProps {
   heroSectionId?: string;
 }
 
+const STORAGE_KEY = 'officeHoursWidgetShown';
+
 export default function OfficeHoursWidget({ heroSectionId = 'hero' }: OfficeHoursWidgetProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [open, setOpen] = useState(false);
+  const [hasBeenShown, setHasBeenShown] = useState(false);
   const heroRef = useRef<HTMLElement | null>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  // Check if widget was already shown in this session
+  useEffect(() => {
+    const shown = sessionStorage.getItem(STORAGE_KEY) === 'true';
+    setHasBeenShown(shown);
+  }, []);
 
   useEffect(() => {
     heroRef.current = document.getElementById(heroSectionId);
-    if (!heroRef.current) return;
+    if (!heroRef.current || hasBeenShown) return;
 
-    const observer = new IntersectionObserver(
-      ([entry]) => setOpen(entry.isIntersecting),
-      { root: null, threshold: 0.3 }
-    );
-
-    observer.observe(heroRef.current);
-    return () => {
-      if (heroRef.current) {
-        observer.unobserve(heroRef.current);
+    const handleIntersect = ([entry]: IntersectionObserverEntry[]) => {
+      if (entry.isIntersecting && !hasBeenShown) {
+        setOpen(true);
+        setHasBeenShown(true);
+        sessionStorage.setItem(STORAGE_KEY, 'true');
       }
     };
-  }, [heroSectionId]);
+
+    observerRef.current = new IntersectionObserver(handleIntersect, {
+      root: null,
+      threshold: 0.3,
+    });
+
+    observerRef.current.observe(heroRef.current);
+
+    return () => {
+      if (observerRef.current && heroRef.current) {
+        observerRef.current.unobserve(heroRef.current);
+      }
+    };
+  }, [heroSectionId, hasBeenShown]);
+
+  // Allow manual close (doesn't re-open even on reload unless session cleared)
+  const handleClose = () => {
+    setOpen(false);
+    // Optional: keep it closed forever in this session
+    sessionStorage.setItem(STORAGE_KEY, 'true');
+  };
 
   return (
     <Slide direction="down" in={open} mountOnEnter unmountOnExit>
@@ -55,7 +81,7 @@ export default function OfficeHoursWidget({ heroSectionId = 'hero' }: OfficeHour
           p: { xs: 2.5, sm: 3 },
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
-          background: 'rgba(0, 0, 0, 0.75)', // Solid black glass
+          background: 'rgba(0, 0, 0, 0.75)',
           border: '1px solid rgba(255, 255, 255, 0.15)',
           boxShadow: `
             0 8px 32px rgba(0, 0, 0, 0.3),
@@ -89,7 +115,7 @@ export default function OfficeHoursWidget({ heroSectionId = 'hero' }: OfficeHour
           </Typography>
           <IconButton
             size="small"
-            onClick={() => setOpen(false)}
+            onClick={handleClose}
             sx={{
               color: '#fff',
               bgcolor: 'rgba(255,255,255,0.12)',
@@ -127,7 +153,7 @@ export default function OfficeHoursWidget({ heroSectionId = 'hero' }: OfficeHour
           >
             Mon–Sat (8am – 8pm) |{' '}
             <Box component="span" sx={{ fontWeight: 600, color: '#fff' }}>
-            Sun CLOSED
+              Sun CLOSED
             </Box>
           </Typography>
         </Box>

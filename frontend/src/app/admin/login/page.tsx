@@ -125,7 +125,6 @@ export default function AdminLogin() {
 
   return (
     <>
-      <TickerBar/>
       <TopNavBar />
       <MainNavBar />
 

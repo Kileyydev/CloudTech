@@ -122,7 +122,6 @@ export default function SmartphoneRepairPage() {
 
   return (
     <>
-    <TickerBar/>
       <TopNavBar />
       <MainNavBar />
 

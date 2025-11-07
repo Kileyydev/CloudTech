@@ -48,7 +48,7 @@ export default function TradeInPage() {
 
   return (
     <>
-      <TickerBar />
+     
       <TopNavBar />
       <MainNavBar />
 

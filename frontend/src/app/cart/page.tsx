@@ -353,7 +353,7 @@ export default function CartPage() {
 
   return (
     <Box>
-      <TickerBar />
+  
       <TopNavBar />
       <MainNavBar />
 
