@@ -26,7 +26,7 @@ type ProductT = {
   description: string;
   cover_image?: string;
   images?: string[];
-  categories?: { name: string }[];
+  categories?: { id: number; name: string; slug?: string }[];
   stock: number;
 };
 
@@ -45,56 +45,127 @@ const ProductCategorySection = () => {
   });
   const [loading, setLoading] = useState(true);
 
-  // ✅ Cache key for localStorage
   const CACHE_KEY = 'apple_products_cache';
   const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
 
-  // ✅ Fetch Apple category products
   useEffect(() => {
     const fetchProducts = async () => {
+      console.log('FETCHING APPLE PRODUCTS...');
+
       try {
-        const cachedData = localStorage.getItem(CACHE_KEY);
-        if (cachedData) {
-          const { data, timestamp } = JSON.parse(cachedData);
-          if (Date.now() - timestamp < CACHE_DURATION) {
-            setProducts(data);
-            setLoading(false);
-            return;
+        // CLEAR CACHE FOR DEBUG (remove later)
+        localStorage.removeItem(CACHE_KEY);
+        console.log('Cache cleared for debug');
+
+        // CHECK ENV VAR
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE;
+        console.log('NEXT_PUBLIC_API_BASE:', API_BASE_URL);
+        if (!API_BASE_URL) {
+          throw new Error('NEXT_PUBLIC_API_BASE is not defined in .env');
+        }
+
+        // TRY MULTIPLE FILTERS
+        const filters = [
+          'category__slug=apple',
+          'category_slug=apple',
+          'categories__slug=apple',
+          'category=apple',
+          'category_name=apple',
+        ];
+
+        let finalProducts: ProductT[] = [];
+        let usedFilter = '';
+
+        for (const filter of filters) {
+          const API_URL = `${API_BASE_URL}/products/?${filter}`;
+          console.log(`Trying filter: ${filter} → ${API_URL}`);
+
+          const res = await fetch(API_URL, { cache: 'no-store' });
+          console.log(`Status: ${res.status} ${res.statusText}`);
+
+          if (!res.ok) {
+            console.log(`Failed with ${filter}`);
+            continue;
+          }
+
+          const rawText = await res.text();
+          console.log(`Raw response (${filter}):`, rawText.substring(0, 500));
+
+          let data;
+          try {
+  data = JSON.parse(rawText);
+} catch (e) {
+  console.error(`JSON parse failed for ${filter}:`, e);
+  continue;
+}
+
+          const list = Array.isArray(data) ? data : data.results || data.data || [];
+          console.log(`Parsed ${list.length} products with ${filter}:`, list);
+
+          if (list.length > 0) {
+            finalProducts = list;
+            usedFilter = filter;
+            break;
           }
         }
 
-        const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL}/products/?category=apple`;
-        const res = await fetch(API_BASE, { cache: 'no-store' });
-        if (!res.ok) throw new Error('Failed to fetch category products');
-        const data = await res.json();
-        const list = data.results || data;
+        if (finalProducts.length === 0) {
+          console.warn('No products found with any filter. Fetching ALL products to debug...');
+          const allRes = await fetch(`${API_BASE_URL}/products/`, { cache: 'no-store' });
+          const allData = await allRes.json();
+          const allList = Array.isArray(allData) ? allData : allData.results || [];
+          console.log('ALL PRODUCTS (for debug):', allList);
 
+          // Show categories
+          allList.forEach((p: ProductT) => {
+            console.log(`Product ID ${p.id}: "${p.title}" → Categories:`, p.categories);
+          });
+
+          throw new Error('No Apple products found. Check category assignment.');
+        }
+
+        console.log(`SUCCESS! Using filter: ${usedFilter}`);
+        console.log('Final products:', finalProducts);
+
+        // Initialize image indexes
         const indexes: Record<number, number> = {};
-        list.forEach((p: ProductT) => (indexes[p.id] = 0));
+        finalProducts.forEach((p: ProductT) => (indexes[p.id] = 0));
         setCurrentIndexes(indexes);
-        setProducts(list);
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ data: list, timestamp: Date.now() }));
-      } catch (err) {
-        console.error('Error fetching products:', err);
-        setSnackbar({ open: true, message: 'Failed to load products', severity: 'error' });
+        setProducts(finalProducts);
+
+        // Save to cache
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ data: finalProducts, timestamp: Date.now() }));
+        console.log('Products cached');
+
+      } catch (err: any) {
+        console.error('FETCH FAILED:', err);
+        console.error('Error stack:', err.stack);
+        setSnackbar({ open: true, message: err.message || 'Failed to load products', severity: 'error' });
       } finally {
         setLoading(false);
+        console.log('Loading state set to false');
       }
     };
+
     fetchProducts();
   }, []);
 
-  // ✅ Load wishlist
+  // Load wishlist
   useEffect(() => {
     try {
       const stored = localStorage.getItem('wishlist');
-      if (stored) setWishlist(new Set(JSON.parse(stored)));
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setWishlist(new Set(parsed));
+        console.log('Wishlist loaded:', parsed);
+      }
     } catch (e) {
       console.error('Error loading wishlist:', e);
     }
   }, []);
 
   const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
+    console.log(`Snackbar: [${severity}] ${message}`);
     setSnackbar({ open: true, message, severity });
   };
 
@@ -106,11 +177,13 @@ const ProductCategorySection = () => {
       if (updated.has(id)) updated.delete(id);
       else updated.add(id);
       localStorage.setItem('wishlist', JSON.stringify(Array.from(updated)));
+      console.log('Wishlist updated:', Array.from(updated));
       return updated;
     });
   };
 
   const handleAddToCart = (product: ProductT) => {
+    console.log('Add to cart:', product.title, 'Stock:', product.stock);
     if (product.stock === 0) return showSnackbar('Out of stock', 'error');
 
     const cartItem = cart[product.id];
@@ -176,7 +249,6 @@ const ProductCategorySection = () => {
           '&:hover': { transform: 'translateY(-4px)' },
         }}
       >
-        {/* ❤️ Wishlist */}
         <Box
           sx={{
             position: 'absolute',
@@ -199,7 +271,6 @@ const ProductCategorySection = () => {
           <Favorite sx={{ color: wishlist.has(product.id) ? '#e91e63' : '#888', fontSize: 18 }} />
         </Box>
 
-        {/* 🖼 Image */}
         <Box sx={{ width: 220, height: 180, cursor: 'pointer' }} onClick={() => router.push(`/product/${product.id}`)}>
           <CardMedia component="img" image={imageSrc || '/images/fallback.jpg'} alt={product.title} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           {product.stock < 5 && (
@@ -220,7 +291,6 @@ const ProductCategorySection = () => {
           )}
         </Box>
 
-        {/* 📦 Content */}
         <CardContent sx={{ flexGrow: 1, p: 1.5, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#222', fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -289,6 +359,8 @@ const ProductCategorySection = () => {
       sx={{ bgcolor: '#fff', borderRadius: 0 }}
     />
   ));
+
+  console.log('Rendering with products:', products.length, products);
 
   return (
     <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, backgroundColor: '#fff' }}>
