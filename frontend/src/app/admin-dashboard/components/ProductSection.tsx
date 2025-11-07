@@ -16,15 +16,15 @@ import {
 } from "@mui/icons-material";
 
 /* ------------------------------------------------------------------ */
-/*  CONFIG                                                            */
+/* CONFIG */
 /* ------------------------------------------------------------------ */
 const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE}/products/`;
-const API_OPTS  = `${process.env.NEXT_PUBLIC_API_BASE}/options/`;
-const API_CATS  = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
-const API_BRANDS= `${process.env.NEXT_PUBLIC_API_BASE}/brands/`;
+const API_OPTS = `${process.env.NEXT_PUBLIC_API_BASE}/options/`;
+const API_CATS = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
+const API_BRANDS = `${process.env.NEXT_PUBLIC_API_BASE}/brands/`;
 
 /* ------------------------------------------------------------------ */
-/*  PROFESSIONAL STYLED COMPONENTS                                    */
+/* PROFESSIONAL STYLED COMPONENTS */
 /* ------------------------------------------------------------------ */
 const PageContainer = styled(Box)(({ theme }) => ({
   minHeight: "100vh",
@@ -139,7 +139,7 @@ const DiscountBadge = styled(Box)(({ theme }) => ({
 }));
 
 /* ------------------------------------------------------------------ */
-/*  MAIN COMPONENT                                                    */
+/* MAIN COMPONENT */
 /* ------------------------------------------------------------------ */
 const ProductAdminPage: React.FC = () => {
   const theme = useTheme();
@@ -185,7 +185,7 @@ const ProductAdminPage: React.FC = () => {
   const token = typeof window !== "undefined" ? localStorage.getItem("access") : null;
 
   /* ------------------------------------------------------------------ */
-  /*  FINAL PRICE CALC                                                  */
+  /* FINAL PRICE CALC — ONLY FROM PRICE + DISCOUNT */
   /* ------------------------------------------------------------------ */
   useEffect(() => {
     if (price !== "" && discount !== "") {
@@ -198,7 +198,7 @@ const ProductAdminPage: React.FC = () => {
   }, [price, discount]);
 
   /* ------------------------------------------------------------------ */
-  /*  FETCH DATA                                                        */
+  /* FETCH DATA */
   /* ------------------------------------------------------------------ */
   const fetchAll = useCallback(async () => {
     if (!token) return;
@@ -227,7 +227,7 @@ const ProductAdminPage: React.FC = () => {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   /* ------------------------------------------------------------------ */
-  /*  IMAGE HANDLERS                                                    */
+  /* IMAGE HANDLERS */
   /* ------------------------------------------------------------------ */
   const handleCover = (files: FileList | null) => {
     if (!files?.[0]) { setCoverFile(null); setCoverPreview(null); return; }
@@ -249,7 +249,7 @@ const ProductAdminPage: React.FC = () => {
   };
 
   /* ------------------------------------------------------------------ */
-  /*  FORM RESET & EDIT                                                 */
+  /* FORM RESET & EDIT */
   /* ------------------------------------------------------------------ */
   const resetForm = () => {
     setEditId(null); setTitle(""); setDescription(""); setPrice(""); setStock("");
@@ -266,7 +266,7 @@ const ProductAdminPage: React.FC = () => {
     setPrice(p.price ?? "");
     setStock(p.stock ?? "");
     setDiscount(p.discount ?? 0);
-    setFinalPrice(p.final_price ?? "");
+    // DO NOT SET FINAL PRICE — useEffect will handle it
     setBrandId(p.brand?.id?.toString() ?? "");
     setSelectedCats(p.categories?.map((c: any) => c.id.toString()) ?? []);
     setSelectedRam(p.ram_options?.map((o: any) => o.id.toString()) ?? []);
@@ -278,15 +278,23 @@ const ProductAdminPage: React.FC = () => {
     setCoverPreview(p.cover_image?.url ?? p.cover_image ?? null);
     setGalleryPreviews(p.images?.map((i: any) => i.image?.url ?? i.image).filter(Boolean) ?? []);
     setVariants(p.variants?.map((v: any) => ({
-      id: v.id, sku: v.sku || "", color: v.color || "", ram: v.ram || "",
-      storage: v.storage || "", processor: v.processor || "", size: v.size || "",
-      price: v.price || "", compare_at_price: v.compare_at_price || "", stock: v.stock || "", is_active: v.is_active ?? true
+      id: v.id,
+      sku: v.sku || "",
+      color: v.color || "",
+      ram: v.ram || "",
+      storage: v.storage || "",
+      processor: v.processor || "",
+      size: v.size || "",
+      price: v.price || "",
+      compare_at_price: v.compare_at_price || "",
+      stock: v.stock || "",
+      is_active: v.is_active ?? true
     })) ?? []);
     setTab(0);
   };
 
   /* ------------------------------------------------------------------ */
-  /*  SAVE PRODUCT — NO VALIDATION, EVERYTHING OPTIONAL */
+  /* SAVE PRODUCT — NO VALIDATION, EVERYTHING OPTIONAL */
   /* ------------------------------------------------------------------ */
   const saveProduct = async () => {
     if (!token) {
@@ -296,9 +304,9 @@ const ProductAdminPage: React.FC = () => {
 
     const form = new FormData();
 
-    // Only append if value exists
-    if (title) form.append("title", title.trim());
-    if (description) form.append("description", description);
+    // Optional fields
+    if (title.trim()) form.append("title", title.trim());
+    if (description.trim()) form.append("description", description.trim());
     if (price !== "" && price !== null) form.append("price", String(price));
     if (stock !== "" && stock !== null) form.append("stock", String(stock));
     if (discount !== "" && discount !== null) form.append("discount", String(discount));
@@ -312,15 +320,25 @@ const ProductAdminPage: React.FC = () => {
     selectedColors.forEach(id => form.append("color_option_ids", id));
     tagNames.filter(t => t.trim()).forEach(t => form.append("tag_names", t.trim()));
 
-    if (variants.length > 0) {
+    // ONLY SEND VARIANTS IF THEY HAVE REAL DATA
+    const hasRealVariants = variants.some(v =>
+      v.sku?.trim() ||
+      v.price !== "" ||
+      v.stock !== "" ||
+      v.color?.trim() ||
+      v.ram?.trim() ||
+      v.storage?.trim()
+    );
+
+    if (hasRealVariants) {
       form.append("variants", JSON.stringify(variants.map(v => ({
         id: v.id,
-        sku: v.sku || "",
-        color: v.color || "",
-        ram: v.ram || "",
-        storage: v.storage || "",
-        processor: v.processor || "",
-        size: v.size || "",
+        sku: v.sku?.trim() || "",
+        color: v.color?.trim() || "",
+        ram: v.ram?.trim() || "",
+        storage: v.storage?.trim() || "",
+        processor: v.processor?.trim() || "",
+        size: v.size?.trim() || "",
         price: v.price !== "" ? Number(v.price) : null,
         compare_at_price: v.compare_at_price !== "" ? Number(v.compare_at_price) : null,
         stock: v.stock !== "" ? Number(v.stock) : null,
@@ -335,23 +353,29 @@ const ProductAdminPage: React.FC = () => {
     try {
       const url = editId ? `${API_BASE}${editId}/` : API_BASE;
       const method = editId ? "PATCH" : "POST";
-      const res = await fetch(url, { method, headers: { Authorization: `Bearer ${token}` }, body: form });
+      const res = await fetch(url, {
+        method,
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      });
       if (res.ok) {
         setSnack({ open: true, msg: editId ? "Updated!" : "Created!", sev: "success" });
-        resetForm(); fetchAll(); setTab(1);
+        resetForm();
+        fetchAll();
+        setTab(1);
       } else {
         const err = await res.text();
         setSnack({ open: true, msg: `Error: ${err.slice(0, 120)}`, sev: "error" });
       }
     } catch (err: any) {
-        setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
+      setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
     } finally {
       setSaving(false);
     }
   };
 
   /* ------------------------------------------------------------------ */
-  /*  DELETE & DISCOUNT                                                 */
+  /* DELETE & DISCOUNT */
   /* ------------------------------------------------------------------ */
   const confirmDel = (id: string) => { setDeleteId(id); setConfirmOpen(true); };
   const doDelete = async () => {
@@ -386,11 +410,10 @@ const ProductAdminPage: React.FC = () => {
     setVariants(prev => prev.map((v, i) => i === idx ? { ...v, [field]: value } : v));
   };
   const removeVariant = (idx: number) => setVariants(prev => prev.filter((_, i) => i !== idx));
-
   const getCoverSrc = (p: any) => p.cover_image?.url || p.cover_image || "/placeholder.png";
 
   /* ------------------------------------------------------------------ */
-  /*  RENDER                                                            */
+  /* RENDER */
   /* ------------------------------------------------------------------ */
   return (
     <PageContainer>
@@ -410,7 +433,6 @@ const ProductAdminPage: React.FC = () => {
             </Typography>
 
             <Stack spacing={5}>
-
               {/* BASIC INFO */}
               <Box>
                 <SectionHeader><Category className="icon" /> Basic Information</SectionHeader>

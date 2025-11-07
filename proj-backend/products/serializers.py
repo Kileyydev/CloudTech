@@ -2,6 +2,8 @@
 from rest_framework import serializers
 from django.utils.text import slugify
 from django.db import transaction
+import json  # <-- FOR PARSING JSON STRINGS FROM FormData
+
 from .models import (
     Category, Brand, Tag, Product, ProductVariant, ProductImage, GlobalOption
 )
@@ -21,7 +23,7 @@ class GlobalOptionSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# BASIC SERIALIZERS — ALL OPTIONAL, NO allow_blank
+# BASIC SERIALIZERS — ALL OPTIONAL
 # ===================================================================
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -72,7 +74,7 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT VARIANT — NO allow_blank ON NON-CHAR FIELDS
+# PRODUCT VARIANT — FULLY OPTIONAL
 # ===================================================================
 class ProductVariantSerializer(serializers.ModelSerializer):
     class Meta:
@@ -128,7 +130,8 @@ class ProductListSerializer(serializers.ModelSerializer):
             'price', 'stock', 'discount', 'final_price',
             'is_active', 'is_featured',
             'colors', 'ram_options', 'storage_options',
-            'condition_options', 'features', 'created_at'
+            'condition_options',
+            'features', 'created_at'
         ]
 
     def get_cover_image(self, obj):
@@ -136,7 +139,7 @@ class ProductListSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT CREATE / UPDATE — FULLY OPTIONAL
+# PRODUCT CREATE / UPDATE — HANDLES FormData + JSON STRINGS
 # ===================================================================
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     brand_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
@@ -161,8 +164,10 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         child=serializers.ImageField(), write_only=True, required=False, allow_empty=True
     )
 
-    variants = ProductVariantSerializer(many=True, required=False, allow_empty=True)
+    # Accept variants as JSON string from FormData
+    variants = serializers.JSONField(write_only=True, required=False, allow_null=True)
 
+    # Read-only fields
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
@@ -197,6 +202,33 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     def validate(self, data):
         return data  # No validation
 
+    def to_internal_value(self, data):
+        """
+        Parse JSON strings from FormData (variants, etc.)
+        """
+        # Handle variants JSON string
+        variants_raw = data.get('variants')
+        if isinstance(variants_raw, str):
+            try:
+                data['variants'] = json.loads(variants_raw)
+            except json.JSONDecodeError:
+                data['variants'] = []
+        elif variants_raw is None:
+            data['variants'] = []
+
+        # Optional: Parse other JSON fields if needed
+        for field in ['condition_options', 'features']:
+            field_raw = data.get(field)
+            if isinstance(field_raw, str):
+                try:
+                    data[field] = json.loads(field_raw)
+                except json.JSONDecodeError:
+                    data[field] = {}
+            elif field_raw is None:
+                data[field] = {}
+
+        return super().to_internal_value(data)
+
     @transaction.atomic
     def create(self, validated_data):
         category_ids = validated_data.pop('category_ids', [])
@@ -210,6 +242,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         product = Product.objects.create(**validated_data)
 
+        # M2M
         if category_ids:
             product.categories.set(Category.objects.filter(id__in=category_ids))
         if ram_ids:
@@ -219,6 +252,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         if color_ids:
             product.colors.set(GlobalOption.objects.filter(id__in=color_ids))
 
+        # Tags
         if tag_names:
             for name in tag_names:
                 name = name.strip()
@@ -226,17 +260,32 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                     tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
                     product.tags.add(tag)
 
+        # Cover
         if cover_file:
             product.cover_image = cover_file
             product.save(update_fields=['cover_image'])
 
+        # Gallery
         if gallery_files:
             for img_file in gallery_files:
                 ProductImage.objects.create(product=product, image=img_file)
 
+        # Variants
         if variants_data:
             for var in variants_data:
-                ProductVariant.objects.create(product=product, **var)
+                ProductVariant.objects.create(
+                    product=product,
+                    sku=var.get('sku', ''),
+                    color=var.get('color', ''),
+                    ram=var.get('ram', ''),
+                    storage=var.get('storage', ''),
+                    processor=var.get('processor', ''),
+                    size=var.get('size', ''),
+                    price=var.get('price') or 0,
+                    compare_at_price=var.get('compare_at_price'),
+                    stock=var.get('stock') or 0,
+                    is_active=var.get('is_active', True)
+                )
 
         product.final_price = self._calc_final_price(product)
         product.save(update_fields=['final_price'])
@@ -254,12 +303,14 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery', None)
 
+        # Update scalar fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
         if 'title' in validated_data and validated_data['title']:
             instance.slug = slugify(validated_data['title'])
 
+        # M2M
         if category_ids is not None:
             instance.categories.set(Category.objects.filter(id__in=category_ids) if category_ids else [])
         if ram_ids is not None:
@@ -269,6 +320,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         if color_ids is not None:
             instance.colors.set(GlobalOption.objects.filter(id__in=color_ids) if color_ids else [])
 
+        # Tags
         if tag_names is not None:
             instance.tags.clear()
             for name in tag_names:
@@ -277,18 +329,33 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                     tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
                     instance.tags.add(tag)
 
+        # Cover
         if cover_file is not None:
             instance.cover_image = cover_file
 
+        # Gallery
         if gallery_files is not None:
             instance.images.all().delete()
             for img_file in gallery_files:
                 ProductImage.objects.create(product=instance, image=img_file)
 
+        # Variants
         if variants_data is not None:
             instance.variants.all().delete()
             for var in variants_data:
-                ProductVariant.objects.create(product=instance, **var)
+                ProductVariant.objects.create(
+                    product=instance,
+                    sku=var.get('sku', ''),
+                    color=var.get('color', ''),
+                    ram=var.get('ram', ''),
+                    storage=var.get('storage', ''),
+                    processor=var.get('processor', ''),
+                    size=var.get('size', ''),
+                    price=var.get('price') or 0,
+                    compare_at_price=var.get('compare_at_price'),
+                    stock=var.get('stock') or 0,
+                    is_active=var.get('is_active', True)
+                )
 
         instance.final_price = self._calc_final_price(instance)
         instance.save()

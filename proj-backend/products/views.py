@@ -2,6 +2,7 @@
 from rest_framework import viewsets, permissions, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.parsers import MultiPartParser, FormParser  # <-- CRITICAL
 from django_filters.rest_framework import DjangoFilterBackend
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
@@ -23,7 +24,7 @@ from .serializers import (
 
 
 # ===================================================================
-# GLOBAL OPTION VIEWSET — READ-ONLY, NO FILTERS NEEDED
+# GLOBAL OPTION VIEWSET — READ-ONLY
 # ===================================================================
 class GlobalOptionViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = GlobalOption.objects.all().order_by('type', 'value')
@@ -34,14 +35,13 @@ class GlobalOptionViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # ===================================================================
-# PERMISSION: ANYONE CAN DO ANYTHING (OR KEEP IsAdminOrReadOnly)
+# PERMISSIONS — FULLY OPEN (OR ADMIN-ONLY WRITE)
 # ===================================================================
 class AllowAll(permissions.BasePermission):
     def has_permission(self, request, view):
         return True  # No restrictions
 
 
-# OR keep IsAdminOrReadOnly if you want admin-only write
 class IsAdminOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
@@ -50,13 +50,17 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 
 
 # ===================================================================
-# PRODUCT VIEWSET — FULLY OPTIONAL, NO FILTERS, NO VALIDATION
+# PRODUCT VIEWSET — FULLY OPTIONAL, HANDLES multipart/form-data
 # ===================================================================
 class ProductViewSet(viewsets.ModelViewSet):
-    # Uncomment one:
+    # Choose one:
     permission_classes = [AllowAll]  # OR [IsAdminOrReadOnly]
+    
+    # SUPPORT FILES + JSON IN ONE REQUEST
+    parser_classes = [MultiPartParser, FormParser]  # <-- REQUIRED
+
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['brand__id', 'categories__id']  # Removed is_active, is_featured
+    filterset_fields = ['brand__id', 'categories__id']
     search_fields = ['title', 'description', 'brand__name', 'tags__name']
     ordering_fields = ['price', 'created_at', 'discount', 'final_price']
     ordering = ['-created_at']
@@ -66,11 +70,7 @@ class ProductViewSet(viewsets.ModelViewSet):
             return ProductListSerializer
         return ProductCreateUpdateSerializer
 
-    # ===================================================================
-    # NO FILTERING ON is_active — SHOW ALL PRODUCTS
-    # ===================================================================
     def get_queryset(self):
-        # Optional: cache per query params
         cache_key = f"products_all_{hash(frozenset(self.request.query_params.items()))}"
         cached_qs = cache.get(cache_key)
         if cached_qs is not None:
@@ -87,7 +87,6 @@ class ProductViewSet(viewsets.ModelViewSet):
             'variants'
         )
 
-        # Apply optional filters
         category_slug = self.request.query_params.get('category')
         brand_id = self.request.query_params.get('brand')
         is_featured = self.request.query_params.get('is_featured')
@@ -108,7 +107,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         return context
 
     # ===================================================================
-    # FEATURED — STILL WORKS, BUT OPTIONAL
+    # FEATURED — OPTIONAL
     # ===================================================================
     @action(detail=False, methods=['get'], url_path='featured')
     @method_decorator(cache_page(60 * 5))
@@ -118,7 +117,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     # ===================================================================
-    # FINAL PRICE — ONLY IF PRICE & DISCOUNT EXIST
+    # FINAL PRICE — SAFE CALC
     # ===================================================================
     def perform_create(self, serializer):
         product = serializer.save()
@@ -142,7 +141,8 @@ class ProductViewSet(viewsets.ModelViewSet):
 class ProductVariantViewSet(viewsets.ModelViewSet):
     queryset = ProductVariant.objects.select_related('product__brand').all()
     serializer_class = ProductVariantSerializer
-    permission_classes = [AllowAll]  # or [IsAdminOrReadOnly]
+    permission_classes = [AllowAll]
+    parser_classes = [MultiPartParser, FormParser]  # Optional, but safe
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['product__id', 'color', 'storage', 'ram', 'processor']
     search_fields = ['sku', 'processor', 'product__title']
@@ -151,7 +151,7 @@ class ProductVariantViewSet(viewsets.ModelViewSet):
 
 
 # ===================================================================
-# CATEGORY VIEWSET — READ-ONLY, NO RESTRICTIONS
+# CATEGORY VIEWSET — READ-ONLY
 # ===================================================================
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Category.objects.all()
@@ -176,6 +176,7 @@ class BrandViewSet(viewsets.ReadOnlyModelViewSet):
 class ProductImageViewSet(viewsets.ModelViewSet):
     queryset = ProductImage.objects.select_related('product').all()
     serializer_class = ProductImageSerializer
-    permission_classes = [AllowAll] 
+    permission_classes = [AllowAll]
+    parser_classes = [MultiPartParser, FormParser]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['product__id']

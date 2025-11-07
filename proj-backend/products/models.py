@@ -72,7 +72,7 @@ class GlobalOption(models.Model):
     value = models.CharField(max_length=50, blank=True, null=True)
 
     class Meta:
-        unique_together = ()  # Removed to allow duplicates if needed
+        unique_together = ()  # Allow duplicates
         ordering = ['type', 'value']
 
     def __str__(self):
@@ -80,7 +80,7 @@ class GlobalOption(models.Model):
 
 
 # ===================================================================
-# PRODUCT
+# PRODUCT — FINAL_PRICE AUTO-CALCULATED
 # ===================================================================
 class Product(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -94,12 +94,11 @@ class Product(models.Model):
 
     cover_image = CloudinaryField('image', blank=True, null=True)
 
-    price = models.DecimalField(max_digits=12, decimal_places=2, default=0, blank=True, null=True)
-    stock = models.PositiveIntegerField(default=0, blank=True, null=True)
+    price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
+    stock = models.PositiveIntegerField(blank=True, null=True)
     discount = models.DecimalField(
         max_digits=5,
         decimal_places=2,
-        default=0,
         blank=True,
         null=True,
         validators=[MinValueValidator(0), MaxValueValidator(100)]
@@ -140,7 +139,7 @@ class Product(models.Model):
         return self.title or f"Product {self.id}"
 
     def save(self, *args, **kwargs):
-        # Only generate slug if title exists
+        # Generate slug only if title exists
         if self.title and not self.slug:
             base = slugify(self.title)[:240]
             slug = base
@@ -150,7 +149,7 @@ class Product(models.Model):
                 i += 1
             self.slug = slug
 
-        # Auto-calculate final_price only if price and discount exist
+        # Auto-calculate final_price
         if self.price is not None and self.discount is not None and self.discount > 0:
             self.final_price = round(float(self.price) * (1 - self.discount / 100), 2)
         else:
@@ -175,13 +174,13 @@ class ProductVariant(models.Model):
 
     price = models.DecimalField(max_digits=12, decimal_places=2, blank=True, null=True)
     compare_at_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
-    stock = models.PositiveIntegerField(default=0, blank=True, null=True)
+    stock = models.PositiveIntegerField(blank=True, null=True)
 
     is_active = models.BooleanField(default=False, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True, blank=True, null=True)
 
     class Meta:
-        unique_together = ()  # Removed to allow duplicates
+        unique_together = ()  # Allow duplicates
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['sku']),
@@ -225,7 +224,9 @@ class ProductImage(models.Model):
 
     def save(self, *args, **kwargs):
         if self.is_primary and self.product and self.image:
+            # Demote other primary images
             ProductImage.objects.filter(product=self.product, is_primary=True).update(is_primary=False)
+            # Sync cover_image
             if self.product.cover_image != self.image:
                 self.product.cover_image = self.image
                 self.product.save(update_fields=['cover_image'])
