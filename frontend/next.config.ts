@@ -30,6 +30,7 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  trailingSlash: true, // Optional: makes /product/1/ → /product/1/index.html
 
   // Security Headers (including HSTS) - Applies to all routes in production
   async headers() {
@@ -88,4 +89,4 @@ const nextConfig = {
   output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
 };
 
-module.exports = nextConfig;
+export default nextConfig;

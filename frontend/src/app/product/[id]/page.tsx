@@ -5,7 +5,6 @@ import { use } from 'react';
 import {
   Box,
   Typography,
-  IconButton,
   Button,
   Select,
   MenuItem,
@@ -61,8 +60,44 @@ interface ProductT {
   storage_options?: OptionT[];
   color_options?: OptionT[];
   variants?: VariantT[];
+  stock?: number;
 }
 
+// ──────────────────────────────────────────────────────────────
+// generateStaticParams – REQUIRED FOR `output: 'export'`
+// ──────────────────────────────────────────────────────────────
+export async function generateStaticParams() {
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE;
+
+  if (!API_BASE_URL) {
+    console.warn('NEXT_PUBLIC_API_BASE not set. Skipping generateStaticParams.');
+    return [];
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/products/`, {
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to fetch products: ${res.status}`);
+    }
+
+    const products: Pick<ProductT, 'id'>[] = await res.json();
+
+    return products.map((product) => ({
+      id: product.id.toString(),
+    }));
+  } catch (error) {
+    console.error('generateStaticParams error:', error);
+    return [];
+  }
+}
+
+// ──────────────────────────────────────────────────────────────
+// MAIN PAGE COMPONENT
+// ──────────────────────────────────────────────────────────────
 const ProductDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const { id } = use(params);
   const theme = useTheme();
@@ -171,13 +206,12 @@ const ProductDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
   const handleAddToCart = () => {
     if (!product) return;
     const item = cart[product.id];
-    const qty = item ? item.quantity + 1 : 1;
     addToCart({
       id: product.id,
       title: product.title,
       price: currentFinalPrice,
       quantity: 1,
-      stock: (product as any).stock ?? 0,
+      stock: product.stock ?? 0,
       cover_image: typeof product.cover_image === 'string'
         ? product.cover_image
         : getImageUrl(product.cover_image),
@@ -241,7 +275,6 @@ const ProductDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
       <Box sx={{ display: 'flex', gap: { xs: 2, md: 4 }, flexDirection: { xs: 'column', lg: 'row' } }}>
         {/* LEFT: Cover + Gallery */}
         <Box sx={{ flex: '0 0 500px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {/* Main Image */}
           <Box
             sx={{
               bgcolor: '#fff',
@@ -258,7 +291,6 @@ const ProductDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
             />
           </Box>
 
-          {/* Gallery Thumbnails */}
           {(galleryImages.length > 0 || product.cover_image) && (
             <Stack direction="row" spacing={1} sx={{ overflowX: 'auto', pb: 1 }}>
               {[getImageUrl(product.cover_image), ...galleryImages].map((src, i) => (
@@ -287,12 +319,10 @@ const ProductDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
 
         {/* RIGHT: Details */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          {/* Title */}
           <Typography variant="h4" sx={{ fontWeight: 800, color: '#1a1a1a', mb: 1 }}>
             {product.title}
           </Typography>
 
-          {/* Brand */}
           {product.brand && (
             <Chip
               icon={<Business sx={{ fontSize: 16 }} />}
@@ -301,7 +331,6 @@ const ProductDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
             />
           )}
 
-          {/* Price */}
           <Box sx={{ mb: 3 }}>
             {hasDiscount ? (
               <Stack direction="row" alignItems="center" spacing={2}>
@@ -320,7 +349,6 @@ const ProductDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
             )}
           </Box>
 
-          {/* Variant Options */}
           <Stack spacing={2} sx={{ mb: 4 }}>
             {ramOptions.length > 0 && (
               <FormControl fullWidth>
@@ -371,7 +399,6 @@ const ProductDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
             )}
           </Stack>
 
-          {/* Add to Cart */}
           <Button
             fullWidth
             size="large"
@@ -392,7 +419,6 @@ const ProductDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
             Add to Cart
           </Button>
 
-          {/* Wishlist */}
           <Button
             fullWidth
             variant="outlined"
@@ -411,7 +437,6 @@ const ProductDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
 
           <Divider sx={{ my: 4 }} />
 
-          {/* Description */}
           <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: '#1a1a1a' }}>
             Description
           </Typography>
@@ -421,7 +446,6 @@ const ProductDetailPage = ({ params }: { params: Promise<{ id: string }> }) => {
         </Box>
       </Box>
 
-      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
