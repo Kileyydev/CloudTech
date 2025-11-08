@@ -369,7 +369,7 @@ const ProductAdminPage: React.FC = () => {
 
     // IMAGES
     if (coverFile) form.append("cover_image", coverFile);
-    galleryFiles.forEach(f => form.append("gallery", f));
+    galleryFiles.forEach(f => form.append("gallery", f));  // ← SAME KEY, BUT MUST BE LIST
 
     setSaving(true);
     try {

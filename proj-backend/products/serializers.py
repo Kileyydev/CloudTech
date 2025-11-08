@@ -160,7 +160,9 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     )
 
     cover_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
-    gallery = serializers.ListField(
+    
+    # FIXED: Use gallery_images to avoid ListField(ImageField) parsing bug
+    gallery_images = serializers.ListField(
         child=serializers.ImageField(), write_only=True, required=False, allow_empty=True
     )
 
@@ -186,7 +188,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             'ram_options', 'ram_option_ids',
             'storage_options', 'storage_option_ids',
             'colors', 'color_option_ids',
-            'tag_names', 'cover_image', 'gallery', 'images', 'variants', 'tags'
+            'tag_names', 'cover_image', 'gallery_images', 'images', 'variants', 'tags'
         ]
         read_only_fields = ['final_price', 'id', 'slug']
         extra_kwargs = {
@@ -238,7 +240,8 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         tag_names = validated_data.pop('tag_names', [])
         variants_data = validated_data.pop('variants', [])
         cover_file = validated_data.pop('cover_image', None)
-        gallery_files = validated_data.pop('gallery', [])
+        # FIXED: Use gallery_images
+        gallery_files = validated_data.pop('gallery_images', [])
 
         product = Product.objects.create(**validated_data)
 
@@ -301,7 +304,8 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         tag_names = validated_data.pop('tag_names', None)
         variants_data = validated_data.pop('variants', None)
         cover_file = validated_data.pop('cover_image', None)
-        gallery_files = validated_data.pop('gallery', None)
+        # FIXED: Use gallery_images
+        gallery_files = validated_data.pop('gallery_images', None)
 
         # Update scalar fields
         for attr, value in validated_data.items():
