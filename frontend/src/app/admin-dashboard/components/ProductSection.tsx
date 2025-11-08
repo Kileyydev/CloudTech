@@ -139,6 +139,17 @@ const DiscountBadge = styled(Box)(({ theme }) => ({
 }));
 
 /* ------------------------------------------------------------------ */
+/* ERROR LOGGING HELPER */
+/* ------------------------------------------------------------------ */
+const logError = (msg: string, error: any, context?: { url?: string; status?: number }) => {
+  console.error(`[ProductAdmin ERROR] ${msg}`, {
+    message: error?.message || String(error),
+    stack: error?.stack,
+    context,
+  });
+};
+
+/* ------------------------------------------------------------------ */
 /* MAIN COMPONENT */
 /* ------------------------------------------------------------------ */
 const ProductAdminPage: React.FC = () => {
@@ -201,7 +212,10 @@ const ProductAdminPage: React.FC = () => {
   /* FETCH DATA */
   /* ------------------------------------------------------------------ */
   const fetchAll = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      logError("No auth token found", new Error("Missing token"), { url: "N/A" });
+      return;
+    }
     setLoading(true);
     try {
       const [pRes, cRes, bRes, oRes] = await Promise.all([
@@ -210,14 +224,24 @@ const ProductAdminPage: React.FC = () => {
         fetch(API_BRANDS, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(API_OPTS, { headers: { Authorization: `Bearer ${token}` } })
       ]);
+
+      if (!pRes.ok || !cRes.ok || !bRes.ok || !oRes.ok) {
+        throw new Error(`HTTP ${[pRes, cRes, bRes, oRes].map(r => r.status).join(", ")}`);
+      }
+
       const [pJson, cJson, bJson, oJson] = await Promise.all([
         pRes.json(), cRes.json(), bRes.json(), oRes.json()
       ]);
+
       setProducts(Array.isArray(pJson) ? pJson : pJson.results || []);
       setCategories(Array.isArray(cJson) ? cJson : cJson.results || []);
       setBrands(Array.isArray(bJson) ? bJson : bJson.results || []);
       setOptions(Array.isArray(oJson) ? oJson : oJson.results || []);
-    } catch {
+    } catch (error: any) {
+      logError("Failed to load initial data", error, {
+        url: API_BASE,
+        status: error.status
+      });
       setSnack({ open: true, msg: "Failed to load data", sev: "error" });
     } finally {
       setLoading(false);
@@ -266,7 +290,6 @@ const ProductAdminPage: React.FC = () => {
     setPrice(p.price ?? "");
     setStock(p.stock ?? "");
     setDiscount(p.discount ?? 0);
-    // DO NOT SET FINAL PRICE — useEffect will handle it
     setBrandId(p.brand?.id?.toString() ?? "");
     setSelectedCats(p.categories?.map((c: any) => c.id.toString()) ?? []);
     setSelectedRam(p.ram_options?.map((o: any) => o.id.toString()) ?? []);
@@ -294,17 +317,17 @@ const ProductAdminPage: React.FC = () => {
   };
 
   /* ------------------------------------------------------------------ */
-  /* SAVE PRODUCT — NO VALIDATION, EVERYTHING OPTIONAL */
+  /* SAVE PRODUCT */
   /* ------------------------------------------------------------------ */
   const saveProduct = async () => {
     if (!token) {
+      logError("Save attempted without token", new Error("No access token"));
       setSnack({ open: true, msg: "No token", sev: "error" });
       return;
     }
 
     const form = new FormData();
 
-    // Optional fields
     if (title.trim()) form.append("title", title.trim());
     if (description.trim()) form.append("description", description.trim());
     if (price !== "" && price !== null) form.append("price", String(price));
@@ -320,7 +343,6 @@ const ProductAdminPage: React.FC = () => {
     selectedColors.forEach(id => form.append("color_option_ids", id));
     tagNames.filter(t => t.trim()).forEach(t => form.append("tag_names", t.trim()));
 
-    // ONLY SEND VARIANTS IF THEY HAVE REAL DATA
     const hasRealVariants = variants.some(v =>
       v.sku?.trim() ||
       v.price !== "" ||
@@ -358,16 +380,19 @@ const ProductAdminPage: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` },
         body: form
       });
+
       if (res.ok) {
         setSnack({ open: true, msg: editId ? "Updated!" : "Created!", sev: "success" });
         resetForm();
         fetchAll();
         setTab(1);
       } else {
-        const err = await res.text();
-        setSnack({ open: true, msg: `Error: ${err.slice(0, 120)}`, sev: "error" });
+        const errText = await res.text();
+        logError(`Save failed (HTTP ${res.status})`, new Error(errText.slice(0, 200)), { url, status: res.status });
+        setSnack({ open: true, msg: `Error: ${errText.slice(0, 120)}`, sev: "error" });
       }
     } catch (err: any) {
+      logError("Network error during save", err, { url: editId ? `${API_BASE}${editId}/` : API_BASE });
       setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
     } finally {
       setSaving(false);
@@ -381,25 +406,45 @@ const ProductAdminPage: React.FC = () => {
   const doDelete = async () => {
     if (!token || !deleteId) return;
     try {
-      await fetch(`${API_BASE}${deleteId}/`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      setSnack({ open: true, msg: "Deleted!", sev: "success" });
-      fetchAll();
-    } catch { setSnack({ open: true, msg: "Delete failed", sev: "error" }); }
-    finally { setConfirmOpen(false); setDeleteId(null); }
+      const url = `${API_BASE}${deleteId}/`;
+      const res = await fetch(url, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        setSnack({ open: true, msg: "Deleted!", sev: "success" });
+        fetchAll();
+      } else {
+        const err = await res.text();
+        logError(`Delete failed (HTTP ${res.status})`, new Error(err), { url, status: res.status });
+        setSnack({ open: true, msg: "Delete failed", sev: "error" });
+      }
+    } catch (err: any) {
+      logError("Network error during delete", err, { url: `${API_BASE}${deleteId}/` });
+      setSnack({ open: true, msg: "Delete failed", sev: "error" });
+    } finally {
+      setConfirmOpen(false); setDeleteId(null);
+    }
   };
 
   const updateDiscount = async (p: any) => {
     if (!token) return;
     const final = p.price && p.discount ? Math.round(p.price * (1 - p.discount / 100) * 100) / 100 : p.price;
     try {
-      await fetch(`${API_BASE}${p.id}/`, {
+      const url = `${API_BASE}${p.id}/`;
+      const res = await fetch(url, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ discount: p.discount, final_price: final })
       });
-      setSnack({ open: true, msg: "Discount updated", sev: "success" });
-      fetchAll();
-    } catch { setSnack({ open: true, msg: "Update failed", sev: "error" }); }
+      if (res.ok) {
+        setSnack({ open: true, msg: "Discount updated", sev: "success" });
+        fetchAll();
+      } else {
+        const err = await res.text();
+        throw new Error(err);
+      }
+    } catch (err: any) {
+      logError("Discount update failed", err, { url: `${API_BASE}${p.id}/` });
+      setSnack({ open: true, msg: "Update failed", sev: "error" });
+    }
   };
 
   const filtered = categoryFilter === "all" ? products : products.filter(p => p.categories?.some((c: any) => c.id === categoryFilter));
