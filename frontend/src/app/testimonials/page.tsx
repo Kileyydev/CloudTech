@@ -128,8 +128,7 @@ export default function TestimonialsPage() {
   return (
     <>
       
-      <TopNavBar />
-      <MainNavBar />
+      
 
       <Box sx={{ bgcolor: '#ffffff', minHeight: '100vh', color: '#000000' }}>
 

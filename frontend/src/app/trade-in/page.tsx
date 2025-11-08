@@ -48,9 +48,7 @@ export default function TradeInPage() {
 
   return (
     <>
-     
-      <TopNavBar />
-      <MainNavBar />
+ 
 
       <Box sx={{ bgcolor: '#ffffff', minHeight: '100vh', py: { xs: 4, md: 8 } }}>
         <Container maxWidth="md">

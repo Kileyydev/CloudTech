@@ -9,8 +9,6 @@ export default function Home() {
   return (
     <div>
    
-      <TopNavBar />
-      <MainNavBar />
       <AudioAccessoriesSection />
     </div>
   );

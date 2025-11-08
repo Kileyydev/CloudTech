@@ -16,8 +16,6 @@ export default function Home() {
   return (
     <div>
    
-      <TopNavBar />
-      <MainNavBar />
       <HeroSection />
       <FeaturedProductsSection />
       <TopCategoriesSection />

@@ -122,8 +122,7 @@ export default function SmartphoneRepairPage() {
 
   return (
     <>
-      <TopNavBar />
-      <MainNavBar />
+
 
       <Box sx={{ backgroundColor: '#fff', color: '#000', py: { xs: 4, md: 6 }, px: { xs: 2, md: 6 } }}>
         {/* REPAIR CATEGORIES */}

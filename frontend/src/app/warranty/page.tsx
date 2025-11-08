@@ -60,8 +60,6 @@ const WarrantyPolicy = () => {
   return (
     <>
    
-      <TopNavBar />
-      <MainNavBar />
 
       <Box sx={{ bgcolor: '#ffffff', minHeight: '100vh', py: { xs: 6, md: 10 } }}>
         <Container maxWidth="md">

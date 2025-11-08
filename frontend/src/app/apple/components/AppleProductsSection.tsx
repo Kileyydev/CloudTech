@@ -23,7 +23,7 @@ import {
   ShoppingCart,
   Add,
   Remove,
-  Apple,
+  Headset,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
@@ -41,15 +41,15 @@ interface ProductT {
   cover_image?: ProductImage;
   images?: ProductImage[];
   brand?: { name: string };
-  ram_options?: { value: string }[];
-  storage_options?: { value: string }[];
+  type?: { value: string }[];        // e.g. Wireless, Wired
+  connectivity?: { value: string }[]; // e.g. Bluetooth, 3.5mm
   colors?: { value: string }[];
 }
 
-const CACHE_KEY = 'apple_products_cache_v3';
-const CACHE_DURATION = 1000 * 60 * 5;
+const CACHE_KEY = 'apple_accessories_cache_v3';
+const CACHE_DURATION = 1000 * 60 * 5; // 5 mins
 
-const AppleProductsSection = () => {
+const AppleAccessoriesSection = () => {
   const theme = useTheme();
   const router = useRouter();
   const { cart, addToCart, updateQuantity } = useCart();
@@ -89,7 +89,6 @@ const AppleProductsSection = () => {
           'categories__slug=apple',
           'category_slug=apple',
           'category=apple',
-          'brand__name=Apple',
         ];
 
         let finalProducts: ProductT[] = [];
@@ -118,7 +117,7 @@ const AppleProductsSection = () => {
         }
 
         if (finalProducts.length === 0)
-          throw new Error('No Apple products found');
+          throw new Error('No apple accessories found');
 
         setProducts(finalProducts);
         localStorage.setItem(
@@ -126,9 +125,10 @@ const AppleProductsSection = () => {
           JSON.stringify({ data: finalProducts, timestamp: Date.now() })
         );
       } catch (err: any) {
+        console.error('Apple fetch failed:', err);
         setSnackbar({
           open: true,
-          message: err.message || 'Failed to load Apple products',
+          message: err.message || 'Failed to load apple accessories',
           severity: 'error',
         });
       } finally {
@@ -154,9 +154,7 @@ const AppleProductsSection = () => {
   const showSnackbar = (
     message: string,
     severity: 'success' | 'error' = 'success'
-  ) => {
-    setSnackbar({ open: true, message, severity });
-  };
+  ) => setSnackbar({ open: true, message, severity });
 
   const handleCloseSnackbar = () =>
     setSnackbar((prev) => ({ ...prev, open: false }));
@@ -237,7 +235,6 @@ const AppleProductsSection = () => {
         height: 380,
         flex: '0 0 auto',
         bgcolor: '#fff',
-        
         mr: 2,
         boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
       }}
@@ -266,13 +263,11 @@ const AppleProductsSection = () => {
           height: 400,
           flex: '0 0 auto',
           bgcolor: '#fff',
-         
           mr: 2,
           overflow: 'hidden',
           position: 'relative',
           boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
           transition: 'all 0.3s ease',
-
         }}
       >
         {/* Wishlist */}
@@ -289,7 +284,7 @@ const AppleProductsSection = () => {
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-           
+            borderRadius: '50%',
             boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
           }}
           onClick={(e) => {
@@ -325,7 +320,6 @@ const AppleProductsSection = () => {
               height: '100%',
               objectFit: 'cover',
               transition: '0.4s',
-              
             }}
           />
           {hasDiscount && (
@@ -340,7 +334,7 @@ const AppleProductsSection = () => {
                 fontSize: '0.75rem',
                 px: 1.2,
                 py: 0.4,
-                
+                borderRadius: 1,
                 boxShadow: '0 3px 10px rgba(233,30,99,0.4)',
               }}
             >
@@ -369,7 +363,7 @@ const AppleProductsSection = () => {
           {/* Brand */}
           {product.brand && (
             <Stack direction="row" alignItems="center" gap={0.8} mb={1}>
-              <Apple sx={{ fontSize: 15, color: '#999' }} />
+              <Headset sx={{ fontSize: 15, color: '#999' }} />
               <Typography
                 variant="body2"
                 sx={{ color: '#444', fontWeight: 600, fontSize: '0.8rem' }}
@@ -379,19 +373,19 @@ const AppleProductsSection = () => {
             </Stack>
           )}
 
-          {/* Specs - Text Labels */}
+          {/* Specs */}
           <Stack spacing={0.8} mb={1.5}>
-            {Array.isArray(product.ram_options) && product.ram_options.length > 0 && (
+            {Array.isArray(product.type) && product.type.length > 0 && (
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                 <Typography
                   sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 600, mr: 0.5 }}
                 >
-                  RAM:
+                  Type:
                 </Typography>
-                {product.ram_options.map((ram, i) => (
+                {product.type.map((t, i) => (
                   <Chip
                     key={i}
-                    label={ram.value}
+                    label={t.value}
                     size="small"
                     sx={{
                       height: 20,
@@ -405,17 +399,17 @@ const AppleProductsSection = () => {
               </Box>
             )}
 
-            {Array.isArray(product.storage_options) && product.storage_options.length > 0 && (
+            {Array.isArray(product.connectivity) && product.connectivity.length > 0 && (
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                 <Typography
                   sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 600, mr: 0.5 }}
                 >
-                  Storage:
+                  Connectivity:
                 </Typography>
-                {product.storage_options.map((s, i) => (
+                {product.connectivity.map((c, i) => (
                   <Chip
                     key={i}
-                    label={s.value}
+                    label={c.value}
                     size="small"
                     sx={{
                       height: 20,
@@ -442,7 +436,7 @@ const AppleProductsSection = () => {
                     sx={{
                       width: 16,
                       height: 16,
-                     
+                      borderRadius: '50%',
                       bgcolor: col.value.toLowerCase(),
                       border: '1.5px solid #ddd',
                     }}
@@ -547,7 +541,6 @@ const AppleProductsSection = () => {
                 textTransform: 'none',
                 py: 0.8,
                 fontSize: '0.8rem',
-               
                 '&[disabled]': { bgcolor: '#eee', color: '#999' },
               }}
             >
@@ -556,7 +549,7 @@ const AppleProductsSection = () => {
           )}
         </CardContent>
 
-        {/* Gallery Preview - Compact */}
+        {/* Gallery Preview */}
         {galleryImages.length > 0 && (
           <Box sx={{ px: 1.5, pb: 1.5 }}>
             <Stack direction="row" spacing={0.8}>
@@ -566,12 +559,10 @@ const AppleProductsSection = () => {
                   sx={{
                     width: 40,
                     height: 40,
-                    
                     overflow: 'hidden',
                     border: '1.5px solid #eee',
                     cursor: 'pointer',
                     transition: '0.2s',
-                    
                   }}
                   onClick={() => router.push(`/product/${product.id}`)}
                 >
@@ -587,7 +578,6 @@ const AppleProductsSection = () => {
                   sx={{
                     width: 40,
                     height: 40,
-                    
                     bgcolor: 'rgba(0,0,0,0.6)',
                     color: '#fff',
                     fontSize: '0.65rem',
@@ -621,12 +611,12 @@ const AppleProductsSection = () => {
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Apple sx={{ fontSize: 32, color: '#e91e63' }} />
+          <Headset sx={{ fontSize: 32, color: '#e91e63' }} />
           <Typography
             variant="h5"
             sx={{ fontWeight: 800, color: '#1a1a1a' }}
           >
-            Apple Collection
+            Apple Accessories
           </Typography>
         </Box>
         <Button
@@ -642,8 +632,8 @@ const AppleProductsSection = () => {
             px: 2.5,
             py: 1,
             fontSize: '0.85rem',
-           
           }}
+          disabled={getCartItemCount() === 0}
         >
           Cart ({getCartItemCount()})
         </Button>
@@ -668,10 +658,10 @@ const AppleProductsSection = () => {
                 color="text.secondary"
                 sx={{ textAlign: 'center', py: 5, width: '100%' }}
               >
-                No Apple products available right now.
+                No apple accessories available right now.
               </Typography>
             )
-          : products.map(renderCard)}
+          : products.filter(p => p.stock > 0).map(renderCard)}
       </Box>
 
       <Snackbar
@@ -703,4 +693,4 @@ const AppleProductsSection = () => {
   );
 };
 
-export default AppleProductsSection;
+export default AppleAccessoriesSection;

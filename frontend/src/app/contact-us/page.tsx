@@ -76,9 +76,7 @@ const ContactUsPage = () => {
 
   return (
     <>
-   
-      <TopNavBar />
-      <MainNavBar />
+
 
       <Box
         sx={{

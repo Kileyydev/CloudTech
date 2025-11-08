@@ -108,7 +108,7 @@ export default function OrderConfirmation() {
   if (!order) {
     return (
       <Box sx={{ minHeight: '100vh', bgcolor: '#f9f9f9' }}>
-        <TopNavBar /><MainNavBar />
+      
         <Container sx={{ py: 6, textAlign: 'center' }}>
           <Typography color="error">Order not found.</Typography>
         </Container>
@@ -128,8 +128,7 @@ export default function OrderConfirmation() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#f9f9f9' }}>
      
-      <TopNavBar />
-      <MainNavBar />
+      
 
       <style jsx global>{`
         @media print {

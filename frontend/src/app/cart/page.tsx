@@ -354,8 +354,6 @@ export default function CartPage() {
   return (
     <Box>
   
-      <TopNavBar />
-      <MainNavBar />
 
       <Box sx={{ bgcolor: '#fff', minHeight: '100vh', py: { xs: 3, md: 6 } }}>
         <Container maxWidth="lg">

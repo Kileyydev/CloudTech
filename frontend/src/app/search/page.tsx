@@ -314,8 +314,7 @@ const SearchResultsInner = () => {
 export default function SearchPage() {
   return (
     <>
-      <TopNavBar />
-      <MainNavBar />
+      
       <Suspense fallback={
         <Box sx={{ minHeight: '100vh', bgcolor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <CircularProgress size={60} sx={{ color: '#e91e63' }} />

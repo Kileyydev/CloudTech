@@ -125,8 +125,7 @@ export default function AdminLogin() {
 
   return (
     <>
-      <TopNavBar />
-      <MainNavBar />
+      
 
       <Box
         sx={{ minHeight: 'calc(100vh - 180px)', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#fafafa', py: 4, px: 3 }}

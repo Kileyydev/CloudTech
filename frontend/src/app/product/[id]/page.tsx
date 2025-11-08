@@ -7,7 +7,21 @@ const API_BASE =
     ? 'http://localhost:8000/api'
     : 'https://cloudtech-c4ft.onrender.com/api';
 
-type ProductT = {
+type Option = { id: string; value: string };
+
+type Variant = {
+  id: string;
+  sku?: string;
+  color?: string;
+  ram?: string;
+  storage?: string;
+  price: number;
+  compare_at_price?: number;
+  stock: number;
+  is_active: boolean;
+};
+
+export type ProductT = {
   id: string;
   title: string;
   description: string;
@@ -17,9 +31,14 @@ type ProductT = {
   final_price?: number;
   cover_image?: string;
   images?: { id: string; image: string }[];
-  colors?: string[];
   brand?: { id: number; name: string };
   is_active?: boolean;
+
+  // NEW
+  color_options?: Option[];
+  ram_options?: Option[];
+  storage_options?: Option[];
+  variants?: Variant[];
 };
 
 // REQUIRED for static export

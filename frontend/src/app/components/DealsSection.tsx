@@ -1,4 +1,3 @@
-// src/components/DealsSection.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -10,368 +9,683 @@ import {
   CardContent,
   IconButton,
   Button,
-  Tabs,
-  Tab,
+  Chip,
+  Stack,
   useTheme,
-  useMediaQuery,
   Snackbar,
   Alert,
   Skeleton,
+  Divider,
+  alpha,
 } from '@mui/material';
-import { Favorite, ShoppingCart, Add, Remove } from '@mui/icons-material';
+import {
+  Favorite,
+  ShoppingCart,
+  Add,
+  Remove,
+  Headset,
+} from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
-import { useCart } from './cartContext';
+import { useCart } from '@/app/components/cartContext';
 
-type ProductT = {
+type ProductImage = { image?: { url: string } } | { url: string } | string;
+
+interface ProductT {
   id: number;
   title: string;
+  description?: string;
   price: number;
   discount?: number;
-  description: string;
-  cover_image?: string;
-  images?: string[];
-  categories?: { id: number; name: string }[];
+  final_price?: number;
   stock: number;
-  is_active?: boolean;
-};
+  cover_image?: ProductImage;
+  images?: ProductImage[];
+  brand?: { name: string };
+  type?: { value: string }[];        // e.g. Wireless, Wired
+  connectivity?: { value: string }[]; // e.g. Bluetooth, 3.5mm
+  colors?: { value: string }[];
+}
 
-type CategoryT = { id: number; name: string };
-
-const CACHE_KEY = 'deals_cache_v2';
-const CACHE_TIME = 15 * 60 * 1000;
-
-const API_BASE =
-  process.env.NODE_ENV === 'development'
-    ? 'http://localhost:8000/api'
-    : 'https://cloudtech-c4ft.onrender.com/api';
-
-const MEDIA_BASE =
-  process.env.NODE_ENV === 'development'
-    ? 'http://localhost:8000'
-    : 'https://cloudtech-c4ft.onrender.com';
-
-const API_PRODUCTS = `${API_BASE}/products/`;
-const API_CATEGORIES = `${API_BASE}/categories/`;
+const CACHE_KEY = 'deals_accesories_cache';
+const CACHE_DURATION = 1000 * 60 * 5; // 5 mins
 
 const DealsSection = () => {
   const theme = useTheme();
   const router = useRouter();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { cart, addToCart, updateQuantity } = useCart();
 
   const [products, setProducts] = useState<ProductT[]>([]);
-  const [categories, setCategories] = useState<CategoryT[]>([]);
   const [wishlist, setWishlist] = useState<Set<number>>(new Set());
-  const [activeCategory, setActiveCategory] = useState<number | 'all'>('all');
-  const [loading, setLoading] = useState(true);
-  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error';
+  }>({
     open: false,
     message: '',
     severity: 'success',
   });
+  const [loading, setLoading] = useState(true);
+  const mounted = useRef(true);
 
-  // 🛡️ PREVENT FREEZE
-  const hasFetched = useRef(false);
-
-  // Load cache
   useEffect(() => {
-    const cached = sessionStorage.getItem(CACHE_KEY);
-    if (cached) {
-      const { data, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < CACHE_TIME) {
-        setProducts(data.products);
-        setCategories(data.categories);
-        setLoading(false);
-        hasFetched.current = true;
-      }
-    }
-  }, []);
-
-  // Fetch ONCE
-  useEffect(() => {
-    if (hasFetched.current) return;
-
-    const fetchAll = async () => {
+    const loadProducts = async () => {
       try {
-        const [pRes, cRes] = await Promise.all([
-          fetch(API_PRODUCTS, { cache: 'no-store' }),
-          fetch(API_CATEGORIES, { cache: 'no-store' }),
-        ]);
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { data, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < CACHE_DURATION) {
+            setProducts(data);
+            setLoading(false);
+            return;
+          }
+        }
 
-        if (!pRes.ok || !cRes.ok) throw new Error();
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE;
+        if (!API_BASE_URL) throw new Error('API base URL not defined');
 
-        const pJson = await pRes.json();
-        const cJson = await cRes.json();
+        const filters = [
+          'category__slug=bestdeals',
+          'categories__slug=bestdeals',
+          'category_slug=bestdeals',
+          'category=bestdeals',
+        ];
 
-        const allProds: ProductT[] = Array.isArray(pJson) ? pJson : pJson.results ?? [];
-        const deals = allProds.filter(p => p.is_active && p.discount && p.discount > 0 && p.stock > 0);
-        const cats: CategoryT[] = Array.isArray(cJson) ? cJson : cJson.results ?? [];
+        let finalProducts: ProductT[] = [];
 
-        setProducts(deals);
-        setCategories(cats);
-        setLoading(false);
-        hasFetched.current = true;
+        for (const filter of filters) {
+          const res = await fetch(`${API_BASE_URL}/products/?${filter}`, {
+            cache: 'no-store',
+          });
+          if (!res.ok) continue;
 
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify({
-          data: { products: deals, categories: cats },
-          timestamp: Date.now(),
-        }));
-      } catch {
-        setSnackbar({ open: true, message: 'Failed to load deals', severity: 'error' });
+          const text = await res.text();
+          let data;
+          try {
+            data = JSON.parse(text);
+          } catch {
+            continue;
+          }
+
+          const list = Array.isArray(data)
+            ? data
+            : data.results || data.data || [];
+          if (list.length > 0) {
+            finalProducts = list;
+            break;
+          }
+        }
+
+        if (finalProducts.length === 0)
+          throw new Error('No deals found');
+
+        setProducts(finalProducts);
+        localStorage.setItem(
+          CACHE_KEY,
+          JSON.stringify({ data: finalProducts, timestamp: Date.now() })
+        );
+      } catch (err: any) {
+        console.error('Deals fetch failed:', err);
+        setSnackbar({
+          open: true,
+          message: err.message || 'Failed to load deals',
+          severity: 'error',
+        });
+      } finally {
         setLoading(false);
       }
     };
 
-    fetchAll();
+    loadProducts();
+    return () => {
+      mounted.current = false;
+    };
   }, []);
 
-  // Wishlist
   useEffect(() => {
-    const stored = localStorage.getItem('wishlist');
-    if (stored) setWishlist(new Set(JSON.parse(stored)));
+    try {
+      const stored = localStorage.getItem('wishlist');
+      if (stored) setWishlist(new Set(JSON.parse(stored)));
+    } catch (e) {
+      console.error('Failed to load wishlist', e);
+    }
   }, []);
 
-  const show = (msg: string, type: 'success' | 'error' = 'success') =>
-    setSnackbar({ open: true, message: msg, severity: type });
-  const hide = () => setSnackbar(p => ({ ...p, open: false }));
+  const showSnackbar = (
+    message: string,
+    severity: 'success' | 'error' = 'success'
+  ) => setSnackbar({ open: true, message, severity });
 
-  const toggleHeart = (id: number) => {
-    setWishlist(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      localStorage.setItem('wishlist', JSON.stringify([...next]));
-      return next;
+  const handleCloseSnackbar = () =>
+    setSnackbar((prev) => ({ ...prev, open: false }));
+
+  const handleWishlistToggle = (id: number) => {
+    setWishlist((prev) => {
+      const updated = new Set(prev);
+      updated.has(id) ? updated.delete(id) : updated.add(id);
+      localStorage.setItem('wishlist', JSON.stringify(Array.from(updated)));
+      return updated;
     });
   };
 
-  const add = (p: ProductT) => {
-    if (p.stock === 0) return show('Out of stock', 'error');
-    const item = cart[p.id];
-    if (item && item.quantity >= p.stock) return show(`Only ${p.stock} left`, 'error');
-    addToCart({ id: p.id, title: p.title, price: p.price, quantity: 1, stock: p.stock });
-    show(`${p.title} added!`);
+  const handleAddToCart = (product: ProductT) => {
+    if (product.stock <= 0) return showSnackbar('Out of stock', 'error');
+
+    const existing = cart[product.id];
+    const newQty = existing ? existing.quantity + 1 : 1;
+    if (newQty > product.stock)
+      return showSnackbar(`Only ${product.stock} available`, 'error');
+
+    const priceToUse =
+      product.final_price && product.discount ? product.final_price : product.price;
+
+    addToCart({
+      id: product.id,
+      title: product.title,
+      price: priceToUse,
+      quantity: 1,
+      stock: product.stock,
+    });
+
+    showSnackbar(
+      existing ? `+1 ${product.title}` : `${product.title} added to cart!`
+    );
   };
 
-  const sub = (id: number) => {
-    updateQuantity(id, -1);
-    show('Cart updated');
+  const handleDecreaseQuantity = (id: number) => {
+    const item = cart[id];
+    if (!item) return;
+    if (item.quantity <= 1) {
+      updateQuantity(id, -1);
+      showSnackbar(`${item.title} removed`);
+    } else {
+      updateQuantity(id, -1);
+      showSnackbar('Quantity updated');
+    }
   };
 
-  const cartCount = Object.values(cart).reduce((s, i) => s + (i.quantity || 0), 0);
+  const handleViewCart = () => {
+    if (Object.keys(cart).length === 0)
+      return showSnackbar('Your cart is empty', 'error');
+    router.push('/cart');
+  };
 
-  // CARD SIZE
-  const W = 218;
-  const H = 350;
+  const getCartItemCount = () =>
+    Object.values(cart).reduce((sum, i) => sum + i.quantity, 0);
 
-  const skeleton = () => (
-    <Card sx={{ width: W, height: H, borderRadius: 0, bgcolor: '#fff' }}>
-      <Skeleton variant="rectangular" width="100%" height={H * 0.56} />
-      <CardContent sx={{ p: 1.5 }}>
-        <Skeleton width="88%" height={22} sx={{ mb: 0.5 }} />
-        <Skeleton width="65%" height={16} sx={{ mb: 1 }} />
-        <Skeleton width="50%" height={26} />
+  const getImageUrl = (img: ProductImage | undefined): string => {
+    if (!img) return '/images/fallback.jpg';
+    if (typeof img === 'string')
+      return img.startsWith('http')
+        ? img
+        : `${process.env.NEXT_PUBLIC_MEDIA_BASE}${img}`;
+    if ('url' in img)
+      return img.url.startsWith('http')
+        ? img.url
+        : `${process.env.NEXT_PUBLIC_MEDIA_BASE}${img.url}`;
+    if ('image' in img) return getImageUrl(img.image);
+    return '/images/fallback.jpg';
+  };
+
+  const renderSkeletonCard = (_: any, index: number) => (
+    <Card
+      key={index}
+      sx={{
+        width: 260,
+        height: 380,
+        flex: '0 0 auto',
+        bgcolor: '#fff',
+        mr: 2,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+      }}
+    >
+      <Skeleton variant="rectangular" width="100%" height={160} />
+      <CardContent sx={{ p: 2 }}>
+        <Skeleton width="85%" height={24} sx={{ mb: 1 }} />
+        <Skeleton width="70%" height={18} sx={{ mb: 1.5 }} />
+        <Skeleton width="50%" height={28} />
       </CardContent>
     </Card>
   );
 
-  const dealCard = (p: ProductT) => {
-    const src = p.cover_image?.startsWith('http') ? p.cover_image : `${MEDIA_BASE}${p.cover_image}`;
-    const final = p.discount ? p.price * (1 - p.discount / 100) : p.price;
-    const inCart = cart[p.id];
+  const renderCard = (product: ProductT) => {
+    const imageSrc = getImageUrl(product.cover_image);
+    const galleryImages = product.images?.map(getImageUrl).filter(Boolean) || [];
+    const cartItem = cart[product.id];
+    const hasDiscount = product.discount && product.discount > 0;
+    const displayPrice = hasDiscount && product.final_price ? product.final_price : product.price;
 
     return (
       <Card
-        key={p.id}
+        key={product.id}
         sx={{
-          width: W,
-          height: H,
+          width: 260,
+          height: 400,
+          flex: '0 0 auto',
           bgcolor: '#fff',
-          borderRadius: 0,
-          boxShadow: '0 3px 6px rgba(0,0,0,0.08)',
+          mr: 2,
           overflow: 'hidden',
-          flex: `0 0 ${W}px`,
           position: 'relative',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
+          transition: 'all 0.3s ease',
         }}
       >
+        {/* Wishlist */}
         <Box
-          onClick={(e) => { e.stopPropagation(); toggleHeart(p.id); }}
           sx={{
             position: 'absolute',
             top: 10,
             right: 10,
-            zIndex: 1,
-            bgcolor: 'rgba(255,255,255,.95)',
-            width: 36,
-            height: 36,
-            borderRadius: '50%',
+            zIndex: 10,
+            bgcolor: '#fff',
+            width: 34,
+            height: 34,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
+            borderRadius: '50%',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleWishlistToggle(product.id);
           }}
         >
-          <Favorite sx={{ color: wishlist.has(p.id) ? '#e91e63' : '#888', fontSize: 20 }} />
-        </Box>
-
-        <Box
-          onClick={() => router.push(`/product/${p.id}`)}
-          sx={{ width: '100%', height: H * 0.56, cursor: 'pointer', overflow: 'hidden' }}
-        >
-          <CardMedia
-            component="img"
-            image={src || '/images/fallback.jpg'}
-            alt={p.title}
-            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          <Favorite
+            sx={{
+              color: wishlist.has(product.id) ? '#e91e63' : '#bbb',
+              fontSize: 18,
+            }}
           />
         </Box>
 
-        <CardContent sx={{ p: 1.5, height: H * 0.44, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <Box>
-            <Typography sx={{ fontWeight: 600, color: '#222', fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {p.title}
-            </Typography>
-            <Typography sx={{ color: '#666', fontSize: '0.78rem', mt: 0.5, lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-              {p.description}
-            </Typography>
-            
-            {/* ✨ HORIZONTAL DISCOUNT LINE ✨ */}
-            <Box sx={{ mt: 0.8, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Typography 
-                sx={{ 
-                  textDecoration: 'line-through', 
-                  color: '#999', 
-                  fontSize: '0.75rem',
-                  fontWeight: 500 
-                }}
-              >
-                KES {p.price.toLocaleString()}
-              </Typography>
-              <Typography 
-                sx={{ 
-                  fontWeight: 700, 
-                  color: '#e91e63', 
-                  fontSize: '1rem',
-                  ml: 0.5 
-                }}
-              >
-                KES {final.toLocaleString()}
-              </Typography>
+        {/* Cover Image */}
+        <Box
+          sx={{
+            width: '100%',
+            height: 160,
+            cursor: 'pointer',
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+          onClick={() => router.push(`/product/${product.id}`)}
+        >
+          <CardMedia
+            component="img"
+            image={imageSrc}
+            alt={product.title}
+            sx={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transition: '0.4s',
+            }}
+          />
+          {hasDiscount && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 10,
+                left: 10,
+                bgcolor: '#e91e63',
+                color: '#fff',
+                fontWeight: 800,
+                fontSize: '0.75rem',
+                px: 1.2,
+                py: 0.4,
+                borderRadius: 1,
+                boxShadow: '0 3px 10px rgba(233,30,99,0.4)',
+              }}
+            >
+              {product.discount}% OFF
             </Box>
+          )}
+        </Box>
+
+        <CardContent sx={{ p: 2, pb: 1.5 }}>
+          {/* Title */}
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: 800,
+              color: '#1a1a1a',
+              mb: 0.5,
+              fontSize: '0.95rem',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {product.title}
+          </Typography>
+
+          {/* Brand */}
+          {product.brand && (
+            <Stack direction="row" alignItems="center" gap={0.8} mb={1}>
+              <Headset sx={{ fontSize: 15, color: '#999' }} />
+              <Typography
+                variant="body2"
+                sx={{ color: '#444', fontWeight: 600, fontSize: '0.8rem' }}
+              >
+                {product.brand.name}
+              </Typography>
+            </Stack>
+          )}
+
+          {/* Specs */}
+          <Stack spacing={0.8} mb={1.5}>
+            {Array.isArray(product.type) && product.type.length > 0 && (
+              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                <Typography
+                  sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 600, mr: 0.5 }}
+                >
+                  Type:
+                </Typography>
+                {product.type.map((t, i) => (
+                  <Chip
+                    key={i}
+                    label={t.value}
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontSize: '0.7rem',
+                      bgcolor: alpha('#DC1A8A', 0.12),
+                      color: '#DC1A8A',
+                      fontWeight: 600,
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+
+            {Array.isArray(product.connectivity) && product.connectivity.length > 0 && (
+              <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                <Typography
+                  sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 600, mr: 0.5 }}
+                >
+                  Connectivity:
+                </Typography>
+                {product.connectivity.map((c, i) => (
+                  <Chip
+                    key={i}
+                    label={c.value}
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontSize: '0.7rem',
+                      bgcolor: alpha('#1e88e5', 0.12),
+                      color: '#1e88e5',
+                      fontWeight: 600,
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+
+            {Array.isArray(product.colors) && product.colors.length > 0 && (
+              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Typography
+                  sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 600, mr: 0.5 }}
+                >
+                  Color:
+                </Typography>
+                {product.colors.map((col, i) => (
+                  <Box
+                    key={i}
+                    sx={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: '50%',
+                      bgcolor: col.value.toLowerCase(),
+                      border: '1.5px solid #ddd',
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+          </Stack>
+
+          <Divider sx={{ my: 1 }} />
+
+          {/* Price */}
+          <Box sx={{ mb: 1.5 }}>
+            {hasDiscount ? (
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Typography
+                  sx={{
+                    textDecoration: 'line-through',
+                    color: '#999',
+                    fontSize: '0.8rem',
+                  }}
+                >
+                  was KES {product.price.toLocaleString()}
+                </Typography>
+                <Typography
+                  sx={{
+                    fontWeight: 800,
+                    color: '#e91e63',
+                    fontSize: '1rem',
+                  }}
+                >
+                  now KES {displayPrice.toLocaleString()}
+                </Typography>
+              </Stack>
+            ) : (
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  color: '#1a1a1a',
+                  fontSize: '1rem',
+                }}
+              >
+                KES {displayPrice.toLocaleString()}
+              </Typography>
+            )}
           </Box>
 
-          {inCart ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, mt: 1.2 }}>
-              <IconButton size="small" onClick={(e) => { e.stopPropagation(); sub(p.id); }} sx={{ color: '#e91e63', border: '1.5px solid #e91e63', width: 32, height: 32 }}>
-                <Remove fontSize="small" />
+          {/* Cart */}
+          {cartItem ? (
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1,
+              }}
+            >
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDecreaseQuantity(product.id);
+                }}
+                sx={{ color: '#e91e63', width: 30, height: 30 }}
+              >
+                <Remove sx={{ fontSize: 14 }} />
               </IconButton>
-              <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', minWidth: 28, textAlign: 'center' }}>
-                {inCart.quantity}
+              <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', minWidth: 20, textAlign: 'center' }}>
+                {cartItem.quantity}
               </Typography>
               <IconButton
                 size="small"
-                onClick={(e) => { e.stopPropagation(); add(p); }}
-                disabled={inCart.quantity >= p.stock}
-                sx={{ color: '#e91e63', border: '1.5px solid #e91e63', width: 32, height: 32 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToCart(product);
+                }}
+                disabled={cartItem.quantity >= product.stock}
+                sx={{
+                  color: '#e91e63',
+                  width: 30,
+                  height: 30,
+                  '&[disabled]': { color: '#ccc' },
+                }}
               >
-                <Add fontSize="small" />
+                <Add sx={{ fontSize: 14 }} />
               </IconButton>
             </Box>
           ) : (
             <Button
               fullWidth
-              variant="contained"
-              startIcon={<ShoppingCart sx={{ fontSize: 17 }} />}
-              onClick={(e) => { e.stopPropagation(); add(p); }}
-              sx={{ bgcolor: '#e91e63', color: '#fff', textTransform: 'none', mt: 1.5, borderRadius: 0, fontSize: '0.88rem', py: 0.9 }}
+              size="small"
+              startIcon={<ShoppingCart sx={{ fontSize: 16 }} />}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddToCart(product);
+              }}
+              disabled={product.stock === 0}
+              sx={{
+                bgcolor: '#e91e63',
+                color: '#fff',
+                fontWeight: 700,
+                textTransform: 'none',
+                py: 0.8,
+                fontSize: '0.8rem',
+                '&[disabled]': { bgcolor: '#eee', color: '#999' },
+              }}
             >
-              Add to Cart
+              {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
             </Button>
           )}
         </CardContent>
+
+        {/* Gallery Preview */}
+        {galleryImages.length > 0 && (
+          <Box sx={{ px: 1.5, pb: 1.5 }}>
+            <Stack direction="row" spacing={0.8}>
+              {galleryImages.slice(0, 3).map((src, i) => (
+                <Box
+                  key={i}
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    overflow: 'hidden',
+                    border: '1.5px solid #eee',
+                    cursor: 'pointer',
+                    transition: '0.2s',
+                  }}
+                  onClick={() => router.push(`/product/${product.id}`)}
+                >
+                  <img
+                    src={src}
+                    alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </Box>
+              ))}
+              {galleryImages.length > 3 && (
+                <Box
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    bgcolor: 'rgba(0,0,0,0.6)',
+                    color: '#fff',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  +{galleryImages.length - 3}
+                </Box>
+              )}
+            </Stack>
+          </Box>
+        )}
       </Card>
     );
   };
 
-  const filtered = activeCategory === 'all'
-    ? products
-    : products.filter(p => p.categories?.some(c => c.id === activeCategory));
-
   return (
-    <Box sx={{ py: { xs: 3, md: 5 }, bgcolor: '#fff' }}>
-      <Box sx={{ px: { xs: 2, md: 4 }, mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: '#222' }}>
+    <Box sx={{ bgcolor: '#fdfdfd', py: { xs: 2.5, md: 4 }, px: { xs: 2, md: 3 } }}>
+      {/* Header */}
+      <Box
+        sx={{
+          mb: 3,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 1.5,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Headset sx={{ fontSize: 32, color: '#e91e63' }} />
+          <Typography
+            variant="h5"
+            sx={{ fontWeight: 800, color: '#1a1a1a' }}
+          >
           Hot Deals
-        </Typography>
+          </Typography>
+        </Box>
         <Button
           variant="contained"
           size="small"
           startIcon={<ShoppingCart sx={{ fontSize: 16 }} />}
-          onClick={() => router.push('/cart')}
-          sx={{ bgcolor: '#e91e63', color: '#fff', textTransform: 'none', borderRadius: 0 }}
-          disabled={cartCount === 0}
+          onClick={handleViewCart}
+          sx={{
+            bgcolor: '#000',
+            color: '#fff',
+            fontWeight: 700,
+            textTransform: 'none',
+            px: 2.5,
+            py: 1,
+            fontSize: '0.85rem',
+          }}
+          disabled={getCartItemCount() === 0}
         >
-          Cart ({cartCount})
+          Cart ({getCartItemCount()})
         </Button>
       </Box>
 
-      {/* Tabs */}
-      <Tabs
-        value={activeCategory}
-        onChange={(_, v) => setActiveCategory(v)}
-        variant={isMobile ? 'scrollable' : 'standard'}
-        scrollButtons="auto"
-        sx={{
-          mb: 2,
-          px: { xs: 2, md: 4 },
-          '& .MuiTab-root': {
-            textTransform: 'none',
-            fontSize: '0.9rem',
-            fontWeight: 500,
-            color: '#666',
-            minWidth: 'auto',
-            px: 2,
-            '&.Mui-selected': { color: '#e91e63', fontWeight: 700 },
-          },
-          '& .MuiTabs-indicator': { bgcolor: '#e91e63', height: 3 },
-        }}
-      >
-        <Tab label="All" value="all" />
-        {categories.map(c => <Tab key={c.id} label={c.name} value={c.id} />)}
-      </Tabs>
-
-      {/* Grid */}
+      {/* Scrollable Cards */}
       <Box
         sx={{
-          maxWidth: '1350px',
-          mx: 'auto',
-          px: { xs: 1, md: 1.5 },
-          ...(isMobile
-            ? {
-                display: 'flex',
-                overflowX: 'auto',
-                gap: 0.8,
-                pb: 2,
-                '&::-webkit-scrollbar': { display: 'none' },
-                scrollSnapType: 'x mandatory',
-              }
-            : {
-                display: 'grid',
-                gap: 0.8,
-                gridTemplateColumns: {
-                  sm: 'repeat(3, 1fr)',
-                  md: 'repeat(4, 1fr)',
-                  lg: 'repeat(5, 1fr)',
-                },
-              }),
+          display: 'flex',
+          overflowX: 'auto',
+          scrollBehavior: 'smooth',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' },
+          pb: 1,
         }}
       >
         {loading
-          ? Array.from({ length: 10 }).map((_, i) => <Box key={i}>{skeleton()}</Box>)
-          : filtered.map(dealCard)}
+          ? Array.from({ length: 4 }).map(renderSkeletonCard)
+          : products.length === 0
+          ? (
+              <Typography
+                color="text.secondary"
+                sx={{ textAlign: 'center', py: 5, width: '100%' }}
+              >
+                No deals available right now.
+              </Typography>
+            )
+          : products.filter(p => p.stock > 0).map(renderCard)}
       </Box>
 
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={hide} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert onClose={hide} severity={snackbar.severity} sx={{ width: '100%' }}>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{
+            width: '100%',
+            fontWeight: 600,
+            ...(snackbar.severity === 'success' && {
+              bgcolor: '#4caf50',
+              color: '#fff',
+            }),
+            ...(snackbar.severity === 'error' && {
+              bgcolor: '#f44336',
+              color: '#fff',
+            }),
+          }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>

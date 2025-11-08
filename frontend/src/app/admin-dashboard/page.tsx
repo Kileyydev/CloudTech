@@ -25,7 +25,7 @@ export default function AdminDashboardPageComponent() {
         flexDirection: "column",
       }}
     >
-      <TopNavBar />
+      
       <MainNavBar activeSection={activeSection} setActiveSection={setActiveSection} />
 
       <Box sx={{ padding: "16px", flexGrow: 1 }}>
