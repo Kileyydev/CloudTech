@@ -3,6 +3,7 @@ from rest_framework import serializers
 from django.utils.text import slugify
 from django.db import transaction
 import json  # <-- FOR PARSING JSON STRINGS FROM FormData
+from decimal import Decimal, ROUND_HALF_UP
 
 from .models import (
     Category, Brand, Tag, Product, ProductVariant, ProductImage, GlobalOption
@@ -160,16 +161,12 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     )
 
     cover_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
-    
-    # FIXED: Use gallery_images to avoid ListField(ImageField) parsing bug
     gallery_images = serializers.ListField(
         child=serializers.ImageField(), write_only=True, required=False, allow_empty=True
     )
 
-    # Accept variants as JSON string from FormData
     variants = serializers.JSONField(write_only=True, required=False, allow_null=True)
 
-    # Read-only fields
     brand = BrandSerializer(read_only=True)
     categories = CategorySerializer(many=True, read_only=True)
     images = ProductImageSerializer(many=True, read_only=True)
@@ -191,24 +188,27 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             'tag_names', 'cover_image', 'gallery_images', 'images', 'variants', 'tags'
         ]
         read_only_fields = ['final_price', 'id', 'slug']
-        extra_kwargs = {
-            'title': {'required': False, 'allow_blank': True, 'allow_null': True},
-            'description': {'required': False, 'allow_blank': True, 'allow_null': True},
-            'price': {'required': False, 'allow_null': True},
-            'stock': {'required': False, 'allow_null': True},
-            'discount': {'required': False, 'allow_null': True},
-            'is_active': {'required': False, 'allow_null': True},
-            'is_featured': {'required': False, 'allow_null': True},
-        }
 
-    def validate(self, data):
-        return data  # No validation
-
+    # ----------------------------
+    # ROUND DISCOUNT BEFORE VALIDATION
+    # ----------------------------
     def to_internal_value(self, data):
-        """
-        Parse JSON strings from FormData (variants, etc.)
-        """
-        # Handle variants JSON string
+        if hasattr(data, 'copy'):
+            data = data.copy()
+        elif not isinstance(data, dict):
+            data = dict(data)
+
+        # ROUND discount to 2 decimals to satisfy DecimalField validation
+        discount_raw = data.get('discount')
+        if discount_raw is not None:
+            try:
+                data['discount'] = str(
+                    Decimal(discount_raw).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                )
+            except:
+                pass  # let DRF handle invalid decimal inputs
+
+        # Parse variants JSON string if needed
         variants_raw = data.get('variants')
         if isinstance(variants_raw, str):
             try:
@@ -218,7 +218,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         elif variants_raw is None:
             data['variants'] = []
 
-        # Optional: Parse other JSON fields if needed
+        # Parse other JSON fields
         for field in ['condition_options', 'features']:
             field_raw = data.get(field)
             if isinstance(field_raw, str):
@@ -231,6 +231,26 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         return super().to_internal_value(data)
 
+    # ----------------------------
+    # VALIDATE DISCOUNT (optional, safety net)
+    # ----------------------------
+    def validate_discount(self, value):
+        if value is not None:
+            return Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        return value
+
+    # ----------------------------
+    # UNIQUE SLUG GENERATOR
+    # ----------------------------
+    def _generate_unique_slug(self, instance, title):
+        base_slug = slugify(title)
+        slug = base_slug
+        i = 1
+        while Product.objects.exclude(pk=instance.pk).filter(slug=slug).exists():
+            slug = f"{base_slug}-{i}"
+            i += 1
+        return slug
+
     @transaction.atomic
     def create(self, validated_data):
         category_ids = validated_data.pop('category_ids', [])
@@ -240,12 +260,10 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         tag_names = validated_data.pop('tag_names', [])
         variants_data = validated_data.pop('variants', [])
         cover_file = validated_data.pop('cover_image', None)
-        # FIXED: Use gallery_images
         gallery_files = validated_data.pop('gallery_images', [])
 
         product = Product.objects.create(**validated_data)
 
-        # M2M
         if category_ids:
             product.categories.set(Category.objects.filter(id__in=category_ids))
         if ram_ids:
@@ -255,7 +273,6 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         if color_ids:
             product.colors.set(GlobalOption.objects.filter(id__in=color_ids))
 
-        # Tags
         if tag_names:
             for name in tag_names:
                 name = name.strip()
@@ -263,17 +280,14 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                     tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
                     product.tags.add(tag)
 
-        # Cover
         if cover_file:
             product.cover_image = cover_file
             product.save(update_fields=['cover_image'])
 
-        # Gallery
         if gallery_files:
             for img_file in gallery_files:
                 ProductImage.objects.create(product=product, image=img_file)
 
-        # Variants
         if variants_data:
             for var in variants_data:
                 ProductVariant.objects.create(
@@ -292,7 +306,6 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         product.final_price = self._calc_final_price(product)
         product.save(update_fields=['final_price'])
-
         return product
 
     @transaction.atomic
@@ -304,17 +317,14 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         tag_names = validated_data.pop('tag_names', None)
         variants_data = validated_data.pop('variants', None)
         cover_file = validated_data.pop('cover_image', None)
-        # FIXED: Use gallery_images
         gallery_files = validated_data.pop('gallery_images', None)
 
-        # Update scalar fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
         if 'title' in validated_data and validated_data['title']:
-            instance.slug = slugify(validated_data['title'])
+            instance.slug = self._generate_unique_slug(instance, validated_data['title'])
 
-        # M2M
         if category_ids is not None:
             instance.categories.set(Category.objects.filter(id__in=category_ids) if category_ids else [])
         if ram_ids is not None:
@@ -324,7 +334,6 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         if color_ids is not None:
             instance.colors.set(GlobalOption.objects.filter(id__in=color_ids) if color_ids else [])
 
-        # Tags
         if tag_names is not None:
             instance.tags.clear()
             for name in tag_names:
@@ -333,17 +342,14 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                     tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
                     instance.tags.add(tag)
 
-        # Cover
         if cover_file is not None:
             instance.cover_image = cover_file
 
-        # Gallery
         if gallery_files is not None:
             instance.images.all().delete()
             for img_file in gallery_files:
                 ProductImage.objects.create(product=instance, image=img_file)
 
-        # Variants
         if variants_data is not None:
             instance.variants.all().delete()
             for var in variants_data:
@@ -363,10 +369,14 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         instance.final_price = self._calc_final_price(instance)
         instance.save()
-
         return instance
 
+    # =======================
+    # FINAL PRICE CALCULATION
+    # =======================
     def _calc_final_price(self, obj):
-        if obj.price is not None and obj.discount is not None and obj.discount > 0:
-            return round(float(obj.price) * (1 - obj.discount / 100), 2)
-        return obj.price
+        price = obj.price or Decimal('0.00')
+        discount = obj.discount or Decimal('0.00')
+        discount_multiplier = Decimal('1.00') - (discount / Decimal('100'))
+        final_price = (price * discount_multiplier).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        return final_price

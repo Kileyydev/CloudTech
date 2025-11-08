@@ -5,4 +5,4 @@ class RepairRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = RepairRequest
         fields = "__all__"
-        read_only_fields = ("id", "created_at", "is_resolved")
+        read_only_fields = ("id", "created_at")  

@@ -151,11 +151,14 @@ class Product(models.Model):
             self.slug = slug
 
         # Auto-calculate final_price
-        if self.price is not None and self.price > 0 and self.discount is not None and self.discount > 0:
-            self.final_price = round(float(self.price) * (1 - self.discount / 100), 2)
-        else:
-            self.final_price = self.price
+        from decimal import Decimal, ROUND_HALF_UP
+        if self.price is None:
+            self.price = Decimal('0.00')
+        if self.discount is None:
+            self.discount = Decimal('0.00')
 
+        discount_multiplier = Decimal('1.00') - (self.discount / Decimal('100'))
+        self.final_price = (self.price * discount_multiplier).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         super().save(*args, **kwargs)
 
 

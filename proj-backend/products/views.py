@@ -3,11 +3,13 @@ from rest_framework import viewsets, permissions, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework import status
 from django_filters.rest_framework import DjangoFilterBackend
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from django.core.cache import cache
 from django.db.models import Prefetch
+import traceback
 
 from .models import (
     Product, ProductVariant, Category, Brand, ProductImage, GlobalOption
@@ -120,6 +122,27 @@ class ProductViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset().filter(is_featured=True)[:12]
         serializer = ProductListSerializer(queryset, many=True, context=self.get_serializer_context())
         return Response(serializer.data)
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            print("🚨 ERROR in Product create:", e)
+            traceback.print_exc()
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def update(self, request, *args, **kwargs):
+        try:
+            return super().update(request, *args, **kwargs)
+        except Exception as e:
+            print("🚨 ERROR in Product update:", e)
+            traceback.print_exc()
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     # REMOVED: perform_create & perform_update
     # → Final price is calculated inside ProductCreateUpdateSerializer.create/update

@@ -140,7 +140,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://www.cloudtechstore.net",
     "https://cloudtech-c4ft.onrender.com",
     "http://localhost:3000",
-    "http://127.0.1:3000",
+    "http://127.0.0.1:3000",
 ]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
@@ -229,3 +229,16 @@ LOGGING = {
 }
 
 
+# settings.py
+import os
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Media files (uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# In development, serve media files
+from django.conf import settings
+from django.conf.urls.static import static

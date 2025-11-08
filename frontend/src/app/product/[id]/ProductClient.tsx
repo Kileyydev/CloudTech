@@ -321,29 +321,96 @@ export default function ProductClient({
               {/* ---------- OPTIONS ---------- */}
               <Stack spacing={3} mb={4}>
                 {/* COLOR */}
-                {product.color_options?.length ? (
-                  <FormControl fullWidth>
-                    <InputLabel id="color-label">
-                      <Palette sx={{ mr: 1, fontSize: '1rem' }} /> Color
-                    </InputLabel>
-                    <Select
-                      labelId="color-label"
-                      value={selectedColor}
-                      label="Color"
-                      onChange={e => setSelectedColor(e.target.value)}
-                      renderValue={sel => {
-                        const opt = product.color_options?.find(o => o.id === sel);
-                        return <Chip label={opt?.value} size="small" sx={{ bgcolor: '#DC1A8A', color: '#fff' }} />;
-                      }}
-                    >
-                      {product.color_options.map(o => (
-                        <MenuItem key={o.id} value={o.id}>
-                          {o.value}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                ) : null}
+{/* COLOR - Visual Swatches */}
+{product.color_options?.length ? (
+  <Box>
+    <Typography
+      variant="subtitle2"
+      sx={{
+        mb: 1.5,
+        fontWeight: 600,
+        color: '#1a1a1a',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0.5,
+      }}
+    >
+      <Palette sx={{ fontSize: '1rem', color: '#666' }} /> Color
+      <Typography component="span" sx={{ ml: 1, fontWeight: 400, color: '#666', fontSize: '0.9rem' }}>
+        {product.color_options.find(o => o.id === selectedColor)?.value}
+      </Typography>
+    </Typography>
+
+    <Stack direction="row" spacing={1.5} flexWrap="wrap">
+      {product.color_options.map((option) => {
+        const isSelected = selectedColor === option.id;
+        const colorValue = option.value.toLowerCase();
+        const isDark = ['black', 'navy', 'charcoal', 'dark'].some(c => colorValue.includes(c));
+        const isLight = ['white', 'silver', 'cream', 'ivory'].some(c => colorValue.includes(c));
+
+        // Map common color names to hex if not provided
+        const colorMap: Record<string, string> = {
+          black: '#000000',
+          white: '#ffffff',
+          silver: '#c0c0c0',
+          gray: '#808080',
+          red: '#ff0000',
+          blue: '#0000ff',
+          green: '#008000',
+          gold: '#ffd700',
+          rose: '#ff007f',
+          pink: '#ffc0cb',
+          purple: '#800080',
+        };
+
+        const bgColor = colorMap[colorValue.split(' ')[0]] || '#999';
+
+        return (
+          <Box
+            key={option.id}
+            onClick={() => setSelectedColor(option.id)}
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              bgcolor: bgColor,
+              border: isSelected ? '3px solid #DC1A8A' : '2px solid #ddd',
+              boxShadow: isSelected ? '0 0 0 2px #fff, 0 0 0 4px #DC1A8A' : '0 1px 3px rgba(0,0,0,0.2)',
+              cursor: 'pointer',
+              position: 'relative',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                transform: 'scale(1.1)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              },
+              ...(isLight && {
+                border: '2px solid #ccc',
+              }),
+            }}
+          >
+            {/* Optional: Show checkmark when selected */}
+            {isSelected && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: isDark ? '#fff' : '#000',
+                  fontWeight: 'bold',
+                  fontSize: '0.8rem',
+                }}
+              >
+                ✓
+              </Box>
+            )}
+          </Box>
+        );
+      })}
+    </Stack>
+  </Box>
+) : null}
 
                 {/* RAM */}
                 {product.ram_options?.length ? (
