@@ -317,7 +317,7 @@ const ProductAdminPage: React.FC = () => {
   };
 
   /* ------------------------------------------------------------------ */
-  /* SAVE PRODUCT */
+  /* SAVE PRODUCT — FULLY FIXED & CLEANED */
   /* ------------------------------------------------------------------ */
   const saveProduct = async () => {
     if (!token) {
@@ -328,46 +328,46 @@ const ProductAdminPage: React.FC = () => {
 
     const form = new FormData();
 
+    // BASIC FIELDS
     if (title.trim()) form.append("title", title.trim());
     if (description.trim()) form.append("description", description.trim());
-    if (price !== "" && price !== null) form.append("price", String(price));
-    if (stock !== "" && stock !== null) form.append("stock", String(stock));
-    if (discount !== "" && discount !== null) form.append("discount", String(discount));
+    if (price !== "" && price != null) form.append("price", String(price));
+    if (stock !== "" && stock != null) form.append("stock", String(stock));
+    if (discount !== "" && discount != null) form.append("discount", String(discount));
     if (isActive !== null) form.append("is_active", String(isActive));
     if (isFeatured !== null) form.append("is_featured", String(isFeatured));
     if (brandId) form.append("brand_id", brandId);
 
+    // LISTS
     selectedCats.forEach(id => form.append("category_ids", id));
     selectedRam.forEach(id => form.append("ram_option_ids", id));
     selectedStorage.forEach(id => form.append("storage_option_ids", id));
     selectedColors.forEach(id => form.append("color_option_ids", id));
     tagNames.filter(t => t.trim()).forEach(t => form.append("tag_names", t.trim()));
 
-    const hasRealVariants = variants.some(v =>
-      v.sku?.trim() ||
-      v.price !== "" ||
-      v.stock !== "" ||
-      v.color?.trim() ||
-      v.ram?.trim() ||
-      v.storage?.trim()
-    );
+    // CLEAN & FILTER VARIANTS — NO NULL, NO EMPTY
+    const cleanVariants = variants
+      .map(v => {
+        const variant: any = {};
+        if (v.sku?.trim()) variant.sku = v.sku.trim();
+        if (v.color?.trim()) variant.color = v.color.trim();
+        if (v.ram?.trim()) variant.ram = v.ram.trim();
+        if (v.storage?.trim()) variant.storage = v.storage.trim();
+        if (v.processor?.trim()) variant.processor = v.processor.trim();
+        if (v.size?.trim()) variant.size = v.size.trim();
+        if (v.price !== "" && v.price != null) variant.price = Number(v.price);
+        if (v.compare_at_price !== "" && v.compare_at_price != null) variant.compare_at_price = Number(v.compare_at_price);
+        if (v.stock !== "" && v.stock != null) variant.stock = Number(v.stock);
+        variant.is_active = v.is_active ?? true;
+        return variant;
+      })
+      .filter(v => Object.keys(v).length > 1); // has more than just is_active
 
-    if (hasRealVariants) {
-      form.append("variants", JSON.stringify(variants.map(v => ({
-        id: v.id,
-        sku: v.sku?.trim() || "",
-        color: v.color?.trim() || "",
-        ram: v.ram?.trim() || "",
-        storage: v.storage?.trim() || "",
-        processor: v.processor?.trim() || "",
-        size: v.size?.trim() || "",
-        price: v.price !== "" ? Number(v.price) : null,
-        compare_at_price: v.compare_at_price !== "" ? Number(v.compare_at_price) : null,
-        stock: v.stock !== "" ? Number(v.stock) : null,
-        is_active: v.is_active ?? true
-      }))));
+    if (cleanVariants.length > 0) {
+      form.append("variants", JSON.stringify(cleanVariants));
     }
 
+    // IMAGES
     if (coverFile) form.append("cover_image", coverFile);
     galleryFiles.forEach(f => form.append("gallery", f));
 
