@@ -374,7 +374,7 @@ const ProductAdminPage: React.FC = () => {
     setSaving(true);
     try {
       const url = editId ? `${API_BASE}${editId}/` : API_BASE;
-      const method = editId ? "PATCH" : "POST";
+      const method = editId ? "PUT" : "POST";
       const res = await fetch(url, {
         method,
         headers: { Authorization: `Bearer ${token}` },
