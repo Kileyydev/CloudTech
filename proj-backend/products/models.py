@@ -4,6 +4,7 @@ from django.utils.text import slugify
 import uuid
 from cloudinary.models import CloudinaryField
 from django.core.validators import MinValueValidator, MaxValueValidator
+from decimal import Decimal, ROUND_HALF_UP
 
 
 # ===================================================================
@@ -94,7 +95,6 @@ class Product(models.Model):
 
     cover_image = CloudinaryField('image', blank=True, null=True)
 
-    # FIXED: Allow null + default 0
     price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, default=0)
     stock = models.PositiveIntegerField(null=True, blank=True, default=0)
     discount = models.DecimalField(
@@ -150,15 +150,16 @@ class Product(models.Model):
                 i += 1
             self.slug = slug
 
-        # Auto-calculate final_price
-        from decimal import Decimal, ROUND_HALF_UP
+        # Normalize price & discount
         if self.price is None:
             self.price = Decimal('0.00')
         if self.discount is None:
             self.discount = Decimal('0.00')
 
+        # Calculate final price
         discount_multiplier = Decimal('1.00') - (self.discount / Decimal('100'))
         self.final_price = (self.price * discount_multiplier).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
         super().save(*args, **kwargs)
 
 
@@ -200,7 +201,7 @@ class ProductVariant(models.Model):
 
 
 # ===================================================================
-# PRODUCT IMAGE
+# PRODUCT IMAGE — FIXED: Only update cover_image when is_primary=True
 # ===================================================================
 class ProductImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -227,9 +228,17 @@ class ProductImage(models.Model):
         return f"Image for {self.product.title if self.product else 'No Product'}"
 
     def save(self, *args, **kwargs):
+        # Only act if this image is marked as primary AND has an image
         if self.is_primary and self.product and self.image:
-            ProductImage.objects.filter(product=self.product, is_primary=True).update(is_primary=False)
+            # Demote other primary images for this product
+            ProductImage.objects.filter(
+                product=self.product, is_primary=True
+            ).exclude(pk=self.pk).update(is_primary=False)
+
+            # Update product's cover_image ONLY if different
             if self.product.cover_image != self.image:
                 self.product.cover_image = self.image
-                self.product.save(update_fields=['cover_image'])
+                # Use update_fields to avoid triggering Product.save() loop
+                Product.objects.filter(pk=self.product.pk).update(cover_image=self.image)
+
         super().save(*args, **kwargs)

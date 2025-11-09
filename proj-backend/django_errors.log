@@ -3063,3 +3063,13 @@ AssertionError: 'ProductViewSet' should either include a `serializer_class` attr
 "GET /api/products/?categories__slug=powerbank HTTP/1.1" 500 113209
 Internal Server Error: /api/products/
 "POST /api/products/ HTTP/1.1" 500 52
+Internal Server Error: /api/products/e103a5c6-3546-41ab-9f73-56c306f9a5b2/
+"PUT /api/products/e103a5c6-3546-41ab-9f73-56c306f9a5b2/ HTTP/1.1" 500 83
+Internal Server Error: /api/products/e9b15f59-d1f8-4be4-9101-6b96650c53b4/
+"PUT /api/products/e9b15f59-d1f8-4be4-9101-6b96650c53b4/ HTTP/1.1" 500 96
+Internal Server Error: /api/products/00a1a0cd-427b-4f65-8ab4-141bdf5c054e/
+"PUT /api/products/00a1a0cd-427b-4f65-8ab4-141bdf5c054e/ HTTP/1.1" 500 96
+Internal Server Error: /api/products/00a1a0cd-427b-4f65-8ab4-141bdf5c054e/
+"PUT /api/products/00a1a0cd-427b-4f65-8ab4-141bdf5c054e/ HTTP/1.1" 500 102
+Internal Server Error: /api/products/00a1a0cd-427b-4f65-8ab4-141bdf5c054e/
+"PUT /api/products/00a1a0cd-427b-4f65-8ab4-141bdf5c054e/ HTTP/1.1" 500 102

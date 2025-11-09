@@ -24,7 +24,7 @@ const API_CATS = `${process.env.NEXT_PUBLIC_API_BASE}/categories/`;
 const API_BRANDS = `${process.env.NEXT_PUBLIC_API_BASE}/brands/`;
 
 /* ------------------------------------------------------------------ */
-/* PROFESSIONAL STYLED COMPONENTS */
+/* STYLED COMPONENTS */
 /* ------------------------------------------------------------------ */
 const PageContainer = styled(Box)(({ theme }) => ({
   minHeight: "100vh",
@@ -48,10 +48,7 @@ const SectionHeader = styled(Typography)(({ theme }) => ({
   alignItems: "center",
   gap: 8,
   marginBottom: theme.spacing(2),
-  "& .icon": {
-    color: "#DC1A8A",
-    fontSize: "1.3rem"
-  }
+  "& .icon": { color: "#DC1A8A", fontSize: "1.3rem" }
 }));
 
 const StyledTextField = styled(TextField)(({ theme }) => ({
@@ -106,21 +103,14 @@ const SaveButton = styled(Button)(({ theme }) => ({
     transform: "translateY(-2px)",
     boxShadow: "0 8px 24px rgba(220, 26, 138, 0.4)"
   },
-  "&:disabled": {
-    background: "#ccc",
-    transform: "none",
-    boxShadow: "none"
-  }
+  "&:disabled": { background: "#ccc", transform: "none", boxShadow: "none" }
 }));
 
 const ProductCard = styled(Card)(({ theme }) => ({
   overflow: "hidden",
   transition: "all 0.3s ease",
   boxShadow: "0 6px 20px rgba(0,0,0,0.06)",
-  "&:hover": {
-    transform: "translateY(-6px)",
-    boxShadow: "0 16px 32px rgba(0,0,0,0.12)"
-  }
+  "&:hover": { transform: "translateY(-6px)", boxShadow: "0 16px 32px rgba(0,0,0,0.12)" }
 }));
 
 const DiscountBadge = styled(Box)(({ theme }) => ({
@@ -139,7 +129,7 @@ const DiscountBadge = styled(Box)(({ theme }) => ({
 }));
 
 /* ------------------------------------------------------------------ */
-/* ERROR LOGGING HELPER */
+/* ERROR LOGGING */
 /* ------------------------------------------------------------------ */
 const logError = (msg: string, error: any, context?: { url?: string; status?: number }) => {
   console.error(`[ProductAdmin ERROR] ${msg}`, {
@@ -183,6 +173,8 @@ const ProductAdminPage: React.FC = () => {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
   const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
+  const [existingGallery, setExistingGallery] = useState<string[]>([]); // ← URLs to keep
+
   const [isActive, setIsActive] = useState(true);
   const [isFeatured, setIsFeatured] = useState(false);
   const [variants, setVariants] = useState<any[]>([]);
@@ -196,7 +188,7 @@ const ProductAdminPage: React.FC = () => {
   const token = typeof window !== "undefined" ? localStorage.getItem("access") : null;
 
   /* ------------------------------------------------------------------ */
-  /* FINAL PRICE CALC — ONLY FROM PRICE + DISCOUNT */
+  /* FINAL PRICE CALC */
   /* ------------------------------------------------------------------ */
   useEffect(() => {
     if (price !== "" && discount !== "") {
@@ -209,13 +201,21 @@ const ProductAdminPage: React.FC = () => {
   }, [price, discount]);
 
   /* ------------------------------------------------------------------ */
+  /* CLEANUP BLOB URLS */
+  /* ------------------------------------------------------------------ */
+  useEffect(() => {
+    return () => {
+      galleryPreviews.forEach(url => {
+        if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+      });
+    };
+  }, [galleryPreviews]);
+
+  /* ------------------------------------------------------------------ */
   /* FETCH DATA */
   /* ------------------------------------------------------------------ */
   const fetchAll = useCallback(async () => {
-    if (!token) {
-      logError("No auth token found", new Error("Missing token"), { url: "N/A" });
-      return;
-    }
+    if (!token) return;
     setLoading(true);
     try {
       const [pRes, cRes, bRes, oRes] = await Promise.all([
@@ -238,10 +238,7 @@ const ProductAdminPage: React.FC = () => {
       setBrands(Array.isArray(bJson) ? bJson : bJson.results || []);
       setOptions(Array.isArray(oJson) ? oJson : oJson.results || []);
     } catch (error: any) {
-      logError("Failed to load initial data", error, {
-        url: API_BASE,
-        status: error.status
-      });
+      logError("Failed to load data", error);
       setSnack({ open: true, msg: "Failed to load data", sev: "error" });
     } finally {
       setLoading(false);
@@ -268,7 +265,15 @@ const ProductAdminPage: React.FC = () => {
   };
 
   const removeGallery = (idx: number) => {
-    setGalleryFiles(prev => prev.filter((_, i) => i !== idx));
+    const isNew = idx >= existingGallery.length;
+    const realIdx = isNew ? idx - existingGallery.length : idx;
+
+    if (isNew) {
+      setGalleryFiles(prev => prev.filter((_, i) => i !== realIdx));
+    } else {
+      setExistingGallery(prev => prev.filter((_, i) => i !== realIdx));
+    }
+
     setGalleryPreviews(prev => prev.filter((_, i) => i !== idx));
   };
 
@@ -279,7 +284,8 @@ const ProductAdminPage: React.FC = () => {
     setEditId(null); setTitle(""); setDescription(""); setPrice(""); setStock("");
     setDiscount(0); setFinalPrice(""); setSelectedCats([]); setBrandId("");
     setSelectedRam([]); setSelectedStorage([]); setSelectedColors([]); setTagNames([]);
-    setCoverFile(null); setCoverPreview(null); setGalleryFiles([]); setGalleryPreviews([]);
+    setCoverFile(null); setCoverPreview(null);
+    setGalleryFiles([]); setGalleryPreviews([]); setExistingGallery([]);
     setIsActive(true); setIsFeatured(false); setVariants([]);
   };
 
@@ -299,7 +305,12 @@ const ProductAdminPage: React.FC = () => {
     setIsActive(p.is_active ?? true);
     setIsFeatured(p.is_featured ?? false);
     setCoverPreview(p.cover_image?.url ?? p.cover_image ?? null);
-    setGalleryPreviews(p.images?.map((i: any) => i.image?.url ?? i.image).filter(Boolean) ?? []);
+
+    // ← PRESERVE EXISTING GALLERY
+    const existing = p.images?.map((i: any) => i.image?.url ?? i.image).filter(Boolean) ?? [];
+    setExistingGallery(existing);
+    setGalleryPreviews(existing);
+
     setVariants(p.variants?.map((v: any) => ({
       id: v.id,
       sku: v.sku || "",
@@ -317,18 +328,14 @@ const ProductAdminPage: React.FC = () => {
   };
 
   /* ------------------------------------------------------------------ */
-  /* SAVE PRODUCT — FULLY FIXED & CLEANED */
+  /* SAVE PRODUCT — FULLY FIXED */
   /* ------------------------------------------------------------------ */
   const saveProduct = async () => {
-    if (!token) {
-      logError("Save attempted without token", new Error("No access token"));
-      setSnack({ open: true, msg: "No token", sev: "error" });
-      return;
-    }
+    if (!token) return;
 
     const form = new FormData();
 
-    // BASIC FIELDS
+    // BASIC
     if (title.trim()) form.append("title", title.trim());
     if (description.trim()) form.append("description", description.trim());
     if (price !== "" && price != null) form.append("price", String(price));
@@ -345,7 +352,7 @@ const ProductAdminPage: React.FC = () => {
     selectedColors.forEach(id => form.append("color_option_ids", id));
     tagNames.filter(t => t.trim()).forEach(t => form.append("tag_names", t.trim()));
 
-    // CLEAN & FILTER VARIANTS — NO NULL, NO EMPTY
+    // VARIANTS
     const cleanVariants = variants
       .map(v => {
         const variant: any = {};
@@ -361,7 +368,7 @@ const ProductAdminPage: React.FC = () => {
         variant.is_active = v.is_active ?? true;
         return variant;
       })
-      .filter(v => Object.keys(v).length > 1); // has more than just is_active
+      .filter(v => Object.keys(v).length > 1);
 
     if (cleanVariants.length > 0) {
       form.append("variants", JSON.stringify(cleanVariants));
@@ -369,7 +376,10 @@ const ProductAdminPage: React.FC = () => {
 
     // IMAGES
     if (coverFile) form.append("cover_image", coverFile);
-    galleryFiles.forEach(f => form.append("gallery", f));  // ← SAME KEY, BUT MUST BE LIST
+    galleryFiles.forEach(f => form.append("gallery_images", f)); // ← NEW FILES
+
+    // ← SEND EXISTING URLs TO KEEP!
+    existingGallery.forEach(url => form.append("keep_gallery", url));
 
     setSaving(true);
     try {
@@ -388,11 +398,9 @@ const ProductAdminPage: React.FC = () => {
         setTab(1);
       } else {
         const errText = await res.text();
-        logError(`Save failed (HTTP ${res.status})`, new Error(errText.slice(0, 200)), { url, status: res.status });
         setSnack({ open: true, msg: `Error: ${errText.slice(0, 120)}`, sev: "error" });
       }
     } catch (err: any) {
-      logError("Network error during save", err, { url: editId ? `${API_BASE}${editId}/` : API_BASE });
       setSnack({ open: true, msg: `Network error: ${err.message}`, sev: "error" });
     } finally {
       setSaving(false);
@@ -406,18 +414,17 @@ const ProductAdminPage: React.FC = () => {
   const doDelete = async () => {
     if (!token || !deleteId) return;
     try {
-      const url = `${API_BASE}${deleteId}/`;
-      const res = await fetch(url, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}${deleteId}/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
       if (res.ok) {
         setSnack({ open: true, msg: "Deleted!", sev: "success" });
         fetchAll();
       } else {
-        const err = await res.text();
-        logError(`Delete failed (HTTP ${res.status})`, new Error(err), { url, status: res.status });
         setSnack({ open: true, msg: "Delete failed", sev: "error" });
       }
-    } catch (err: any) {
-      logError("Network error during delete", err, { url: `${API_BASE}${deleteId}/` });
+    } catch {
       setSnack({ open: true, msg: "Delete failed", sev: "error" });
     } finally {
       setConfirmOpen(false); setDeleteId(null);
@@ -428,8 +435,7 @@ const ProductAdminPage: React.FC = () => {
     if (!token) return;
     const final = p.price && p.discount ? Math.round(p.price * (1 - p.discount / 100) * 100) / 100 : p.price;
     try {
-      const url = `${API_BASE}${p.id}/`;
-      const res = await fetch(url, {
+      const res = await fetch(`${API_BASE}${p.id}/`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ discount: p.discount, final_price: final })
@@ -437,12 +443,8 @@ const ProductAdminPage: React.FC = () => {
       if (res.ok) {
         setSnack({ open: true, msg: "Discount updated", sev: "success" });
         fetchAll();
-      } else {
-        const err = await res.text();
-        throw new Error(err);
       }
-    } catch (err: any) {
-      logError("Discount update failed", err, { url: `${API_BASE}${p.id}/` });
+    } catch {
       setSnack({ open: true, msg: "Update failed", sev: "error" });
     }
   };
@@ -463,7 +465,7 @@ const ProductAdminPage: React.FC = () => {
   return (
     <PageContainer>
       {/* TABS */}
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} centered sx={{ mb: 5, "& .MuiTab-root": { fontWeight: 600 } }}>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} centered sx={{ mb: 5 }}>
         <Tab label={editId ? "Edit Product" : "Add Product"} />
         <Tab label="All Products" />
         <Tab label="Discounted" />
@@ -473,7 +475,7 @@ const ProductAdminPage: React.FC = () => {
       {tab === 0 && (
         <FormCard elevation={0}>
           <Box sx={{ p: { xs: 3, md: 6 } }}>
-            <Typography variant="h4" sx={{ mb: 5, fontWeight: 800, textAlign: "center", color: "#1a1a1a" }}>
+            <Typography variant="h4" sx={{ mb: 5, fontWeight: 800, textAlign: "center" }}>
               {editId ? "Edit Product" : "Add New Product"}
             </Typography>
 
@@ -512,7 +514,7 @@ const ProductAdminPage: React.FC = () => {
                       renderValue={sel => (
                         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                           {(sel as string[]).map(v => {
-                            const cat = categories.find(c => c.id.toString() === v);
+                            const cat = categories.find((c: any) => c.id.toString() === v);
                             return <Chip key={v} label={cat?.name} size="small" sx={{ bgcolor: "#DC1A8A", color: "#fff" }} />;
                           })}
                         </Box>
@@ -593,7 +595,7 @@ const ProductAdminPage: React.FC = () => {
                     <input type="file" accept="image/*" onChange={e => handleCover(e.target.files)} id="cover-upload" />
                     <label htmlFor="cover-upload">
                       <AddPhotoAlternate sx={{ fontSize: 50, color: "#DC1A8A", mb: 1 }} />
-                      <Typography variant="body2" sx={{ color: "#666" }}>Drop or click to upload</Typography>
+                      <Typography variant="body2" sx={{ color: "#666" }}>Drop or click</Typography>
                     </label>
                   </UploadBox>
                   {coverPreview && (
@@ -609,14 +611,17 @@ const ProductAdminPage: React.FC = () => {
                     <input type="file" accept="image/*" multiple onChange={e => handleGallery(e.target.files)} id="gallery-upload" />
                     <label htmlFor="gallery-upload">
                       <ImageIcon sx={{ fontSize: 50, color: "#DC1A8A", mb: 1 }} />
-                      <Typography variant="body2" sx={{ color: "#666" }}>Add multiple images</Typography>
+                      <Typography variant="body2" sx={{ color: "#666" }}>Add multiple</Typography>
                     </label>
                   </UploadBox>
                   <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", mt: 2 }}>
                     {galleryPreviews.map((src, i) => (
                       <GalleryThumb key={i}>
                         <img src={src} alt="" />
-                        <IconButton size="small" onClick={() => removeGallery(i)} sx={{ position: "absolute", top: -10, right: -10, bgcolor: "rgba(0,0,0,0.7)", "&:hover": { bgcolor: "rgba(0,0,0,0.9)" } }}>
+                        <IconButton size="small" onClick={() => removeGallery(i)} sx={{
+                          position: "absolute", top: -10, right: -10,
+                          bgcolor: "rgba(0,0,0,0.7)", "&:hover": { bgcolor: "rgba(0,0,0,0.9)" }
+                        }}>
                           <CloseIcon fontSize="small" sx={{ color: "#fff" }} />
                         </IconButton>
                       </GalleryThumb>
@@ -723,7 +728,7 @@ const ProductAdminPage: React.FC = () => {
       {tab === 2 && (
         <Paper elevation={0} sx={{ overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.08)" }}>
           <Box sx={{ p: { xs: 3, md: 5 } }}>
-            <Typography variant="h5" sx={{ mb: 4, fontWeight: 700, color: "#222" }}>Discounted Products</Typography>
+            <Typography variant="h5" sx={{ mb: 4, fontWeight: 700 }}>Discounted Products</Typography>
             {loading ? (
               <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
                 <CircularProgress size={60} sx={{ color: "#DC1A8A" }} />
@@ -784,7 +789,7 @@ const ProductAdminPage: React.FC = () => {
       </Dialog>
 
       <Snackbar open={snack.open} autoHideDuration={4000} onClose={() => setSnack(s => ({ ...s, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
-        <Alert severity={snack.sev} icon={snack.sev === "success" ? <CheckCircle /> : <ErrorIcon />} sx={{
+        <Alert severity={snack.sev} sx={{
           width: "100%", fontWeight: 600, boxShadow: "0 6px 20px rgba(0,0,0,0.15)",
           ...(snack.sev === "success" && { bgcolor: "#4caf50", color: "#fff" }),
           ...(snack.sev === "error" && { bgcolor: "#f44336", color: "#fff" }),

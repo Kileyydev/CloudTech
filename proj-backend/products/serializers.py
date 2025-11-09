@@ -2,12 +2,27 @@
 from rest_framework import serializers
 from django.utils.text import slugify
 from django.db import transaction
-import json  # <-- FOR PARSING JSON STRINGS FROM FormData
+import json
+import re  # ← FOR public_id EXTRACTION
 from decimal import Decimal, ROUND_HALF_UP
+import logging
 
 from .models import (
     Category, Brand, Tag, Product, ProductVariant, ProductImage, GlobalOption
 )
+
+# ===================================================================
+# SETUP LOGGER — SHOWS IN DJANGO CONSOLE
+# ===================================================================
+logger = logging.getLogger('products.serializers')
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
 
 
 # ===================================================================
@@ -140,7 +155,7 @@ class ProductListSerializer(serializers.ModelSerializer):
 
 
 # ===================================================================
-# PRODUCT CREATE / UPDATE — HANDLES FormData + JSON STRINGS
+# PRODUCT CREATE / UPDATE — FINAL FIX: PYTHON COMPARISON
 # ===================================================================
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
     brand_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
@@ -165,6 +180,10 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         child=serializers.ImageField(), write_only=True, required=False, allow_empty=True
     )
 
+    keep_gallery = serializers.ListField(
+        child=serializers.URLField(), write_only=True, required=False, allow_empty=True
+    )
+
     variants = serializers.JSONField(write_only=True, required=False, allow_null=True)
 
     brand = BrandSerializer(read_only=True)
@@ -185,20 +204,16 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
             'ram_options', 'ram_option_ids',
             'storage_options', 'storage_option_ids',
             'colors', 'color_option_ids',
-            'tag_names', 'cover_image', 'gallery_images', 'images', 'variants', 'tags'
+            'tag_names', 'cover_image', 'gallery_images', 'keep_gallery', 'images', 'variants', 'tags'
         ]
         read_only_fields = ['final_price', 'id', 'slug']
 
-    # ----------------------------
-    # ROUND DISCOUNT BEFORE VALIDATION
-    # ----------------------------
     def to_internal_value(self, data):
         if hasattr(data, 'copy'):
             data = data.copy()
         elif not isinstance(data, dict):
             data = dict(data)
 
-        # ROUND discount to 2 decimals to satisfy DecimalField validation
         discount_raw = data.get('discount')
         if discount_raw is not None:
             try:
@@ -206,9 +221,8 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                     Decimal(discount_raw).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 )
             except:
-                pass  # let DRF handle invalid decimal inputs
+                pass
 
-        # Parse variants JSON string if needed
         variants_raw = data.get('variants')
         if isinstance(variants_raw, str):
             try:
@@ -218,7 +232,6 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         elif variants_raw is None:
             data['variants'] = []
 
-        # Parse other JSON fields
         for field in ['condition_options', 'features']:
             field_raw = data.get(field)
             if isinstance(field_raw, str):
@@ -231,17 +244,11 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         return super().to_internal_value(data)
 
-    # ----------------------------
-    # VALIDATE DISCOUNT (optional, safety net)
-    # ----------------------------
     def validate_discount(self, value):
         if value is not None:
             return Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         return value
 
-    # ----------------------------
-    # UNIQUE SLUG GENERATOR
-    # ----------------------------
     def _generate_unique_slug(self, instance, title):
         base_slug = slugify(title)
         slug = base_slug
@@ -253,6 +260,9 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        logger.debug("=== PRODUCT CREATE START ===")
+        logger.debug(f"Validated data keys: {list(validated_data.keys())}")
+
         category_ids = validated_data.pop('category_ids', [])
         ram_ids = validated_data.pop('ram_option_ids', [])
         storage_ids = validated_data.pop('storage_option_ids', [])
@@ -261,6 +271,11 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         variants_data = validated_data.pop('variants', [])
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery_images', [])
+        keep_urls = validated_data.pop('keep_gallery', None)
+
+        logger.debug(f"cover_image: {cover_file}")
+        logger.debug(f"gallery_images: {len(gallery_files)} files")
+        logger.debug(f"keep_gallery: {keep_urls}")
 
         product = Product.objects.create(**validated_data)
 
@@ -306,10 +321,16 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
 
         product.final_price = self._calc_final_price(product)
         product.save(update_fields=['final_price'])
+        logger.debug("=== PRODUCT CREATE END ===\n")
         return product
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        logger.debug("=== PRODUCT UPDATE START ===")
+        logger.debug(f"Product ID: {instance.id}")
+        logger.debug(f"Validated data keys: {list(validated_data.keys())}")
+
+        request = self.context["request"]
         category_ids = validated_data.pop('category_ids', None)
         ram_ids = validated_data.pop('ram_option_ids', None)
         storage_ids = validated_data.pop('storage_option_ids', None)
@@ -318,13 +339,20 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         variants_data = validated_data.pop('variants', None)
         cover_file = validated_data.pop('cover_image', None)
         gallery_files = validated_data.pop('gallery_images', None)
+        keep_urls = validated_data.pop('keep_gallery', None)
 
+        logger.debug(f"cover_file: {cover_file}")
+        logger.debug(f"gallery_files: {len(gallery_files) if gallery_files else 0} files")
+        logger.debug(f"keep_gallery URLs: {keep_urls}")
+
+        # === BASIC FIELDS ===
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
         if 'title' in validated_data and validated_data['title']:
             instance.slug = self._generate_unique_slug(instance, validated_data['title'])
 
+        # === RELATIONSHIPS ===
         if category_ids is not None:
             instance.categories.set(Category.objects.filter(id__in=category_ids) if category_ids else [])
         if ram_ids is not None:
@@ -334,6 +362,7 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
         if color_ids is not None:
             instance.colors.set(GlobalOption.objects.filter(id__in=color_ids) if color_ids else [])
 
+        # === TAGS ===
         if tag_names is not None:
             instance.tags.clear()
             for name in tag_names:
@@ -342,15 +371,48 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                     tag, _ = Tag.objects.get_or_create(name=name, defaults={'slug': slugify(name)})
                     instance.tags.add(tag)
 
+        # === COVER IMAGE ===
         if cover_file is not None:
+            logger.debug(f"Updating cover_image → {cover_file.name}")
             instance.cover_image = cover_file
 
-        if gallery_files is not None:
-            instance.images.all().delete()
-            for img_file in gallery_files:
-                ProductImage.objects.create(product=instance, image=img_file)
+        # === GALLERY: SMART UPDATE USING PYTHON COMPARISON (NO DB LOOKUP) ===
+        if gallery_files is not None or keep_urls is not None:
+            # Extract public_ids from keep_gallery URLs
+            keep_public_ids = set()
+            if keep_urls:
+                for url in keep_urls:
+                    match = re.search(r"/v\d+/(.+?)\.(jpg|jpeg|png|webp|gif)", url)
+                    if match:
+                        keep_public_ids.add(match.group(1))
+            logger.debug(f"Keep public_ids: {keep_public_ids}")
 
+            # Fetch current images
+            current_images = list(ProductImage.objects.filter(product=instance))
+
+            # Find images to delete (not in keep list)
+            to_delete = []
+            for img in current_images:
+                if img.image and img.image.public_id not in keep_public_ids:
+                    to_delete.append(img)
+
+            if to_delete:
+                delete_ids = [img.id for img in to_delete]
+                logger.debug(f"Deleting {len(to_delete)} images: {delete_ids}")
+                ProductImage.objects.filter(id__in=delete_ids).delete()
+            else:
+                logger.debug("No images to delete")
+
+            # Add new images
+            if gallery_files:
+                logger.debug(f"Adding {len(gallery_files)} new images")
+                for img_file in gallery_files:
+                    logger.debug(f"→ Creating: {img_file.name} ({img_file.size} bytes)")
+                    ProductImage.objects.create(product=instance, image=img_file)
+
+        # === VARIANTS ===
         if variants_data is not None:
+            logger.debug(f"Replacing {instance.variants.count()} variants")
             instance.variants.all().delete()
             for var in variants_data:
                 ProductVariant.objects.create(
@@ -367,13 +429,16 @@ class ProductCreateUpdateSerializer(serializers.ModelSerializer):
                     is_active=var.get('is_active', True)
                 )
 
+        # === FINAL PRICE & SAVE ===
         instance.final_price = self._calc_final_price(instance)
         instance.save()
+
+        # === FINAL LOG ===
+        final_image_urls = [img.image.url for img in instance.images.all() if img.image]
+        logger.debug(f"Final images after save: {final_image_urls}")
+        logger.debug("=== PRODUCT UPDATE END ===\n")
         return instance
 
-    # =======================
-    # FINAL PRICE CALCULATION
-    # =======================
     def _calc_final_price(self, obj):
         price = obj.price or Decimal('0.00')
         discount = obj.discount or Decimal('0.00')
