@@ -52,14 +52,15 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 
 
 # ===================================================================
-# PRODUCT VIEWSET — FULLY FIXED
+# PRODUCT VIEWSET — UPDATED FOR CATEGORY SLUG FILTER
 # ===================================================================
 class ProductViewSet(viewsets.ModelViewSet):
-    permission_classes = [AllowAll]  # or [IsAdminOrReadOnly]
+    permission_classes = [AllowAll]
     parser_classes = [MultiPartParser, FormParser]
 
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['brand__id', 'categories__id']
+    # ✅ Added 'categories__slug' filter
+    filterset_fields = ['brand__id', 'categories__id', 'categories__slug']
     search_fields = ['title', 'description', 'brand__name', 'tags__name']
     ordering_fields = ['price', 'created_at', 'discount', 'final_price']
     ordering = ['-created_at']
@@ -70,9 +71,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         return ProductCreateUpdateSerializer
 
     def get_serializer(self, *args, **kwargs):
-        """
-        Enable partial updates (PATCH) by passing partial=True
-        """
+        # Enable partial updates
         if self.action in ['update', 'partial_update']:
             kwargs.setdefault('partial', True)
         return super().get_serializer(*args, **kwargs)
@@ -94,7 +93,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             'variants'
         )
 
-        category_slug = self.request.query_params.get('category')
+        # ✅ Filter logic
+        category_slug = self.request.query_params.get('categories__slug')
         brand_id = self.request.query_params.get('brand')
         is_featured = self.request.query_params.get('is_featured')
 
@@ -114,7 +114,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         return context
 
     # ===================================================================
-    # FEATURED
+    # FEATURED PRODUCTS
     # ===================================================================
     @action(detail=False, methods=['get'], url_path='featured')
     @method_decorator(cache_page(60 * 5))
@@ -122,16 +122,17 @@ class ProductViewSet(viewsets.ModelViewSet):
         queryset = self.get_queryset().filter(is_featured=True)[:12]
         serializer = ProductListSerializer(queryset, many=True, context=self.get_serializer_context())
         return Response(serializer.data)
+
+    # ===================================================================
+    # SAFE CREATE & UPDATE WITH ERROR LOGGING
+    # ===================================================================
     def create(self, request, *args, **kwargs):
         try:
             return super().create(request, *args, **kwargs)
         except Exception as e:
             print("🚨 ERROR in Product create:", e)
             traceback.print_exc()
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def update(self, request, *args, **kwargs):
         try:
@@ -139,13 +140,7 @@ class ProductViewSet(viewsets.ModelViewSet):
         except Exception as e:
             print("🚨 ERROR in Product update:", e)
             traceback.print_exc()
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-    # REMOVED: perform_create & perform_update
-    # → Final price is calculated inside ProductCreateUpdateSerializer.create/update
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ===================================================================

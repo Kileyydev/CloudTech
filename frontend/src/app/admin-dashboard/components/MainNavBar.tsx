@@ -14,7 +14,7 @@ import {
 import {
   Add as AddIcon,
   Remove as RemoveIcon,
-  Dashboard as DashboardIcon,
+
   ShoppingCart as ShoppingCartIcon,
   Build as BuildIcon,
   Star as StarIcon,
@@ -31,7 +31,7 @@ type Props = {
 
 // ✅ Navigation items
 const navItems = [
-  { text: "Dashboard", icon: <DashboardIcon />, section: "dashboard" },
+
   { text: "Products", icon: <ShoppingCartIcon />, section: "products" },
   { text: "Orders", icon: <ReceiptLongIcon />, section: "orders" },
   { text: "Repairs", icon: <BuildIcon />, section: "repairs" },

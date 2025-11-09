@@ -3032,3 +3032,32 @@ Internal Server Error: /api/products/b6d6480b-21c3-4de2-bd00-4ebb78c0abb0/
 "PUT /api/products/b6d6480b-21c3-4de2-bd00-4ebb78c0abb0/ HTTP/1.1" 500 129
 Internal Server Error: /api/products/b6d6480b-21c3-4de2-bd00-4ebb78c0abb0/
 "PUT /api/products/b6d6480b-21c3-4de2-bd00-4ebb78c0abb0/ HTTP/1.1" 500 129
+Internal Server Error: /api/products/
+Traceback (most recent call last):
+  File "C:\Users\ADMIN\Desktop\Projects\wahab-website\.venv\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Users\ADMIN\Desktop\Projects\wahab-website\.venv\Lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Users\ADMIN\Desktop\Projects\wahab-website\.venv\Lib\site-packages\django\views\decorators\csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Users\ADMIN\Desktop\Projects\wahab-website\.venv\Lib\site-packages\rest_framework\viewsets.py", line 125, in view
+    return self.dispatch(request, *args, **kwargs)
+           ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\Desktop\Projects\wahab-website\.venv\Lib\site-packages\rest_framework\views.py", line 515, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Users\ADMIN\Desktop\Projects\wahab-website\.venv\Lib\site-packages\rest_framework\views.py", line 475, in handle_exception
+    self.raise_uncaught_exception(exc)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^
+  File "C:\Users\ADMIN\Desktop\Projects\wahab-website\.venv\Lib\site-packages\rest_framework\views.py", line 486, in raise_uncaught_exception
+    raise exc
+  File "C:\Users\ADMIN\Desktop\Projects\wahab-website\.venv\Lib\site-packages\rest_framework\views.py", line 512, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Users\ADMIN\Desktop\Projects\wahab-website\.venv\Lib\site-packages\rest_framework\mixins.py", line 45, in list
+    serializer = self.get_serializer(queryset, many=True)
+  File "C:\Users\ADMIN\Desktop\Projects\wahab-website\.venv\Lib\site-packages\rest_framework\generics.py", line 112, in get_serializer
+    serializer_class = self.get_serializer_class()
+  File "C:\Users\ADMIN\Desktop\Projects\wahab-website\.venv\Lib\site-packages\rest_framework\generics.py", line 126, in get_serializer_class
+    assert self.serializer_class is not None, (
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'ProductViewSet' should either include a `serializer_class` attribute, or override the `get_serializer_class()` method.
+"GET /api/products/?categories__slug=powerbank HTTP/1.1" 500 113209

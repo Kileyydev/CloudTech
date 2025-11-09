@@ -11,7 +11,6 @@ import {
   Button,
   Chip,
   Stack,
-  useTheme,
   Snackbar,
   Alert,
   Skeleton,
@@ -23,12 +22,10 @@ import {
   ShoppingCart,
   Add,
   Remove,
-  Headset,
+  BatteryChargingFull,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
-import TopNavBar from '../components/TopNavBar';
-import MainNavBar from '../components/MainNavBar';
 
 type ProductImage = { image?: { url: string } } | { url: string } | string;
 
@@ -43,8 +40,8 @@ interface ProductT {
   cover_image?: ProductImage;
   images?: ProductImage[];
   brand?: { name: string };
-  type?: { value: string }[];        // e.g. Wireless, Wired
-  connectivity?: { value: string }[]; // e.g. Bluetooth, 3.5mm
+  type?: { value: string }[];
+  connectivity?: { value: string }[];
   colors?: { value: string }[];
 }
 
@@ -52,10 +49,8 @@ const CACHE_KEY = 'powerbank_accessories_cache_v3';
 const CACHE_DURATION = 1000 * 60 * 5; // 5 mins
 
 const PowerbankAccessoriesSection = () => {
-  const theme = useTheme();
   const router = useRouter();
   const { cart, addToCart, updateQuantity } = useCart();
-
   const [products, setProducts] = useState<ProductT[]>([]);
   const [wishlist, setWishlist] = useState<Set<number>>(new Set());
   const [snackbar, setSnackbar] = useState<{
@@ -86,37 +81,29 @@ const PowerbankAccessoriesSection = () => {
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE;
         if (!API_BASE_URL) throw new Error('API base URL not defined');
 
-        const filters = [
-          'category__slug=powerbank',
-          'categories__slug=powerbank',
-          'category_slug=powerbank',
-          'category=powerbank',
-        ];
+const slug = 'powerbank'; // or use the correct slug for your category
+const res = await fetch(`${API_BASE_URL}/products/?categories__slug=${slug}`, {
+  cache: 'no-store',
+});
 
-        let finalProducts: ProductT[] = [];
 
-        for (const filter of filters) {
-          const res = await fetch(`${API_BASE_URL}/products/?${filter}`, {
-            cache: 'no-store',
-          });
-          if (!res.ok) continue;
+if (!res.ok) throw new Error('Failed to fetch powerbank products');
+const data = await res.json();
 
-          const text = await res.text();
-          let data;
-          try {
-            data = JSON.parse(text);
-          } catch {
-            continue;
-          }
+// adjust if your API wraps results like { results: [...] }
+const finalProducts = Array.isArray(data)
+  ? data
+  : data.results || data.data || [];
 
-          const list = Array.isArray(data)
-            ? data
-            : data.results || data.data || [];
-          if (list.length > 0) {
-            finalProducts = list;
-            break;
-          }
-        }
+if (finalProducts.length === 0)
+  throw new Error('No powerbank products found');
+
+setProducts(finalProducts);
+localStorage.setItem(
+  CACHE_KEY,
+  JSON.stringify({ data: finalProducts, timestamp: Date.now() })
+);
+
 
         if (finalProducts.length === 0)
           throw new Error('No powerbank accessories found');
@@ -172,15 +159,12 @@ const PowerbankAccessoriesSection = () => {
 
   const handleAddToCart = (product: ProductT) => {
     if (product.stock <= 0) return showSnackbar('Out of stock', 'error');
-
     const existing = cart[product.id];
     const newQty = existing ? existing.quantity + 1 : 1;
     if (newQty > product.stock)
       return showSnackbar(`Only ${product.stock} available`, 'error');
-
     const priceToUse =
       product.final_price && product.discount ? product.final_price : product.price;
-
     addToCart({
       id: product.id,
       title: product.title,
@@ -188,7 +172,6 @@ const PowerbankAccessoriesSection = () => {
       quantity: 1,
       stock: product.stock,
     });
-
     showSnackbar(
       existing ? `+1 ${product.title}` : `${product.title} added to cart!`
     );
@@ -229,25 +212,24 @@ const PowerbankAccessoriesSection = () => {
     return '/images/fallback.jpg';
   };
 
-  const renderSkeletonCard = (_: any, index: number) => (
-    <Card
-      key={index}
+  const renderSkeletonCard = () => (
+    <Box
       sx={{
-        width: 260,
-        height: 380,
-        flex: '0 0 auto',
+        width: 290,
+        height: 440,
         bgcolor: '#fff',
-        mr: 2,
         boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
-      <Skeleton variant="rectangular" width="100%" height={160} />
-      <CardContent sx={{ p: 2 }}>
-        <Skeleton width="85%" height={24} sx={{ mb: 1 }} />
-        <Skeleton width="70%" height={18} sx={{ mb: 1.5 }} />
-        <Skeleton width="50%" height={28} />
-      </CardContent>
-    </Card>
+      <Skeleton variant="rectangular" width="100%" height={180} />
+      <Box sx={{ p: 2, flexGrow: 1 }}>
+        <Skeleton width="85%" height={30} sx={{ mb: 1 }} />
+        <Skeleton width="70%" height={20} sx={{ mb: 1.5 }} />
+        <Skeleton width="60%" height={34} />
+      </Box>
+    </Box>
   );
 
   const renderCard = (product: ProductT) => {
@@ -261,33 +243,33 @@ const PowerbankAccessoriesSection = () => {
       <Card
         key={product.id}
         sx={{
-          width: 260,
-          height: 400,
-          flex: '0 0 auto',
+          width: 290,
+          height: 440,
           bgcolor: '#fff',
-          mr: 2,
           overflow: 'hidden',
           position: 'relative',
           boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
-          transition: 'all 0.3s ease',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 0,
         }}
       >
         {/* Wishlist */}
         <Box
           sx={{
             position: 'absolute',
-            top: 10,
-            right: 10,
+            top: 12,
+            right: 12,
             zIndex: 10,
             bgcolor: '#fff',
-            width: 34,
-            height: 34,
+            width: 36,
+            height: 36,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             borderRadius: '50%',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
           }}
           onClick={(e) => {
             e.stopPropagation();
@@ -297,7 +279,7 @@ const PowerbankAccessoriesSection = () => {
           <Favorite
             sx={{
               color: wishlist.has(product.id) ? '#e91e63' : '#bbb',
-              fontSize: 18,
+              fontSize: 19,
             }}
           />
         </Box>
@@ -306,10 +288,14 @@ const PowerbankAccessoriesSection = () => {
         <Box
           sx={{
             width: '100%',
-            height: 160,
+            height: 180,
+            p: 2.5,
             cursor: 'pointer',
+            bgcolor: '#f9f9f9',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             overflow: 'hidden',
-            position: 'relative',
           }}
           onClick={() => router.push(`/product/${product.id}`)}
         >
@@ -320,23 +306,21 @@ const PowerbankAccessoriesSection = () => {
             sx={{
               width: '100%',
               height: '100%',
-              objectFit: 'cover',
-              transition: '0.4s',
+              objectFit: 'contain',
             }}
           />
           {hasDiscount && (
             <Box
               sx={{
                 position: 'absolute',
-                top: 10,
-                left: 10,
+                top: 12,
+                left: 12,
                 bgcolor: '#e91e63',
                 color: '#fff',
                 fontWeight: 800,
                 fontSize: '0.75rem',
                 px: 1.2,
                 py: 0.4,
-                borderRadius: 1,
                 boxShadow: '0 3px 10px rgba(233,30,99,0.4)',
               }}
             >
@@ -345,18 +329,20 @@ const PowerbankAccessoriesSection = () => {
           )}
         </Box>
 
-        <CardContent sx={{ p: 2, pb: 1.5 }}>
+        <CardContent sx={{ p: 2, pb: 1.8, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
           {/* Title */}
           <Typography
-            variant="h6"
+            onClick={() => router.push(`/product/${product.id}`)}
             sx={{
               fontWeight: 800,
               color: '#1a1a1a',
-              mb: 0.5,
+              mb: 0.6,
               fontSize: '0.95rem',
-              whiteSpace: 'nowrap',
+              cursor: 'pointer',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
             }}
           >
             {product.title}
@@ -365,23 +351,18 @@ const PowerbankAccessoriesSection = () => {
           {/* Brand */}
           {product.brand && (
             <Stack direction="row" alignItems="center" gap={0.8} mb={1}>
-              <Headset sx={{ fontSize: 15, color: '#999' }} />
-              <Typography
-                variant="body2"
-                sx={{ color: '#444', fontWeight: 600, fontSize: '0.8rem' }}
-              >
+            
+              <Typography sx={{ color: '#444', fontWeight: 600, fontSize: '0.8rem' }}>
                 {product.brand.name}
               </Typography>
             </Stack>
           )}
 
           {/* Specs */}
-          <Stack spacing={0.8} mb={1.5}>
+          <Stack spacing={0.8} mb={1.5} sx={{ flexGrow: 1 }}>
             {Array.isArray(product.type) && product.type.length > 0 && (
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                <Typography
-                  sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 600, mr: 0.5 }}
-                >
+                <Typography sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 600, mr: 0.5 }}>
                   Type:
                 </Typography>
                 {product.type.map((t, i) => (
@@ -400,12 +381,9 @@ const PowerbankAccessoriesSection = () => {
                 ))}
               </Box>
             )}
-
             {Array.isArray(product.connectivity) && product.connectivity.length > 0 && (
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                <Typography
-                  sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 600, mr: 0.5 }}
-                >
+                <Typography sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 600, mr: 0.5 }}>
                   Connectivity:
                 </Typography>
                 {product.connectivity.map((c, i) => (
@@ -424,12 +402,9 @@ const PowerbankAccessoriesSection = () => {
                 ))}
               </Box>
             )}
-
             {Array.isArray(product.colors) && product.colors.length > 0 && (
               <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                <Typography
-                  sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 600, mr: 0.5 }}
-                >
+                <Typography sx={{ fontSize: '0.75rem', color: '#666', fontWeight: 600, mr: 0.5 }}>
                   Color:
                 </Typography>
                 {product.colors.map((col, i) => (
@@ -502,11 +477,11 @@ const PowerbankAccessoriesSection = () => {
                   e.stopPropagation();
                   handleDecreaseQuantity(product.id);
                 }}
-                sx={{ color: '#e91e63', width: 30, height: 30 }}
+                sx={{ color: '#e91e63', width: 32, height: 32 }}
               >
-                <Remove sx={{ fontSize: 14 }} />
+                <Remove sx={{ fontSize: 15 }} />
               </IconButton>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', minWidth: 20, textAlign: 'center' }}>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', minWidth: 24, textAlign: 'center' }}>
                 {cartItem.quantity}
               </Typography>
               <IconButton
@@ -518,12 +493,12 @@ const PowerbankAccessoriesSection = () => {
                 disabled={cartItem.quantity >= product.stock}
                 sx={{
                   color: '#e91e63',
-                  width: 30,
-                  height: 30,
+                  width: 32,
+                  height: 32,
                   '&[disabled]': { color: '#ccc' },
                 }}
               >
-                <Add sx={{ fontSize: 14 }} />
+                <Add sx={{ fontSize: 15 }} />
               </IconButton>
             </Box>
           ) : (
@@ -541,8 +516,8 @@ const PowerbankAccessoriesSection = () => {
                 color: '#fff',
                 fontWeight: 700,
                 textTransform: 'none',
-                py: 0.8,
-                fontSize: '0.8rem',
+                py: 0.9,
+                fontSize: '0.82rem',
                 '&[disabled]': { bgcolor: '#eee', color: '#999' },
               }}
             >
@@ -553,7 +528,7 @@ const PowerbankAccessoriesSection = () => {
 
         {/* Gallery Preview */}
         {galleryImages.length > 0 && (
-          <Box sx={{ px: 1.5, pb: 1.5 }}>
+          <Box sx={{ px: 1.8, pb: 1.8 }}>
             <Stack direction="row" spacing={0.8}>
               {galleryImages.slice(0, 3).map((src, i) => (
                 <Box
@@ -564,7 +539,6 @@ const PowerbankAccessoriesSection = () => {
                     overflow: 'hidden',
                     border: '1.5px solid #eee',
                     cursor: 'pointer',
-                    transition: '0.2s',
                   }}
                   onClick={() => router.push(`/product/${product.id}`)}
                 >
@@ -599,99 +573,148 @@ const PowerbankAccessoriesSection = () => {
     );
   };
 
+  const inStockProducts = products.filter(p => p.stock > 0);
+
   return (
-    <Box sx={{ bgcolor: '#fdfdfd', py: { xs: 2.5, md: 4 }, px: { xs: 2, md: 3 } }}>
-      {/* Header */}
-      <Box
-        sx={{
-          mb: 3,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 1.5,
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Headset sx={{ fontSize: 32, color: '#e91e63' }} />
-          <Typography
-            variant="h5"
-            sx={{ fontWeight: 800, color: '#1a1a1a' }}
+    <>
+      <Box sx={{ bgcolor: '#fdfdfd', py: { xs: 3, lg: 4 }, px: { xs: 2, lg: 3 } }}>
+        {/* Header */}
+        <Box
+          sx={{
+            mb: 3,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1.5,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+         
+            <Typography variant="h5" sx={{ fontWeight: 800, color: '#1a1a1a' }}>
+              Powerbank Accessories
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<ShoppingCart sx={{ fontSize: 16 }} />}
+            onClick={handleViewCart}
+            sx={{
+              bgcolor: '#000',
+              color: '#fff',
+              fontWeight: 700,
+              textTransform: 'none',
+              px: 2.5,
+              py: 1,
+              fontSize: '0.85rem',
+            }}
+            disabled={getCartItemCount() === 0}
           >
-            Powerbank Accessories
-          </Typography>
+            Cart ({getCartItemCount()})
+          </Button>
         </Box>
-        <Button
-          variant="contained"
-          size="small"
-          startIcon={<ShoppingCart sx={{ fontSize: 16 }} />}
-          onClick={handleViewCart}
-          sx={{
-            bgcolor: '#000',
-            color: '#fff',
-            fontWeight: 700,
-            textTransform: 'none',
-            px: 2.5,
-            py: 1,
-            fontSize: '0.85rem',
-          }}
-          disabled={getCartItemCount() === 0}
+
+        {/* Mobile & Tablet: Horizontal Scroll */}
+        <Box sx={{ display: { xs: 'block', lg: 'none' } }}>
+          <Box
+            sx={{
+              overflowX: 'auto',
+              display: 'flex',
+              pb: 2,
+              scrollbarWidth: 'none',
+              '&::-webkit-scrollbar': { display: 'none' },
+            }}
+          >
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              {loading
+                ? Array.from({ length: 6 }).map((_, i) => renderSkeletonCard())
+                : inStockProducts.length === 0
+                ? (
+                    <Typography color="text.secondary" sx={{ py: 5, pl: 2 }}>
+                      No powerbank accessories available right now.
+                    </Typography>
+                  )
+                : inStockProducts.map(renderCard)}
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Large Screens: 4 per row, UNLIMITED rows (GRID) */}
+        <Box sx={{ display: { xs: 'none', lg: 'block' } }}>
+          {loading ? (
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 290px)',
+                gap: 2,
+                justifyContent: 'center',
+                maxWidth: 1240,
+                mx: 'auto',
+                px: { lg: 2 },
+              }}
+            >
+              {Array.from({ length: 12 }).map((_, i) => renderSkeletonCard())}
+            </Box>
+          ) : inStockProducts.length === 0 ? (
+            <Typography color="text.secondary" sx={{ textAlign: 'center', py: 5 }}>
+              No powerbank accessories available right now.
+            </Typography>
+          ) : (
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 290px)',
+                gap: 2,
+                justifyContent: 'center',
+                maxWidth: 1240,
+                mx: 'auto',
+                px: { lg: 2 },
+              }}
+            >
+              {inStockProducts.map(renderCard)}
+            </Box>
+          )}
+        </Box>
+
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={3000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         >
-          Cart ({getCartItemCount()})
-        </Button>
+          <Alert
+            onClose={handleCloseSnackbar}
+            severity={snackbar.severity}
+            sx={{
+              width: '100%',
+              fontWeight: 600,
+              ...(snackbar.severity === 'success' && {
+                bgcolor: '#4caf50',
+                color: '#fff',
+              }),
+              ...(snackbar.severity === 'error' && {
+                bgcolor: '#f44336',
+                color: '#fff',
+              }),
+            }}
+          >
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
       </Box>
 
-      {/* Scrollable Cards */}
+      {/* Elegant Black Separator Line Below */}
       <Box
         sx={{
-          display: 'flex',
-          overflowX: 'auto',
-          scrollBehavior: 'smooth',
-          scrollbarWidth: 'none',
-          '&::-webkit-scrollbar': { display: 'none' },
-          pb: 1,
+          height: 5,
+          bgcolor: '#000',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          background: 'linear-gradient(to right, transparent, #000 15%, #000 85%, transparent)',
+          borderRadius: '2px',
         }}
-      >
-        {loading
-          ? Array.from({ length: 4 }).map(renderSkeletonCard)
-          : products.length === 0
-          ? (
-              <Typography
-                color="text.secondary"
-                sx={{ textAlign: 'center', py: 5, width: '100%' }}
-              >
-                No powerbank accessories available right now.
-              </Typography>
-            )
-          : products.filter(p => p.stock > 0).map(renderCard)}
-      </Box>
-
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          sx={{
-            width: '100%',
-            fontWeight: 600,
-            ...(snackbar.severity === 'success' && {
-              bgcolor: '#4caf50',
-              color: '#fff',
-            }),
-            ...(snackbar.severity === 'error' && {
-              bgcolor: '#f44336',
-              color: '#fff',
-            }),
-          }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+      />
+    </>
   );
 };
 

@@ -29,7 +29,7 @@ export default function AdminDashboardPageComponent() {
       <MainNavBar activeSection={activeSection} setActiveSection={setActiveSection} />
 
       <Box sx={{ padding: "16px", flexGrow: 1 }}>
-        {activeSection === "dashboard" && <DashboardSection />}
+       
         {activeSection === "products" && <ProductsSection />}
         {activeSection === "discounts" && <DiscountsSection />}
         {activeSection === "users" && <UsersSection />}

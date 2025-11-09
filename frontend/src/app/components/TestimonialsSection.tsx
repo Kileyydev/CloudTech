@@ -1,4 +1,3 @@
-// 🌸 Updated TestimonialsSection.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -42,10 +41,7 @@ const SectionBox = styled(Box)(({ theme }) => ({
   },
 }));
 
-const ContentContainer = styled(Box)({
-  position: "relative",
-  zIndex: 1,
-});
+const ContentContainer = styled(Box)({ position: "relative", zIndex: 1 });
 
 const TestimonialCard = styled(Card)(({ theme }) => ({
   padding: theme.spacing(2),
@@ -91,9 +87,7 @@ const NavButton = styled(IconButton)(({ theme }) => ({
   transform: "translateY(-50%)",
   backgroundColor: "rgba(0, 0, 0, 0.5)",
   color: "#FFFFFF",
-  "&:hover": {
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-  },
+  "&:hover": { backgroundColor: "rgba(0, 0, 0, 0.7)" },
   zIndex: 2,
 }));
 
@@ -109,9 +103,15 @@ type TestimonialT = {
   created_at: string;
 };
 
-// ✅ Use env variable for API & media
+// ✅ Env variables for API & media
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE + "/testimonials/";
-const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || "http://localhost:8000";
+const MEDIA_BASE = process.env.NEXT_PUBLIC_MEDIA_BASE || "http://localhost:8000/media/";
+
+// Helper to handle local & full URLs
+const getImageUrl = (img?: string) => {
+  if (!img) return "/images/fallback.jpg";
+  return img.startsWith("http") ? img : `${MEDIA_BASE}${img}`;
+};
 
 export default function TestimonialsSection() {
   const [testimonials, setTestimonials] = useState<TestimonialT[]>([]);
@@ -135,9 +135,10 @@ export default function TestimonialsSection() {
           : [];
 
         const approved = list.filter((item: TestimonialT) => item.is_approved === true);
-        console.log("Approved testimonials:", approved); 
+        console.log("Approved testimonials fetched:", approved);
         setTestimonials(approved);
       } catch (err: any) {
+        console.error("Error fetching testimonials:", err);
         setError(err.message || "Failed to load testimonials");
       } finally {
         setLoading(false);
@@ -224,12 +225,16 @@ export default function TestimonialsSection() {
                     {t.image && (
                       <ProductImageBox>
                         <img
-                          src={
-                            t.image.startsWith("http")
-                              ? t.image
-                              : `${MEDIA_BASE}${t.image}`
-                          }
+                          src={getImageUrl(t.image)}
                           alt={t.product || "Product image"}
+                          onError={(e) => {
+                            console.error(
+                              `Failed to load image for testimonial ${t.id}:`,
+                              getImageUrl(t.image)
+                            );
+                            // fallback
+                            (e.currentTarget as HTMLImageElement).src = "/images/fallback.jpg";
+                          }}
                         />
                       </ProductImageBox>
                     )}
