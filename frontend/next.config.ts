@@ -32,19 +32,16 @@ const nextConfig = {
   },
   trailingSlash: true, // Optional: makes /product/1/ → /product/1/index.html
 
-  // Security Headers (including HSTS) - Applies to all routes in production
+  // Security Headers
   async headers() {
     return [
       {
-        // Apply to all paths
         source: '/:path*',
         headers: [
-          // HSTS: 1 year, subdomains, NO preload (unless submitted to hstspreload.org)
           {
             key: 'Strict-Transport-Security',
             value: 'max-age=31536000; includeSubDomains',
           },
-          // Additional security headers for better protection
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff',
@@ -57,7 +54,6 @@ const nextConfig = {
             key: 'X-XSS-Protection',
             value: '1; mode=block',
           },
-          // Referrer policy for privacy
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
@@ -67,7 +63,7 @@ const nextConfig = {
     ];
   },
 
-  // Force HTTPS redirects (for HTTP attempts) - Applies in production
+  // HTTPS redirects
   async redirects() {
     return [
       {
@@ -80,13 +76,13 @@ const nextConfig = {
           },
         ],
         destination: 'https://www.cloudtechstore.net/:path*',
-        permanent: true, // 301 redirect
+        permanent: true,
       },
     ];
   },
 
-  // Optional: Ensure HTTPS in production builds (Render handles some, but this reinforces)
-  output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
+  // ✅ Remove static export for dynamic pages
+  // output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
 };
 
 export default nextConfig;
