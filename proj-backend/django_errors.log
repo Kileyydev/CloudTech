@@ -3061,3 +3061,5 @@ Traceback (most recent call last):
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 AssertionError: 'ProductViewSet' should either include a `serializer_class` attribute, or override the `get_serializer_class()` method.
 "GET /api/products/?categories__slug=powerbank HTTP/1.1" 500 113209
+Internal Server Error: /api/products/
+"POST /api/products/ HTTP/1.1" 500 52

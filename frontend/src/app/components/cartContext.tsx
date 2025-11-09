@@ -10,6 +10,11 @@ type CartItem = {
   quantity: number;
   stock: number;
   cover_image?: string;
+  selectedOptions?: {
+    ram?: string;
+    storage?: string;
+    color?: string;
+  };
 };
 
 type CartContextType = {
