@@ -22,7 +22,7 @@ import {
   ShoppingCart,
   Add,
   Remove,
-  BatteryChargingFull,
+  PhoneIphone,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
@@ -45,10 +45,10 @@ interface ProductT {
   colors?: { value: string }[];
 }
 
-const CACHE_KEY = 'storage_accessories_cache';
+const CACHE_KEY = 'storage_accessories_products';
 const CACHE_DURATION = 1000 * 60 * 5; // 5 mins
 
-const StorageAccessoriesSection = () => {
+const StorageAccessories = () => {
   const router = useRouter();
   const { cart, addToCart, updateQuantity } = useCart();
   const [products, setProducts] = useState<ProductT[]>([]);
@@ -90,9 +90,10 @@ const StorageAccessoriesSection = () => {
 
         let finalProducts: ProductT[] = [];
         for (const filter of filters) {
-          const res = await fetch(`${API_BASE_URL}/products/?${filter}`, {
-            cache: 'no-store',
-          });
+          const slug = 'storage'; // or use the correct slug for your category
+const res = await fetch(`${API_BASE_URL}/products/?categories__slug=${slug}`, {
+  cache: 'no-store',
+});
           if (!res.ok) continue;
           const text = await res.text();
           let data;
@@ -111,7 +112,7 @@ const StorageAccessoriesSection = () => {
         }
 
         if (finalProducts.length === 0)
-          throw new Error('No storage accessories found');
+          throw new Error('No Storage Products found');
 
         setProducts(finalProducts);
         localStorage.setItem(
@@ -119,10 +120,10 @@ const StorageAccessoriesSection = () => {
           JSON.stringify({ data: finalProducts, timestamp: Date.now() })
         );
       } catch (err: any) {
-        console.error('Storage devices fetch failed:', err);
+        console.error('Storage Products fetch failed:', err);
         setSnackbar({
           open: true,
-          message: err.message || 'Failed to load storage devices',
+          message: err.message || 'Failed to load storage products',
           severity: 'error',
         });
       } finally {
@@ -356,7 +357,7 @@ const StorageAccessoriesSection = () => {
           {/* Brand */}
           {product.brand && (
             <Stack direction="row" alignItems="center" gap={0.8} mb={1}>
-          
+              <PhoneIphone sx={{ fontSize: 15, color: '#999' }} />
               <Typography sx={{ color: '#444', fontWeight: 600, fontSize: '0.8rem' }}>
                 {product.brand.name}
               </Typography>
@@ -595,9 +596,9 @@ const StorageAccessoriesSection = () => {
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-       
+          
             <Typography variant="h5" sx={{ fontWeight: 800, color: '#1a1a1a' }}>
-              Storage
+             Storage
             </Typography>
           </Box>
           <Button
@@ -637,7 +638,7 @@ const StorageAccessoriesSection = () => {
                 : inStockProducts.length === 0
                 ? (
                     <Typography color="text.secondary" sx={{ py: 5, pl: 2 }}>
-                      No storage accessories available right now.
+                      No storage products available right now.
                     </Typography>
                   )
                 : inStockProducts.map(renderCard)}
@@ -663,7 +664,7 @@ const StorageAccessoriesSection = () => {
             </Box>
           ) : inStockProducts.length === 0 ? (
             <Typography color="text.secondary" sx={{ textAlign: 'center', py: 5 }}>
-              No storage accessories available right now.
+              No storage products available right now.
             </Typography>
           ) : (
             <Box
@@ -723,4 +724,4 @@ const StorageAccessoriesSection = () => {
   );
 };
 
-export default StorageAccessoriesSection;
+export default StorageAccessories;

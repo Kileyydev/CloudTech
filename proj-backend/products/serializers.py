@@ -157,7 +157,125 @@ class ProductListSerializer(serializers.ModelSerializer):
 # ===================================================================
 # PRODUCT CREATE / UPDATE — FINAL FIX: PYTHON COMPARISON
 # ===================================================================
+# ===================================================================
+# PRODUCT CREATE / UPDATE — FIXED DECIMALS
+# ===================================================================
 class ProductCreateUpdateSerializer(serializers.ModelSerializer):
+    brand_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
+    category_ids = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=False, allow_empty=True
+    )
+    ram_option_ids = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=False, allow_empty=True
+    )
+    storage_option_ids = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=False, allow_empty=True
+    )
+    color_option_ids = serializers.ListField(
+        child=serializers.IntegerField(), write_only=True, required=False, allow_empty=True
+    )
+    tag_names = serializers.ListField(
+        child=serializers.CharField(max_length=60), write_only=True, required=False, allow_empty=True
+    )
+
+    cover_image = serializers.ImageField(write_only=True, required=False, allow_null=True)
+    gallery_images = serializers.ListField(
+        child=serializers.ImageField(), write_only=True, required=False, allow_empty=True
+    )
+    keep_gallery = serializers.ListField(
+        child=serializers.URLField(), write_only=True, required=False, allow_empty=True
+    )
+    variants = serializers.JSONField(write_only=True, required=False, allow_null=True)
+
+    brand = BrandSerializer(read_only=True)
+    categories = CategorySerializer(many=True, read_only=True)
+    images = ProductImageSerializer(many=True, read_only=True)
+    ram_options = GlobalOptionSerializer(many=True, read_only=True)
+    storage_options = GlobalOptionSerializer(many=True, read_only=True)
+    colors = GlobalOptionSerializer(many=True, read_only=True)
+    tags = TagSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'title', 'description', 'price', 'stock', 'discount',
+            'final_price', 'is_active', 'is_featured', 'slug',
+            'brand', 'brand_id',
+            'categories', 'category_ids',
+            'ram_options', 'ram_option_ids',
+            'storage_options', 'storage_option_ids',
+            'colors', 'color_option_ids',
+            'tag_names', 'cover_image', 'gallery_images', 'keep_gallery', 'images', 'variants', 'tags'
+        ]
+        read_only_fields = ['final_price', 'id', 'slug']
+
+    # ===========================
+    # ROUND DECIMALS BEFORE VALIDATION
+    # ===========================
+    def validate_price(self, value):
+        if value is None:
+            return Decimal('0.00')
+        return Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    def validate_discount(self, value):
+        if value is None:
+            return Decimal('0.00')
+        return Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    def validate_final_price(self, value):
+        if value is None:
+            return Decimal('0.00')
+        return Decimal(value).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    # ===========================
+    # OVERRIDE to_internal_value TO HANDLE STRINGS / JSON
+    # ===========================
+    def to_internal_value(self, data):
+        if hasattr(data, 'copy'):
+            data = data.copy()
+        elif not isinstance(data, dict):
+            data = dict(data)
+
+        for field in ['price', 'discount', 'final_price']:
+            if field in data and data[field] is not None:
+                try:
+                    data[field] = str(
+                        Decimal(data[field]).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    )
+                except:
+                    pass
+
+        variants_raw = data.get('variants')
+        if isinstance(variants_raw, str):
+            try:
+                data['variants'] = json.loads(variants_raw)
+            except json.JSONDecodeError:
+                data['variants'] = []
+        elif variants_raw is None:
+            data['variants'] = []
+
+        for field in ['condition_options', 'features']:
+            field_raw = data.get(field)
+            if isinstance(field_raw, str):
+                try:
+                    data[field] = json.loads(field_raw)
+                except json.JSONDecodeError:
+                    data[field] = {}
+            elif field_raw is None:
+                data[field] = {}
+
+        return super().to_internal_value(data)
+
+    # ===========================
+    # CREATE / UPDATE METHODS
+    # ===========================
+    def _calc_final_price(self, obj):
+        price = obj.price or Decimal('0.00')
+        discount = obj.discount or Decimal('0.00')
+        discount_multiplier = Decimal('1.00') - (discount / Decimal('100'))
+        final_price = (price * discount_multiplier).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        return final_price
+
     brand_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
     category_ids = serializers.ListField(
         child=serializers.IntegerField(), write_only=True, required=False, allow_empty=True

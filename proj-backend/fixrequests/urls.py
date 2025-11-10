@@ -1,9 +1,10 @@
+# fixrequests/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import RepairRequestViewSet  # <-- updated
+from .views import RepairRequestViewSet
 
 router = DefaultRouter()
-router.register('', RepairRequestViewSet, basename='repairs')
+router.register(r'repairs', RepairRequestViewSet, basename='repair')
 
 urlpatterns = [
     path('', include(router.urls)),

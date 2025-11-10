@@ -1,3 +1,4 @@
+// src/app/admin/users/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -22,12 +23,16 @@ import {
   Alert,
   IconButton,
   Paper,
+  Tabs,
+  Tab,
+  InputAdornment,
   alpha,
   styled,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
+import SearchIcon from "@mui/icons-material/Search";
 import { useRouter } from "next/navigation";
 
 type UserT = {
@@ -42,21 +47,22 @@ type UserT = {
 // === STYLED COMPONENTS ===
 const StyledPaper = styled(Paper)(({ theme }) => ({
   overflow: "hidden",
-  boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
-  background: "linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)",
-  border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+  border: "1px solid #ddd",
+  boxShadow: "none",
+  background: "#fff",
 }));
 
 const StyledButton = styled(Button)(({ theme }) => ({
   textTransform: "none",
-  fontWeight: 600,
+  fontWeight: 700,
   px: 3,
   py: 1.2,
-  transition: "all 0.2s",
-  "&.primary": {
-    background: "linear-gradient(135deg, #DC1A8A, #B31774)",
-    color: "#fff",
-    "&:hover": { background: "linear-gradient(135deg, #B00053, #90004D)" },
+  bgcolor: "#000",
+  color: "#fff",
+  "&:hover": { bgcolor: "#333" },
+  "&.delete": {
+    bgcolor: "#d32f2f",
+    "&:hover": { bgcolor: "#b71c1c" },
   },
 }));
 
@@ -80,6 +86,10 @@ const UsersSection: React.FC = () => {
     msg: "",
     sev: "success",
   });
+
+  // Search & Filter
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "superuser" | "regular">("all");
 
   // === DIALOG STATES ===
   const [openEdit, setOpenEdit] = useState(false);
@@ -266,109 +276,179 @@ const UsersSection: React.FC = () => {
     }
   };
 
+  // === FILTERED USERS ===
+  const filteredUsers = users.filter((u) => {
+    const matchesSearch =
+      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.full_name ?? u.name ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesRole =
+      roleFilter === "all" ||
+      (roleFilter === "admin" && u.is_staff) ||
+      (roleFilter === "superuser" && u.is_superuser) ||
+      (roleFilter === "regular" && !u.is_staff && !u.is_superuser);
+
+    return matchesSearch && matchesRole;
+  });
+
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, minHeight: "100vh", bgcolor: "#f8f9fa" }}>
-      {/* HEADER */}
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: "#222" }}>
-          Manage Users
-        </Typography>
-        <Box sx={{ display: "flex", gap: 1 }}>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        bgcolor: "#fff",
+        color: "#000",
+        fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif"',
+        margin: 0,
+        padding: 0,
+      }}
+    >
+
+      {/* Search + Role Tabs (Same Level) */}
+      <Box sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
+        <Box sx={{ mb: 3, display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+          <TextField
+            placeholder="Search by email or name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            size="small"
+            sx={{
+              flex: { xs: 1, sm: "0 1 350px" },
+              minWidth: 250,
+              "& .MuiInputBase-input": { color: "#000" },
+              "& .MuiInputLabel-root": { color: "#000" },
+              "& .MuiOutlinedInput-root": {
+                "& fieldset": { borderColor: "#000" },
+                "&:hover fieldset": { borderColor: "#000" },
+                "&.Mui-focused fieldset": { borderColor: "#000" },
+              },
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: "#000" }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Tabs
+            value={roleFilter}
+            onChange={(_, v) => setRoleFilter(v)}
+            sx={{
+              flex: 1,
+              minWidth: 300,
+              "& .MuiTab-root": {
+                color: "#000",
+                "&.Mui-selected": {
+                  color: "#000",
+                  fontWeight: 700,
+                },
+              },
+              "& .MuiTabs-indicator": {
+                bgcolor: "#000",
+              },
+            }}
+          >
+            <Tab label="All" value="all" />
+            <Tab label="Admin" value="admin" />
+            <Tab label="Superuser" value="superuser" />
+            <Tab label="Regular" value="regular" />
+          </Tabs>
+        </Box>
+
+        {/* Action Buttons */}
+        <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1, mb: 2 }}>
           <StyledButton
-            className="primary"
             startIcon={<AddIcon />}
             onClick={() => setOpenAdd(true)}
+            size="small"
           >
             Add User
           </StyledButton>
           <StyledButton
-            className="primary"
             onClick={fetchUsers}
             disabled={loading}
+            size="small"
           >
-            {loading ? <CircularProgress size={20} sx={{ color: "#fff" }} /> : "Refresh"}
+            {loading ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Refresh"}
           </StyledButton>
         </Box>
-      </Box>
 
-      {/* TABLE */}
-      <StyledPaper elevation={0}>
-        <Box sx={{ p: { xs: 2, md: 3 } }}>
-          {loading ? (
-            <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-              <CircularProgress size={60} thickness={5} sx={{ color: "#DC1A8A" }} />
-            </Box>
-          ) : users.length === 0 ? (
-            <Typography textAlign="center" color="text.secondary" py={8}>
-              No users found
-            </Typography>
-          ) : (
-            <Table>
-              <TableHead>
-                <TableRow
-                  sx={{
-                    background: "linear-gradient(135deg, #DC1A8A, #B31774)",
-                    "& .MuiTableCell-root": { color: "#fff", fontWeight: "bold" },
-                  }}
-                >
-                  <TableCell>Full Name</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>Admin</TableCell>
-                  <TableCell>Superuser</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id} hover sx={{ "&:hover": { bgcolor: alpha("#DC1A8A", 0.05) } }}>
-                    <TableCell sx={{ fontWeight: 600 }}>
-                      {u.full_name ?? u.name ?? "—"}
-                    </TableCell>
-                    <TableCell>{u.email}</TableCell>
-                    <TableCell>
-                      <Checkbox checked={Boolean(u.is_staff)} disabled />
-                    </TableCell>
-                    <TableCell>
-                      <Checkbox checked={Boolean(u.is_superuser)} disabled />
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: "flex", gap: 1 }}>
-                        <Tooltip title="Edit">
-                          <IconButton
-                            size="small"
-                            onClick={() => openEditDialog(u)}
-                            sx={{ color: "#DC1A8A" }}
-                          >
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton
-                            size="small"
-                            onClick={() => confirmDelete(u)}
-                            sx={{ color: "#f44336" }}
-                            disabled={deletingId === u.id}
-                          >
-                            {deletingId === u.id ? (
-                              <CircularProgress size={16} />
-                            ) : (
-                              <DeleteIcon />
-                            )}
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
+        {/* Table */}
+        <StyledPaper>
+          <Box sx={{ p: 0 }}>
+            {loading ? (
+              <Box sx={{ py: 10, textAlign: "center" }}>
+                <CircularProgress size={40} sx={{ color: "#000" }} />
+              </Box>
+            ) : filteredUsers.length === 0 ? (
+              <Typography sx={{ py: 10, textAlign: "center", color: "#999" }}>
+                {searchQuery || roleFilter !== "all"
+                  ? "No users match your filters."
+                  : "No users found"}
+              </Typography>
+            ) : (
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: "#000" }}>
+                    <TableCell sx={{ color: "#fff", fontWeight: 700 }}>Full Name</TableCell>
+                    <TableCell sx={{ color: "#fff", fontWeight: 700 }}>Email</TableCell>
+                    <TableCell sx={{ color: "#fff", fontWeight: 700 }}>Admin</TableCell>
+                    <TableCell sx={{ color: "#fff", fontWeight: 700 }}>Superuser</TableCell>
+                    <TableCell sx={{ color: "#fff", fontWeight: 700 }}>Actions</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </Box>
-      </StyledPaper>
+                </TableHead>
+                <TableBody>
+                  {filteredUsers.map((u) => (
+                    <TableRow key={u.id} hover>
+                      <TableCell sx={{ fontWeight: 600, color: "#000" }}>
+                        {u.full_name ?? u.name ?? "—"}
+                      </TableCell>
+                      <TableCell>{u.email}</TableCell>
+                      <TableCell>
+                        <Checkbox checked={Boolean(u.is_staff)} disabled />
+                      </TableCell>
+                      <TableCell>
+                        <Checkbox checked={Boolean(u.is_superuser)} disabled />
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: "flex", gap: 0.5 }}>
+                          <Tooltip title="Edit">
+                            <IconButton
+                              size="small"
+                              onClick={() => openEditDialog(u)}
+                              sx={{ color: "#000" }}
+                            >
+                              <EditIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton
+                              size="small"
+                              onClick={() => confirmDelete(u)}
+                              sx={{ color: "#d32f2f" }}
+                              disabled={deletingId === u.id}
+                            >
+                              {deletingId === u.id ? (
+                                <CircularProgress size={16} />
+                              ) : (
+                                <DeleteIcon />
+                              )}
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </Box>
+        </StyledPaper>
+      </Box>
 
       {/* === ADD USER DIALOG === */}
       <Dialog open={openAdd} onClose={() => setOpenAdd(false)} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ fontWeight: 700 }}>Add New User</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, color: "#000" }}>Add New User</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
           <TextField
             label="Email *"
@@ -376,12 +456,16 @@ const UsersSection: React.FC = () => {
             value={addEmail}
             onChange={(e) => setAddEmail(e.target.value)}
             fullWidth
+            size="small"
+            sx={{ "& .MuiInputLabel-root": { color: "#000" } }}
           />
           <TextField
             label="Full Name"
             value={addFullName}
             onChange={(e) => setAddFullName(e.target.value)}
             fullWidth
+            size="small"
+            sx={{ "& .MuiInputLabel-root": { color: "#000" } }}
           />
           <TextField
             label="Password *"
@@ -389,23 +473,25 @@ const UsersSection: React.FC = () => {
             value={addPassword}
             onChange={(e) => setAddPassword(e.target.value)}
             fullWidth
+            size="small"
+            sx={{ "& .MuiInputLabel-root": { color: "#000" } }}
           />
           <Box sx={{ display: "flex", gap: 3, mt: 1 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Checkbox checked={addIsStaff} onChange={(e) => setAddIsStaff(e.target.checked)} />
-              <Typography>Is Admin</Typography>
+              <Typography sx={{ color: "#000" }}>Is Admin</Typography>
             </Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Checkbox checked={addIsSuperuser} onChange={(e) => setAddIsSuperuser(e.target.checked)} />
-              <Typography>Is Superuser</Typography>
+              <Typography sx={{ color: "#000" }}>Is Superuser</Typography>
             </Box>
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3, gap: 1 }}>
-          <Button onClick={() => setOpenAdd(false)} disabled={saving}>
+          <Button onClick={() => setOpenAdd(false)} disabled={saving} sx={{ color: "#000" }}>
             Cancel
           </Button>
-          <StyledButton className="primary" onClick={handleAddUser} disabled={saving}>
+          <StyledButton onClick={handleAddUser} disabled={saving}>
             {saving ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Create"}
           </StyledButton>
         </DialogActions>
@@ -413,13 +499,15 @@ const UsersSection: React.FC = () => {
 
       {/* === EDIT DIALOG === */}
       <Dialog open={openEdit} onClose={() => setOpenEdit(false)} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ fontWeight: 700 }}>Edit User</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, color: "#000" }}>Edit User</DialogTitle>
         <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
           <TextField
             label="Full Name"
             value={fullNameInput}
             onChange={(e) => setFullNameInput(e.target.value)}
             fullWidth
+            size="small"
+            sx={{ "& .MuiInputLabel-root": { color: "#000" } }}
           />
           <TextField
             label="New Password (leave blank to keep)"
@@ -427,23 +515,25 @@ const UsersSection: React.FC = () => {
             value={passwordInput}
             onChange={(e) => setPasswordInput(e.target.value)}
             fullWidth
+            size="small"
+            sx={{ "& .MuiInputLabel-root": { color: "#000" } }}
           />
           <Box sx={{ display: "flex", gap: 3 }}>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Checkbox checked={isStaffInput} onChange={(e) => setIsStaffInput(e.target.checked)} />
-              <Typography>Is Admin</Typography>
+              <Typography sx={{ color: "#000" }}>Is Admin</Typography>
             </Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Checkbox checked={isSuperuserInput} onChange={(e) => setIsSuperuserInput(e.target.checked)} />
-              <Typography>Is Superuser</Typography>
+              <Typography sx={{ color: "#000" }}>Is Superuser</Typography>
             </Box>
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3, gap: 1 }}>
-          <Button onClick={() => setOpenEdit(false)} disabled={saving}>
+          <Button onClick={() => setOpenEdit(false)} disabled={saving} sx={{ color: "#000" }}>
             Cancel
           </Button>
-          <StyledButton className="primary" onClick={handleSaveUser} disabled={saving}>
+          <StyledButton onClick={handleSaveUser} disabled={saving}>
             {saving ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Save"}
           </StyledButton>
         </DialogActions>
@@ -451,20 +541,17 @@ const UsersSection: React.FC = () => {
 
       {/* === DELETE CONFIRM DIALOG === */}
       <Dialog open={openDelete} onClose={() => setOpenDelete(false)}>
-        <DialogTitle sx={{ fontWeight: 700 }}>Delete User?</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700, color: "#000" }}>Delete User?</DialogTitle>
         <DialogContent>
-          <Typography>
+          <Typography sx={{ color: "#000" }}>
             Are you sure you want to delete <strong>{selectedUser?.email}</strong>? This cannot be undone.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 3, gap: 1 }}>
-          <Button onClick={() => setOpenDelete(false)}>Cancel</Button>
-          <StyledButton
-            className="primary"
-            sx={{ bgcolor: "#f44336", "&:hover": { bgcolor: "#d32f2f" } }}
-            onClick={handleDelete}
-            disabled={deletingId !== null}
-          >
+          <Button onClick={() => setOpenDelete(false)} sx={{ color: "#000" }}>
+            Cancel
+          </Button>
+          <StyledButton className="delete" onClick={handleDelete} disabled={deletingId !== null}>
             {deletingId ? <CircularProgress size={18} sx={{ color: "#fff" }} /> : "Delete"}
           </StyledButton>
         </DialogActions>
@@ -479,13 +566,13 @@ const UsersSection: React.FC = () => {
       >
         <Alert
           severity={snack.sev}
-          sx={{
-            width: "100%",
-            fontWeight: 600,
-            ...(snack.sev === "success" && { bgcolor: "#4caf50", color: "#fff" }),
-            ...(snack.sev === "error" && { bgcolor: "#f44336", color: "#fff" }),
-          }}
           onClose={() => setSnack((s) => ({ ...s, open: false }))}
+          sx={{
+            fontWeight: 600,
+            width: "100%",
+            bgcolor: snack.sev === "success" ? "#4caf50" : "#f44336",
+            color: "#fff",
+          }}
         >
           {snack.msg}
         </Alert>

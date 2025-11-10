@@ -22,7 +22,7 @@ import {
   ShoppingCart,
   Add,
   Remove,
-  BatteryChargingFull,
+  PhoneIphone,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
@@ -45,10 +45,10 @@ interface ProductT {
   colors?: { value: string }[];
 }
 
-const CACHE_KEY = 'smartphone_accessories_cache';
+const CACHE_KEY = 'smartphone_products_cache_v3';
 const CACHE_DURATION = 1000 * 60 * 5; // 5 mins
 
-const SmartphonesAccessoriesSection = () => {
+const Smartphones = () => {
   const router = useRouter();
   const { cart, addToCart, updateQuantity } = useCart();
   const [products, setProducts] = useState<ProductT[]>([]);
@@ -82,7 +82,7 @@ const SmartphonesAccessoriesSection = () => {
         if (!API_BASE_URL) throw new Error('API base URL not defined');
 
         const filters = [
-          'category__slug=smaprtphones',
+          'category__slug=smartphones',
           'categories__slug=smartphones',
           'category_slug=smartphones',
           'category=smartphones',
@@ -90,9 +90,10 @@ const SmartphonesAccessoriesSection = () => {
 
         let finalProducts: ProductT[] = [];
         for (const filter of filters) {
-          const res = await fetch(`${API_BASE_URL}/products/?${filter}`, {
-            cache: 'no-store',
-          });
+          const slug = 'smartphones'; // or use the correct slug for your category
+const res = await fetch(`${API_BASE_URL}/products/?categories__slug=${slug}`, {
+  cache: 'no-store',
+});
           if (!res.ok) continue;
           const text = await res.text();
           let data;
@@ -111,7 +112,7 @@ const SmartphonesAccessoriesSection = () => {
         }
 
         if (finalProducts.length === 0)
-          throw new Error('No smartphones accessories found');
+          throw new Error('No Smartphones found');
 
         setProducts(finalProducts);
         localStorage.setItem(
@@ -356,7 +357,7 @@ const SmartphonesAccessoriesSection = () => {
           {/* Brand */}
           {product.brand && (
             <Stack direction="row" alignItems="center" gap={0.8} mb={1}>
-              
+              <PhoneIphone sx={{ fontSize: 15, color: '#999' }} />
               <Typography sx={{ color: '#444', fontWeight: 600, fontSize: '0.8rem' }}>
                 {product.brand.name}
               </Typography>
@@ -597,7 +598,7 @@ const SmartphonesAccessoriesSection = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           
             <Typography variant="h5" sx={{ fontWeight: 800, color: '#1a1a1a' }}>
-              Smartphones 
+             Smartphones
             </Typography>
           </Box>
           <Button
@@ -637,7 +638,7 @@ const SmartphonesAccessoriesSection = () => {
                 : inStockProducts.length === 0
                 ? (
                     <Typography color="text.secondary" sx={{ py: 5, pl: 2 }}>
-                      No smartphones accessories available right now.
+                      No smartphones products available right now.
                     </Typography>
                   )
                 : inStockProducts.map(renderCard)}
@@ -663,7 +664,7 @@ const SmartphonesAccessoriesSection = () => {
             </Box>
           ) : inStockProducts.length === 0 ? (
             <Typography color="text.secondary" sx={{ textAlign: 'center', py: 5 }}>
-              No smartphones available right now.
+              No smartphones products available right now.
             </Typography>
           ) : (
             <Box
@@ -723,4 +724,4 @@ const SmartphonesAccessoriesSection = () => {
   );
 };
 
-export default SmartphonesAccessoriesSection;
+export default Smartphones;

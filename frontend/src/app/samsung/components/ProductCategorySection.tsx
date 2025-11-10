@@ -22,7 +22,7 @@ import {
   ShoppingCart,
   Add,
   Remove,
-  BatteryChargingFull,
+  PhoneIphone,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
@@ -45,10 +45,10 @@ interface ProductT {
   colors?: { value: string }[];
 }
 
-const CACHE_KEY = 'samsung_accessories_cache';
+const CACHE_KEY = 'samsung_products_cache_v3';
 const CACHE_DURATION = 1000 * 60 * 5; // 5 mins
 
-const SamsungAccessoriesSection = () => {
+const SamsungProducts = () => {
   const router = useRouter();
   const { cart, addToCart, updateQuantity } = useCart();
   const [products, setProducts] = useState<ProductT[]>([]);
@@ -90,9 +90,10 @@ const SamsungAccessoriesSection = () => {
 
         let finalProducts: ProductT[] = [];
         for (const filter of filters) {
-          const res = await fetch(`${API_BASE_URL}/products/?${filter}`, {
-            cache: 'no-store',
-          });
+          const slug = 'samsung'; // or use the correct slug for your category
+const res = await fetch(`${API_BASE_URL}/products/?categories__slug=${slug}`, {
+  cache: 'no-store',
+});
           if (!res.ok) continue;
           const text = await res.text();
           let data;
@@ -111,7 +112,7 @@ const SamsungAccessoriesSection = () => {
         }
 
         if (finalProducts.length === 0)
-          throw new Error('No samsung accessories found');
+          throw new Error('No Samsung Products found');
 
         setProducts(finalProducts);
         localStorage.setItem(
@@ -119,10 +120,10 @@ const SamsungAccessoriesSection = () => {
           JSON.stringify({ data: finalProducts, timestamp: Date.now() })
         );
       } catch (err: any) {
-        console.error('Samsung fetch failed:', err);
+        console.error('Samsung Products fetch failed:', err);
         setSnackbar({
           open: true,
-          message: err.message || 'Failed to load samsung accessories',
+          message: err.message || 'Failed to load samsung products',
           severity: 'error',
         });
       } finally {
@@ -356,7 +357,7 @@ const SamsungAccessoriesSection = () => {
           {/* Brand */}
           {product.brand && (
             <Stack direction="row" alignItems="center" gap={0.8} mb={1}>
-            
+              <PhoneIphone sx={{ fontSize: 15, color: '#999' }} />
               <Typography sx={{ color: '#444', fontWeight: 600, fontSize: '0.8rem' }}>
                 {product.brand.name}
               </Typography>
@@ -595,9 +596,9 @@ const SamsungAccessoriesSection = () => {
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            
+          
             <Typography variant="h5" sx={{ fontWeight: 800, color: '#1a1a1a' }}>
-              Samsung Accessories
+             Samsung
             </Typography>
           </Box>
           <Button
@@ -637,7 +638,7 @@ const SamsungAccessoriesSection = () => {
                 : inStockProducts.length === 0
                 ? (
                     <Typography color="text.secondary" sx={{ py: 5, pl: 2 }}>
-                      No samsung accessories available right now.
+                      Nosamsung products available right now.
                     </Typography>
                   )
                 : inStockProducts.map(renderCard)}
@@ -663,7 +664,7 @@ const SamsungAccessoriesSection = () => {
             </Box>
           ) : inStockProducts.length === 0 ? (
             <Typography color="text.secondary" sx={{ textAlign: 'center', py: 5 }}>
-              No samsung accessories available right now.
+              No samsung products available right now.
             </Typography>
           ) : (
             <Box
@@ -723,4 +724,4 @@ const SamsungAccessoriesSection = () => {
   );
 };
 
-export default SamsungAccessoriesSection;
+export default SamsungProducts;

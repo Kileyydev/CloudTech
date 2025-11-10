@@ -1,317 +1,379 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from "react";
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Typography,
   Table,
-  TableBody,
-  TableCell,
-  TableContainer,
   TableHead,
   TableRow,
-  Paper,
+  TableCell,
+  TableBody,
+  IconButton,
   Button,
+  TextField,
+  Stack,
+  Chip,
   CircularProgress,
   Snackbar,
   Alert,
-} from "@mui/material";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import WhatsAppIcon from "@mui/icons-material/WhatsApp";
+  Tooltip,
+  Select,
+  MenuItem,
+  FormControl,
+  Paper,
+  Divider,
+} from '@mui/material';
+import { WhatsApp, Refresh, CheckCircle, Cancel, Pending, AccessTime, Close } from '@mui/icons-material';
+import axios from 'axios';
+import { motion, AnimatePresence } from 'framer-motion';
 
-// Unified media type — supports string, { url }, { image: { url } }
-type MediaImage = { image?: { url: string } } | { url: string } | string;
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE!;
 
-type RepairT = {
-  id: number;
-  full_name: string;
-  phone_number: string;
-  description: string;
-  media?: MediaImage;
-  created_at: string;
-  is_resolved: boolean;
+type RepairImageT = {
+  id: string;
+  image: string;
+  alt_text: string;
+  is_primary: boolean;
+  uploaded_at: string;
 };
 
-const CACHE_KEY = "repairs_cache_v3";
-const CACHE_DURATION = 1000 * 60 * 5; // 5 mins
-const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE}/repairs/`;
+type RepairT = {
+  id: string;
+  client_name: string;
+  client_phone: string;
+  device_type: string;
+  issue_description: string;
+  status: string;
+  cover_image_url: string | null;
+  images: RepairImageT[];
+  created_at: string;
+};
 
-export default function AdminRepairsPage() {
+export default function AdminRepairsTable() {
   const [repairs, setRepairs] = useState<RepairT[]>([]);
+  const [filtered, setFiltered] = useState<RepairT[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
-    severity: "success" | "error";
-  }>({ open: false, message: "", severity: "success" });
-  const mounted = useRef(true);
+    type: 'success' | 'error' | 'info';
+  }>({
+    open: false,
+    message: '',
+    type: 'success',
+  });
 
-  const token = typeof window !== "undefined" ? localStorage.getItem("access") : null;
-
-  const showSnackbar = (message: string, severity: "success" | "error" = "success") =>
-    setSnackbar({ open: true, message, severity });
-
-  const handleCloseSnackbar = () =>
-    setSnackbar((prev) => ({ ...prev, open: false }));
-
-  // FETCH REPAIRS
-  const fetchRepairs = async () => {
-    setLoading(true);
-    try {
-      const cached = localStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < CACHE_DURATION) {
-          setRepairs(data);
-          setLoading(false);
-          return;
-        }
-      }
-
-      const res = await fetch(API_BASE, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      if (!res.ok) throw new Error("Failed to fetch repair requests");
-
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : data.results || [];
-      setRepairs(list);
-
-      localStorage.setItem(CACHE_KEY, JSON.stringify({ data: list, timestamp: Date.now() }));
-    } catch (err: any) {
-      console.error("Fetch failed:", err);
-      showSnackbar(err.message || "Failed to load repairs", "error");
-    } finally {
-      if (mounted.current) setLoading(false);
-    }
-  };
+  const STATUS_OPTIONS = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'REJECTED'];
 
   useEffect(() => {
     fetchRepairs();
-    return () => { mounted.current = false; };
   }, []);
 
-  // MARK RESOLVED
-  const markResolved = async (id: number) => {
-    setRepairs((prev) => prev.map((r) => (r.id === id ? { ...r, is_resolved: true } : r)));
-
+  const fetchRepairs = async () => {
+    setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}${id}/`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ is_resolved: true }),
-      });
-      if (!res.ok) throw new Error("Failed to update");
-      showSnackbar("Marked as resolved", "success");
-    } catch (err: any) {
-      showSnackbar(err.message || "Update failed", "error");
-      setRepairs((prev) => prev.map((r) => (r.id === id ? { ...r, is_resolved: false } : r)));
+      const res = await axios.get(`${API_BASE}/fixrequests/repairs/`);
+      const sorted = res.data.sort((a: RepairT, b: RepairT) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setRepairs(sorted);
+      setFiltered(sorted);
+    } catch (err) {
+      console.error(err);
+      setSnackbar({ open: true, message: 'Failed to fetch repair requests', type: 'error' });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // WHATSAPP CHAT
-  const chatWhatsApp = (name: string, phone: string) => {
-    const message = `Hi ${name}, this is CloudTech Support. Regarding your repair request, please reply.`;
-    const cleanPhone = phone.replace(/^\+?0/, "254");
-    const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
+  const handleSearch = (val: string) => {
+    setSearch(val);
+    const lower = val.toLowerCase();
+    setFiltered(
+      repairs.filter(
+        (r) =>
+          r.client_name?.toLowerCase().includes(lower) ||
+          r.device_type?.toLowerCase().includes(lower) ||
+          r.client_phone?.includes(val) ||
+          r.status?.toLowerCase().includes(lower)
+      )
+    );
   };
 
-  // EXACT SAME LOGIC AS AUDIO SECTION
-  const getMediaUrl = (media: MediaImage | undefined): string => {
-    if (!media) return "/images/fallback-repair.jpg";
-
-    let url = "";
-    if (typeof media === "string") url = media;
-    else if ("url" in media) url = media.url;
-    else if ("image" in media && media.image) return getMediaUrl(media.image);
-    else return "/images/fallback-repair.jpg";
-
-    // Clean leading slashes to avoid double //
-    const cleanPath = url.replace(/^\/+/, "");
-    return url.startsWith("http") ? url : `${process.env.NEXT_PUBLIC_MEDIA_BASE}${cleanPath}`;
+  const updateStatus = async (id: string, status: string) => {
+    try {
+      await axios.patch(`${API_BASE}/fixrequests/repairs/${id}/`, { status });
+      setSnackbar({ open: true, message: `Status updated to ${status.replace('_', ' ')}`, type: 'success' });
+      fetchRepairs();
+    } catch (err) {
+      console.error(err);
+      setSnackbar({ open: true, message: 'Failed to update status', type: 'error' });
+    }
   };
 
-  const isVideo = (media: MediaImage | undefined): boolean => {
-    if (!media) return false;
-    const url = getMediaUrl(media);
-    return /\.(mp4|webm|ogg)$/i.test(url);
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'COMPLETED':
+        return { icon: <CheckCircle sx={{ fontSize: 18 }} />, color: '#4caf50', bg: '#e8f5e9', label: 'COMPLETED' };
+      case 'IN_PROGRESS':
+        return { icon: <AccessTime sx={{ fontSize: 18 }} />, color: '#ff8f00', bg: '#fff8e1', label: 'IN PROGRESS' };
+      case 'REJECTED':
+        return { icon: <Close sx={{ fontSize: 18 }} />, color: '#f44336', bg: '#ffebee', label: 'REJECTED' };
+      default:
+        return { icon: <Pending sx={{ fontSize: 18 }} />, color: '#666', bg: '#fafafa', label: 'PENDING' };
+    }
   };
+
+  // Calculate stats
+  const stats = {
+    total: repairs.length,
+    pending: repairs.filter(r => r.status === 'PENDING').length,
+    inProgress: repairs.filter(r => r.status === 'IN_PROGRESS').length,
+    completed: repairs.filter(r => r.status === 'COMPLETED').length,
+  };
+
+  const currentTime = new Date().toLocaleString('en-KE', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Africa/Nairobi',
+  });
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: "#f9f9fb", minHeight: "100vh" }}>
-      <Typography variant="h5" sx={{ mb: 3, fontWeight: 800, color: "#1a1a1a" }}>
-        Repair Requests
-      </Typography>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: '#fff0f8',
+        color: '#000',
+        fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
+        margin: 0,
+        padding: 0,
+      }}
+    >
 
-      {loading ? (
-        <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-          <CircularProgress size={50} thickness={4.5} />
+
+      {/* Summary Stats Bar - Full Width, Top */}
+      <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #ddd' }}>
+        <Box sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            justifyContent="space-between"
+            spacing={3}
+            divider={<Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', sm: 'block' } }} />}
+          >
+            {[
+              { label: 'TOTAL REQUESTS', value: stats.total, color: '#000' },
+              { label: 'PENDING', value: stats.pending, color: '#666' },
+              { label: 'IN PROGRESS', value: stats.inProgress, color: '#ff8f00' },
+              { label: 'COMPLETED', value: stats.completed, color: '#4caf50' },
+            ].map((stat) => (
+              <Box key={stat.label} sx={{ textAlign: 'center', flex: 1 }}>
+                <Typography variant="h3" sx={{ fontWeight: 900, color: stat.color, lineHeight: 1 }}>
+                  {stat.value}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#666', fontWeight: 600, mt: 0.5 }}>
+                  {stat.label}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
         </Box>
-      ) : repairs.length === 0 ? (
-        <Paper sx={{ p: 5, textAlign: "center", bgcolor: "#fff", borderRadius: 2 }}>
-          <Typography variant="h6" color="text.secondary">
-            No repair requests yet.
-          </Typography>
-        </Paper>
-      ) : (
-        <TableContainer component={Paper} sx={{ borderRadius: 2, overflow: "hidden", boxShadow: "0 8px 30px rgba(0,0,0,0.08)" }}>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow sx={{ bgcolor: "#f8f9fa" }}>
-                <TableCell sx={{ fontWeight: 700, color: "#333" }}>ID</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Phone</TableCell>
-                <TableCell sx={{ fontWeight: 700, minWidth: 180 }}>Issue</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Media</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Submitted</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Action</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {repairs.map((r) => (
-                <TableRow
-                  key={r.id}
-                  hover
-                  sx={{
-                    bgcolor: r.is_resolved ? "#f0fdf4" : "#fff",
-                    "&:hover": { bgcolor: "#f5f5f5" },
-                  }}
-                >
-                  <TableCell>#{r.id}</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>{r.full_name}</TableCell>
-                  <TableCell>{r.phone_number}</TableCell>
-                  <TableCell sx={{ maxWidth: 240, lineHeight: 1.5 }}>
-                    {r.description}
-                  </TableCell>
+      </Box>
 
-                  {/* MEDIA CELL — FULLY UPGRADED */}
-                  <TableCell>
-                    {r.media ? (
-                      isVideo(r.media) ? (
-                        <Box
-                          sx={{
-                            width: 180,
-                            height: 120,
-                            borderRadius: 2,
-                            overflow: "hidden",
-                            border: "1px solid #e0e0e0",
-                            boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-                          }}
-                        >
-                          <video
-                            width="100%"
-                            height="100%"
-                            controls
-                            style={{ objectFit: "cover" }}
-                            poster="/images/video-placeholder.jpg"
-                          >
-                            <source src={getMediaUrl(r.media)} type="video/mp4" />
-                            <Typography variant="caption" color="error">
-                              Video failed
-                            </Typography>
-                          </video>
-                        </Box>
-                      ) : (
-                        <Box
-                          sx={{
-                            width: 100,
-                            height: 100,
-                            borderRadius: 2,
-                            overflow: "hidden",
-                            border: "1px solid #e0e0e0",
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                          }}
-                        >
-                          <img
-                            src={getMediaUrl(r.media)}
-                            alt="Repair photo"
-                            loading="lazy"
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                            onError={(e) => {
-                              e.currentTarget.src = "/images/fallback-repair.jpg";
-                            }}
-                          />
-                        </Box>
-                      )
-                    ) : (
-                      <Typography variant="body2" color="text.secondary" fontStyle="italic">
-                        No media
-                      </Typography>
-                    )}
-                  </TableCell>
+      {/* Search & Refresh - Full Width */}
+      <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #ddd' }}>
+        <Box sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={3}>
+            <Typography variant="h5" sx={{ fontWeight: 700, color: '#000' }}>
+              REPAIR REQUESTS
+            </Typography>
 
-                  <TableCell>
-                    {new Date(r.created_at).toLocaleString("en-KE", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </TableCell>
+            <Stack direction="row" spacing={2} sx={{ width: { xs: '100%', md: 'auto' } }}>
+              <TextField
+                placeholder="Search by name, phone, device, or status..."
+                value={search}
+                onChange={(e) => handleSearch(e.target.value)}
+                size="small"
+                fullWidth
+                sx={{
+                  '& .MuiOutlinedInput-root': { borderRadius: 0 },
+                  minWidth: { xs: '100%', md: 340 },
+                }}
+                InputProps={{
+                  style: { fontSize: '1rem' },
+                }}
+              />
+              <Button
+                variant="contained"
+                onClick={fetchRepairs}
+                startIcon={<Refresh />}
+                disabled={loading}
+                sx={{
+                  bgcolor: '#000',
+                  color: '#fff',
+                  px: 4,
+                  py: 1.5,
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  fontSize: '1rem',
+                  whiteSpace: 'nowrap',
+                  '&:disabled': { bgcolor: '#ccc' },
+                }}
+              >
+                REFRESH
+              </Button>
+            </Stack>
+          </Stack>
+        </Box>
+      </Box>
 
-                  <TableCell>
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: "0.9rem",
-                        color: r.is_resolved ? "success.main" : "error.main",
-                      }}
-                    >
-                      {r.is_resolved ? "Resolved" : "Pending"}
-                    </Typography>
-                  </TableCell>
-
-                  <TableCell>
-                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                      {!r.is_resolved && (
-                        <Button
-                          variant="contained"
-                          color="success"
-                          size="small"
-                          startIcon={<CheckCircleIcon />}
-                          onClick={() => markResolved(r.id)}
-                          sx={{ textTransform: "none", fontWeight: 600 }}
-                        >
-                          Mark Resolved
-                        </Button>
-                      )}
-                      <Button
-                        variant="outlined"
-                        color="success"
-                        size="small"
-                        startIcon={<WhatsAppIcon />}
-                        onClick={() => chatWhatsApp(r.full_name, r.phone_number)}
-                        sx={{ textTransform: "none", fontWeight: 600 }}
-                      >
-                        Chat on WhatsApp
-                      </Button>
-                    </Box>
+      {/* Table - Full Width */}
+      <Box sx={{ bgcolor: '#fff' }}>
+        <Box sx={{ overflowX: 'auto' }}>
+          {loading ? (
+            <Box sx={{ py: 12, textAlign: 'center' }}>
+              <CircularProgress size={56} sx={{ color: '#ff1493' }} />
+              <Typography sx={{ mt: 3, fontWeight: 600, color: '#666', fontSize: '1.1rem' }}>
+                Loading repair requests...
+              </Typography>
+            </Box>
+          ) : filtered.length === 0 ? (
+            <Box sx={{ py: 12, textAlign: 'center' }}>
+              <Typography variant="h6" sx={{ color: '#999', fontWeight: 500 }}>
+                No repair requests found.
+              </Typography>
+            </Box>
+          ) : (
+            <Table sx={{ minWidth: 1000 }}>
+              <TableHead>
+                <TableRow sx={{ bgcolor: '#000' }}>
+                  <TableCell sx={{ color: '#fff', fontWeight: 700, fontSize: '1.05rem', py: 2.5, pl: 4 }}>CLIENT</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 700, fontSize: '1.05rem', py: 2.5 }}>PHONE</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 700, fontSize: '1.05rem', py: 2.5 }}>DEVICE</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 700, fontSize: '1.05rem', py: 2.5 }}>ISSUE</TableCell>
+                  <TableCell sx={{ color: '#fff', fontWeight: 700, fontSize: '1.05rem', py: 2.5 }}>STATUS</TableCell>
+                  <TableCell align="center" sx={{ color: '#fff', fontWeight: 700, fontSize: '1.05rem', py: 2.5, pr: 4 }}>
+                    ACTION
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
+              </TableHead>
+              <TableBody>
+                {filtered.map((r, index) => {
+                  const config = getStatusConfig(r.status);
+                  return (
+                    <TableRow
+                      key={r.id}
+                      sx={{
+                        bgcolor: index % 2 === 0 ? '#fff' : '#f8f8f8',
+                        borderBottom: '1px solid #eee',
+                      }}
+                    >
+                      <TableCell sx={{ fontWeight: 600, py: 3, pl: 4 }}>
+                        {r.client_name || '—'}
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 500, py: 3 }}>
+                        <Chip
+                          label={r.client_phone}
+                          size="small"
+                          sx={{ bgcolor: '#fff0f8', color: '#d81b60', fontWeight: 600 }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: 600, py: 3, color: '#d81b60' }}>
+                        {r.device_type}
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: 320, whiteSpace: 'pre-wrap', py: 3, color: '#444' }}>
+                        {r.issue_description}
+                      </TableCell>
 
+                      {/* Status Selector */}
+                      <TableCell sx={{ py: 3 }}>
+                        <FormControl size="small" fullWidth>
+                          <Select
+                            value={r.status}
+                            onChange={(e) => updateStatus(r.id, e.target.value)}
+                            sx={{
+                              bgcolor: config.bg,
+                              color: config.color,
+                              fontWeight: 600,
+                              fontSize: '0.95rem',
+                              '& .MuiSelect-select': {
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                              },
+                            }}
+                            startAdornment={config.icon}
+                          >
+                            {STATUS_OPTIONS.map((s) => {
+                              const optConfig = getStatusConfig(s);
+                              return (
+                                <MenuItem key={s} value={s} sx={{ fontWeight: 600 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    {optConfig.icon}
+                                    {optConfig.label}
+                                  </Box>
+                                </MenuItem>
+                              );
+                            })}
+                          </Select>
+                        </FormControl>
+                      </TableCell>
+
+                      {/* WhatsApp Action */}
+                      <TableCell align="center" sx={{ py: 3, pr: 4 }}>
+                        <Tooltip title="Open WhatsApp Chat" arrow>
+                          <IconButton
+                            onClick={() =>
+                              window.open(
+                                `https://wa.me/${r.client_phone.replace(/^0/, '254')}?text=Hello ${encodeURIComponent(
+                                  r.client_name
+                                )},%0A%0ARegarding your *${r.device_type}* repair:%0A_%0A*Issue:* ${encodeURIComponent(
+                                  r.issue_description
+                                )}%0A%0AWe are ${r.status === 'PENDING' ? 'reviewing' : 'working on'} your request. Any updates will be sent here.%0A%0AThank you,%0A*CloudTech Support*`,
+                                '_blank'
+                              )
+                            }
+                            sx={{
+                              bgcolor: '#25d366',
+                              color: '#fff',
+                              width: 48,
+                              height: 48,
+                              '&:hover': { bgcolor: '#1ebe57' },
+                            }}
+                          >
+                            <WhatsApp />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </Box>
+      </Box>
+
+      {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={3000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
+          severity={snackbar.type}
+          variant="filled"
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
           sx={{
-            width: "100%",
             fontWeight: 600,
-            borderRadius: 2,
-            ...(snackbar.severity === "success" && { bgcolor: "#4caf50", color: "#fff" }),
-            ...(snackbar.severity === "error" && { bgcolor: "#f44336", color: "#fff" }),
+            fontSize: '1rem',
+            bgcolor: snackbar.type === 'success' ? '#4caf50' : snackbar.type === 'error' ? '#f44336' : '#ff8f00',
           }}
         >
           {snackbar.message}

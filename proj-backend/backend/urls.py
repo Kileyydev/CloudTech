@@ -20,7 +20,8 @@ urlpatterns = [
     path('api/', include('products.urls')),
     path('api/', include('contact.urls')),
     path('api/', include('testimonials.urls')),
-    path('api/repairs/', include('repairs.urls')),
+    path('api/fixrequests/', include('fixrequests.urls')),
+
     path('api/health', health_check, name='health'),
     path('api/accounts/', include('accounts.urls')),
      path('api/orders/', include('purchases.urls')), 

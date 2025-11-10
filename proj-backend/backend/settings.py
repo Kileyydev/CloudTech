@@ -52,9 +52,9 @@ INSTALLED_APPS = [
     "products",
     "accounts",
     "contact",
-    "repairs",
     "testimonials",
     "purchases",
+    "fixrequests",
 ]
 
 # ===================================================================

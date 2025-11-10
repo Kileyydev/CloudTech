@@ -21,6 +21,7 @@ import {
   People as PeopleIcon,
   Logout as LogoutIcon,
   ReceiptLong as ReceiptLongIcon, // ✅ new icon for Orders
+  TrendingUp as TrendingUpIcon,
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
 
@@ -31,7 +32,7 @@ type Props = {
 
 // ✅ Navigation items
 const navItems = [
-
+  { text: "Dashboard", icon: <TrendingUpIcon />, section: "dashboard" },
   { text: "Products", icon: <ShoppingCartIcon />, section: "products" },
   { text: "Orders", icon: <ReceiptLongIcon />, section: "orders" },
   { text: "Repairs", icon: <BuildIcon />, section: "repairs" },
