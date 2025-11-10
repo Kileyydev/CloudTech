@@ -1,6 +1,5 @@
 // src/app/admin/orders/page.tsx
 'use client';
-
 import React, { useEffect, useState } from 'react';
 import {
   Box,
@@ -37,15 +36,16 @@ import {
   CreditCard,
   ShoppingCart,
   TrendingUp,
+  Visibility,               // <-- NEW
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';   // <-- NEW
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ||
   (process.env.NODE_ENV === 'development'
     ? 'http://localhost:8000/api'
     : 'https://api.cloudtechstore.net/api');
-
 const ORDERS_URL = `${API_BASE}/purchases/`;
 
 interface OrderItem {
@@ -54,7 +54,6 @@ interface OrderItem {
   price: number;
   quantity: number;
 }
-
 interface OrderData {
   id: string;
   name: string;
@@ -81,6 +80,7 @@ const STATUS_STEPS = [
 
 export default function AdminOrdersPage() {
   const theme = useTheme();
+  const router = useRouter();                         // <-- NEW
   const [orders, setOrders] = useState<OrderData[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -94,7 +94,6 @@ export default function AdminOrdersPage() {
     severity: 'success',
   });
   const [nextUrl, setNextUrl] = useState<string | null>(null);
-
   const token = typeof window !== 'undefined' ? localStorage.getItem('access') : null;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -107,7 +106,6 @@ export default function AdminOrdersPage() {
       setLoading(false);
       return;
     }
-
     setLoading(true);
     try {
       const res = await fetch(url, { headers });
@@ -115,13 +113,11 @@ export default function AdminOrdersPage() {
         const errorText = await res.text();
         throw new Error(`HTTP ${res.status}: ${errorText || 'Unknown error'}`);
       }
-
       const raw = await res.json();
       let list: OrderData[] = [];
       if (Array.isArray(raw)) list = raw;
       else if (raw.results && Array.isArray(raw.results)) list = raw.results;
       else if (raw.id) list = [raw];
-
       setOrders((prev) => (url.includes('page=') ? [...prev, ...list] : list));
       setNextUrl(raw.next || null);
     } catch (err: any) {
@@ -171,6 +167,12 @@ export default function AdminOrdersPage() {
   const getStep = (status: string) =>
     STATUS_STEPS.find((s) => s.key === status) ?? STATUS_STEPS[0];
 
+  // ---------- NEW: View order details ----------
+  const handleViewOrder = (orderId: string) => {
+    router.push(`/order-confirmation?orderId=${orderId}`);
+  };
+  // -------------------------------------------
+
   // Summary Stats
   const stats = {
     total: orders.length,
@@ -179,16 +181,6 @@ export default function AdminOrdersPage() {
     dispatched: orders.filter((o) => o.status === 'dispatched').length,
     delivered: orders.filter((o) => o.status === 'delivered').length,
   };
-
-  const currentTime = new Date().toLocaleString('en-KE', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Africa/Nairobi',
-  });
 
   return (
     <Box
@@ -201,7 +193,6 @@ export default function AdminOrdersPage() {
         padding: 0,
       }}
     >
-  
 
       {/* Summary Stats */}
       <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #ddd' }}>
@@ -218,7 +209,6 @@ export default function AdminOrdersPage() {
               { label: 'PROCESSING', value: stats.processing, icon: <AccessTime />, color: '#2196f3' },
               { label: 'DISPATCHED', value: stats.dispatched, icon: <LocalShipping />, color: '#4caf50' },
               { label: 'DELIVERED', value: stats.delivered, icon: <DoneAll />, color: '#2e7d32' },
-
             ].map((stat) => (
               <Box key={stat.label} sx={{ textAlign: 'center', flex: 1 }}>
                 <Typography variant="h3" sx={{ fontWeight: 900, color: stat.color, lineHeight: 1 }}>
@@ -277,6 +267,9 @@ export default function AdminOrdersPage() {
                   <TableCell sx={{ color: '#000', fontWeight: 700, fontSize: '1.05rem', py: 2.5 }}>
                     STATUS
                   </TableCell>
+                  <TableCell align="center" sx={{ color: '#000', fontWeight: 700, fontSize: '1.05rem', py: 2.5, pr: 4 }}>
+                    ACTIONS
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -285,9 +278,16 @@ export default function AdminOrdersPage() {
                   return (
                     <TableRow
                       key={order.id}
+                      onClick={(e) => {
+                        // ignore clicks inside the status Select
+                        if ((e.target as HTMLElement).closest('select')) return;
+                        handleViewOrder(order.id);
+                      }}
                       sx={{
                         bgcolor: index % 2 === 0 ? '#fff' : '#f8f8f8',
                         borderBottom: '1px solid #eee',
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: '#fdf2f8' },
                       }}
                     >
                       <TableCell sx={{ fontWeight: 600, py: 3, pl: 4 }}>
@@ -329,12 +329,15 @@ export default function AdminOrdersPage() {
                           </Typography>
                         </Stack>
                       </TableCell>
+
+                      {/* STATUS SELECT */}
                       <TableCell sx={{ py: 3 }}>
                         <FormControl size="small" fullWidth>
                           <Select
                             value={order.status}
-                            onChange={(e) => updateStatus(order.id, e.target.value)}
+                            onChange={(e) => updateStatus(order.id, e.target.value as string)}
                             disabled={savingId === order.id}
+                            onClick={(e) => e.stopPropagation()}   // prevent row navigation
                             sx={{
                               bgcolor: step.bg,
                               color: step.color,
@@ -359,8 +362,21 @@ export default function AdminOrdersPage() {
                           </Select>
                         </FormControl>
                       </TableCell>
+
+                      {/* ACTIONS (View button) */}
                       <TableCell align="center" sx={{ py: 3, pr: 4 }}>
-                        
+                        <Tooltip title="View order confirmation">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewOrder(order.id);
+                            }}
+                          >
+                            <Visibility />
+                          </IconButton>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   );
@@ -394,7 +410,20 @@ export default function AdminOrdersPage() {
       </Box>
 
       {/* Snackbar */}
-     
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={4000}
+        onClose={() => setSnack({ ...snack, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnack({ ...snack, open: false })}
+          severity={snack.severity}
+          sx={{ width: '100%' }}
+        >
+          {snack.msg}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
