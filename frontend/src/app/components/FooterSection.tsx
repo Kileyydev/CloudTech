@@ -6,13 +6,11 @@ import {
   Box,
   Typography,
   IconButton,
-  TextField,
-  Button,
   Stack,
   Link as MuiLink,
   useTheme,
   useMediaQuery,
-  Alert,
+  Button,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
@@ -52,16 +50,14 @@ const LogoSection = styled(Box)(({ theme }) => ({
 const Logo = styled('img')({
   height: '90px',
   width: 'auto',
-  
 });
 
-// REDUCED FONT SIZE + BETTER BALANCE
 const BrandName = styled(Typography)(({ theme }) => ({
-  fontSize: '1.9rem',        // Reduced from 2.4rem
+  fontSize: '1.9rem',
   fontWeight: 800,
   letterSpacing: '0.5px',
   lineHeight: 1,
-  marginTop: '-10px',        // Slightly lower to align with logo
+  marginTop: '-10px',
   fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
   [theme.breakpoints.down('sm')]: {
     fontSize: '1.7rem',
@@ -102,12 +98,17 @@ const FooterLink = styled(Typography)(({ theme }) => ({
   },
 }));
 
-const ContactForm = styled(Box)(({ theme }) => ({
+const WhatsAppCTA = styled(Box)(({ theme }) => ({
   backgroundColor: '#111',
   padding: theme.spacing(3),
   border: '1px solid #333',
   flex: 1,
   minWidth: 300,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  textAlign: 'center',
+  gap: theme.spacing(2),
 }));
 
 const Copyright = styled(Typography)(({ theme }) => ({
@@ -140,30 +141,17 @@ const WhatsAppButton = styled(IconButton)(({ theme }) => ({
   },
 }));
 
+// Pre-filled WhatsApp message
+const whatsappMessage = encodeURIComponent(
+  "Hi CloudTech! I'm interested in your products and would like to know more. Could you assist me?"
+);
+
+const whatsappUrl = `https://wa.me/254722244482?text=${whatsappMessage}`;
+
 export default function Footer() {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const currentYear = new Date().getFullYear();
-
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    message: '',
-  });
-  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatus('idle');
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setStatus('success');
-    setFormData({ name: '', email: '', message: '' });
-    setTimeout(() => setStatus('idle'), 3000);
-  };
 
   return (
     <>
@@ -255,165 +243,48 @@ export default function Footer() {
             </FooterLink>
           </Column>
 
-          {/* Contact Form (Desktop) */}
-          {!isMobile && (
-            <ContactForm>
-              <Typography variant="h6" sx={{ color: '#db1b88', mb: 2, fontWeight: 700 }}>
-                Get in Touch
-              </Typography>
-              {status === 'success' && (
-                <Alert severity="success" sx={{ mb: 2, fontSize: '0.85rem', py: 0.5 }}>
-                  Message sent! We'll reply soon.
-                </Alert>
-              )}
-              <form onSubmit={handleSubmit}>
-                <Stack spacing={2}>
-                  <TextField
-                    name="name"
-                    placeholder="Your Name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    size="small"
-                    fullWidth
-                    variant="outlined"
-                    InputProps={{ style: { color: '#fff', backgroundColor: '#222' } }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        '& fieldset': { borderColor: '#444' },
-                        '&:hover fieldset': { borderColor: '#666' },
-                        '&.Mui-focused fieldset': { borderColor: '#db1b88' },
-                      },
-                    }}
-                  />
-                  <TextField
-                    name="email"
-                    placeholder="Your Email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    size="small"
-                    fullWidth
-                    variant="outlined"
-                    InputProps={{ style: { color: '#fff', backgroundColor: '#222' } }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        '& fieldset': { borderColor: '#444' },
-                        '&:hover fieldset': { borderColor: '#666' },
-                        '&.Mui-focused fieldset': { borderColor: '#db1b88' },
-                      },
-                    }}
-                  />
-                  <TextField
-                    name="message"
-                    placeholder="Your Message"
-                    value={formData.message}
-                    onChange={handleChange}
-                    required
-                    size="small"
-                    fullWidth
-                    multiline
-                    rows={3}
-                    variant="outlined"
-                    InputProps={{ style: { color: '#fff', backgroundColor: '#222' } }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        '& fieldset': { borderColor: '#444' },
-                        '&:hover fieldset': { borderColor: '#666' },
-                        '&.Mui-focused fieldset': { borderColor: '#db1b88' },
-                      },
-                    }}
-                  />
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    fullWidth
-                    sx={{
-                      bgcolor: '#db1b88',
-                      color: '#fff',
-                      '&:hover': { bgcolor: '#b1166f' },
-                      textTransform: 'none',
-                      fontWeight: 700,
-                      py: 1.2,
-                    
-                    }}
-                  >
-                    Send Message
-                  </Button>
-                </Stack>
-              </form>
-            </ContactForm>
-          )}
-        </FooterGrid>
-
-        {/* Mobile Form */}
-        {isMobile && (
-          <ContactForm sx={{ mt: 3 }}>
-            <Typography variant="h6" sx={{ color: '#db1b88', mb: 2, fontWeight: 700 }}>
-              Quick Message
+          {/* WhatsApp CTA (Replaces Contact Form) */}
+          <WhatsAppCTA>
+            <Typography variant="h6" sx={{ color: '#db1b88', fontWeight: 700 }}>
+              Message Us on WhatsApp
             </Typography>
-            <form onSubmit={handleSubmit}>
-              <Stack spacing={1.5}>
-                <TextField
-                  name="name"
-                  placeholder="Name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  size="small"
-                  fullWidth
-                  required
-                  variant="outlined"
-                  InputProps={{ style: { backgroundColor: '#222', color: '#fff' } }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      '& fieldset': { borderColor: '#444' },
-                      '&:hover fieldset': { borderColor: '#666' },
-                    },
-                  }}
-                />
-                <TextField
-                  name="email"
-                  placeholder="Email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  size="small"
-                  fullWidth
-                  required
-                  variant="outlined"
-                  InputProps={{ style: { backgroundColor: '#222', color: '#fff' } }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      '& fieldset': { borderColor: '#444' },
-                      '&:hover fieldset': { borderColor: '#666' },
-                    },
-                  }}
-                />
-                <Button
-                  type="submit"
-                  variant="contained"
-                  fullWidth
-                  sx={{
-                    bgcolor: '#db1b88',
-                   
-                  
-                  }}
-                >
-                  Send
-                </Button>
-              </Stack>
-            </form>
-          </ContactForm>
-        )}
+            <Typography variant="body2" color="#aaa" sx={{ mb: 1 }}>
+              Get instant support! Tap below to chat.
+            </Typography>
+            <MuiLink
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="none"
+            >
+              <Button
+                variant="contained"
+                startIcon={<WhatsAppIcon />}
+                sx={{
+                  bgcolor: '#25D366',
+                  color: '#fff',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  py: 1.2,
+                  px: 3,
+                  '&:hover': {
+                    bgcolor: '#1DA851',
+                  },
+                }}
+              >
+                Chat on WhatsApp
+              </Button>
+            </MuiLink>
+          </WhatsAppCTA>
+        </FooterGrid>
 
         <Copyright>
           © {currentYear} CLOUDTECH • Created by Kim
         </Copyright>
       </FooterContainer>
 
-      {/* WhatsApp Floating Button */}
-      <MuiLink href="https://wa.me/254722244482" target="_blank" rel="noopener noreferrer" underline="none">
+      {/* Floating WhatsApp Button */}
+      <MuiLink href={whatsappUrl} target="_blank" rel="noopener noreferrer" underline="none">
         <WhatsAppButton aria-label="Chat on WhatsApp">
           <WhatsAppIcon sx={{ fontSize: 32 }} />
         </WhatsAppButton>

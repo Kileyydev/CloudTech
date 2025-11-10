@@ -52,25 +52,10 @@ const TestimonialCard = styled(Card)(({ theme }) => ({
   flexDirection: "column",
   justifyContent: "space-between",
   transition: "transform 0.25s ease, box-shadow 0.25s ease",
-  "&:hover": {
-    transform: "translateY(-6px)",
-    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.2)",
-  },
   backgroundColor: "#FFFFFF",
 }));
 
-const ProductImageBox = styled(Box)({
-  height: 140,
-  overflow: "hidden",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  "& img": {
-    maxWidth: "100%",
-    height: "auto",
-    objectFit: "contain",
-  },
-});
+
 
 const SliderContainer = styled(Box)(({ theme }) => ({
   display: "flex",
@@ -87,7 +72,6 @@ const NavButton = styled(IconButton)(({ theme }) => ({
   transform: "translateY(-50%)",
   backgroundColor: "rgba(0, 0, 0, 0.5)",
   color: "#FFFFFF",
-  "&:hover": { backgroundColor: "rgba(0, 0, 0, 0.7)" },
   zIndex: 2,
 }));
 
@@ -191,7 +175,6 @@ export default function TestimonialsSection() {
             backgroundColor: "#e91e63",
             color: "#fff",
             zIndex: 3,
-            "&:hover": { backgroundColor: "#d81b60" },
           }}
           onClick={() => router.push("/testimonials")}
         >
@@ -222,22 +205,6 @@ export default function TestimonialsSection() {
                       p: 2,
                     }}
                   >
-                    {t.image && (
-                      <ProductImageBox>
-                        <img
-                          src={getImageUrl(t.image)}
-                          alt={t.product || "Product image"}
-                          onError={(e) => {
-                            console.error(
-                              `Failed to load image for testimonial ${t.id}:`,
-                              getImageUrl(t.image)
-                            );
-                            // fallback
-                            (e.currentTarget as HTMLImageElement).src = "/images/fallback.jpg";
-                          }}
-                        />
-                      </ProductImageBox>
-                    )}
 
                     <Typography
                       variant="body2"
