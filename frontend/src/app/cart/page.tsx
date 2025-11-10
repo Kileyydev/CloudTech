@@ -9,12 +9,9 @@ import {
   CardMedia, CardContent, Container, InputAdornment, useTheme, useMediaQuery,
   Stack, Skeleton
 } from '@mui/material';
-import { Add, Remove, Delete, CreditCard, AttachMoney } from '@mui/icons-material';
+import { Add, Remove, Delete, CreditCard } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
-import TopNavBar from '../components/TopNavBar';
-import MainNavBar from '../components/MainNavBar';
 import { useCart } from '../components/cartContext';
-import TickerBar from '../components/TickerBar';
 import axios from 'axios';
 
 const API_BASE =
@@ -25,6 +22,19 @@ const MEDIA_BASE =
   process.env.NODE_ENV === 'development'
     ? 'http://localhost:8000'
     : 'https://cloudtech-c4ft.onrender.com';
+
+// === IMAGE HELPER (same as Apple section) ===
+type ProductImage = { image?: { url: string } } | { url: string } | string;
+
+const getImageUrl = (img: ProductImage | undefined): string => {
+  if (!img) return '/images/fallback.jpg';
+  if (typeof img === 'string')
+    return img.startsWith('http') ? img : `${MEDIA_BASE}${img}`;
+  if ('url' in img)
+    return img.url.startsWith('http') ? img.url : `${MEDIA_BASE}${img.url}`;
+  if ('image' in img) return getImageUrl(img.image);
+  return '/images/fallback.jpg';
+};
 
 // M-PESA VERIFICATION (demo)
 async function verifyMpesaTransaction(
@@ -45,7 +55,7 @@ type ProductT = {
   title: string;
   price: number | string;
   discount?: number;
-  cover_image?: string;
+  cover_image?: ProductImage;
   stock: number;
 };
 
@@ -55,7 +65,7 @@ type CartItem = {
   price: number;
   quantity: number;
   stock: number;
-  cover_image?: string;
+  cover_image?: ProductImage;
 };
 
 // Safe number formatting
@@ -105,8 +115,8 @@ export default function CartPage() {
   }));
 
   const subtotal = safeCart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const shipping = subtotal > 0 ? 200 : 0;
-  const total = subtotal + shipping;
+  const shipping = 0; // Removed
+  const total = subtotal;
   const cashPaid = toNum(checkoutDetails.cashAmount);
   const change = paymentMethod === 'cod' && cashPaid > total ? cashPaid - total : 0;
 
@@ -165,7 +175,7 @@ export default function CartPage() {
     return true;
   };
 
-  // FINAL CHECKOUT — INSTANT + BACKGROUND SAVE
+  // FINAL CHECKOUT
   const handleCheckout = async () => {
     if (safeCart.length === 0) return show('Cart empty', 'error');
     if (!validate()) return;
@@ -188,7 +198,6 @@ export default function CartPage() {
         }
       }
 
-      // === 1. BUILD ORDER DATA FOR INSTANT DISPLAY ===
       const tempOrderId = `TEMP-${Date.now()}`;
       const orderData = {
         id: tempOrderId,
@@ -213,10 +222,8 @@ export default function CartPage() {
         })),
       };
 
-      // === 2. SAVE TO LOCAL STORAGE FOR INSTANT PAGE ===
       localStorage.setItem('pending_order', JSON.stringify(orderData));
 
-      // === 3. SEND TO BACKEND IN BACKGROUND ===
       const payload = {
         name: orderData.name,
         phone: orderData.phone,
@@ -232,12 +239,11 @@ export default function CartPage() {
         items: orderData.items,
       };
 
-      // SEND device_id IN HEADER
       const token = localStorage.getItem('token');
       axios.post(`${API_BASE}/purchases/`, payload, {
         headers: {
           'Content-Type': 'application/json',
-          'X-Device-ID': deviceId,  // ← HERE IT IS, POOKIE!
+          'X-Device-ID': deviceId,
           ...(token ? { Authorization: `Token ${token}` } : {}),
         },
       })
@@ -249,10 +255,8 @@ export default function CartPage() {
       })
       .catch(err => {
         console.error('Background save failed:', err);
-        // Still show confirmation
       });
 
-      // === 4. INSTANT REDIRECT + CLEAR CART ===
       clearCart();
       router.push('/order-confirmation?temp=1');
       show(paymentMessage || 'Order placed! Confirming...', 'success');
@@ -265,7 +269,7 @@ export default function CartPage() {
     }
   };
 
-  // TRENDING UI
+  // TRENDING CARD
   const W = 218;
   const H = 350;
 
@@ -281,7 +285,7 @@ export default function CartPage() {
   );
 
   const trendingCard = (p: ProductT) => {
-    const src = p.cover_image?.startsWith('http') ? p.cover_image : `${MEDIA_BASE}${p.cover_image}`;
+    const src = getImageUrl(p.cover_image);
     const basePrice = toNum(p.price);
     const discount = p.discount ? toNum(p.discount) : 0;
     const final = discount > 0 ? basePrice * (1 - discount / 100) : basePrice;
@@ -294,8 +298,8 @@ export default function CartPage() {
         price: final,
         quantity: 1,
         stock: p.stock,
-        cover_image: p.cover_image,
-      } as CartItem);
+        cover_image: getImageUrl(p.cover_image),
+      });
       show(`${p.title} added to cart!`);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -306,10 +310,11 @@ export default function CartPage() {
         boxShadow: '0 3px 6px rgba(0,0,0,0.08)', overflow: 'hidden', flex: `0 0 ${W}px`
       }}>
         <Box onClick={() => router.push(`/product/${p.id}`)} sx={{
-          width: '100%', height: H * 0.56, cursor: 'pointer', overflow: 'hidden'
+          width: '100%', height: H * 0.56, cursor: 'pointer', overflow: 'hidden',
+          p: 1.5, bgcolor: '#f9f9f9', display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
-          <CardMedia component="img" image={src || '/images/fallback.jpg'} alt={p.title}
-            sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <CardMedia component="img" image={src} alt={p.title}
+            sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </Box>
         <CardContent sx={{
           p: 1.5, height: H * 0.44, display: 'flex',
@@ -353,8 +358,6 @@ export default function CartPage() {
 
   return (
     <Box>
-  
-
       <Box sx={{ bgcolor: '#fff', minHeight: '100vh', py: { xs: 3, md: 6 } }}>
         <Container maxWidth="lg">
           <Stack direction={{ xs: 'column', lg: 'row' }} spacing={4}>
@@ -382,25 +385,39 @@ export default function CartPage() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {safeCart.map(item => (
-                          <TableRow key={item.id}>
-                            <TableCell>{item.title}</TableCell>
-                            <TableCell align="center">
-                              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
-                                <IconButton size="small" onClick={() => updateQuantity(item.id, -1)}><Remove /></IconButton>
-                                <Typography sx={{ minWidth: 32, textAlign: 'center', fontWeight: 600 }}>{item.quantity}</Typography>
-                                <IconButton size="small" onClick={() => updateQuantity(item.id, 1)}><Add /></IconButton>
-                              </Box>
-                            </TableCell>
-                            <TableCell align="right">KES {formatPrice(item.price)}</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 600 }}>
-                              KES {formatPrice(item.price * item.quantity)}
-                            </TableCell>
-                            <TableCell align="center">
-                              <IconButton color="error" onClick={() => removeFromCart(item.id)}><Delete /></IconButton>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {safeCart.map(item => {
+                          
+                          return (
+                            <TableRow key={item.id}>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                  <Box sx={{
+                                    width: 60, height: 60, borderRadius: 1,
+                                    overflow: 'hidden', bgcolor: '#f9f9f9',
+                                    flexShrink: 0, p: 0.5
+                                  }}>
+
+                                  </Box>
+                                  <Typography sx={{ fontSize: '0.95rem' }}>{item.title}</Typography>
+                                </Box>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+                                  <IconButton size="small" onClick={() => updateQuantity(item.id, -1)}><Remove /></IconButton>
+                                  <Typography sx={{ minWidth: 32, textAlign: 'center', fontWeight: 600 }}>{item.quantity}</Typography>
+                                  <IconButton size="small" onClick={() => updateQuantity(item.id, 1)}><Add /></IconButton>
+                                </Box>
+                              </TableCell>
+                              <TableCell align="right">KES {formatPrice(item.price)}</TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 600 }}>
+                                KES {formatPrice(item.price * item.quantity)}
+                              </TableCell>
+                              <TableCell align="center">
+                                <IconButton color="error" onClick={() => removeFromCart(item.id)}><Delete /></IconButton>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </TableContainer>
@@ -410,9 +427,13 @@ export default function CartPage() {
                       <Typography>Subtotal</Typography>
                       <Typography>KES {formatPrice(subtotal)}</Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                      <Typography>Shipping</Typography>
-                      <Typography>KES {formatPrice(shipping)}</Typography>
+                    <Box sx={{ mb: 1 }}>
+                      <Typography color="text.secondary" fontSize="0.9rem">
+                        <strong>Note:</strong> You will be contacted by the admin for delivery.
+                      </Typography>
+                      <Typography color="success.main" fontSize="0.9rem" fontWeight={600}>
+                        Delivery within CBD is free.
+                      </Typography>
                     </Box>
                     <Divider sx={{ my: 1 }} />
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>

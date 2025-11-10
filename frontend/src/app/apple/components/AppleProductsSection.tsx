@@ -42,6 +42,7 @@ interface ProductT {
   type?: { value: string }[];
   connectivity?: { value: string }[];
   colors?: { value: string }[];
+  
 }
 
 const CACHE_KEY = 'apple_accessories_cache_v3';
