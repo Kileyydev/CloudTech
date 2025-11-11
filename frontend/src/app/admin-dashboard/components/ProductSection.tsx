@@ -17,6 +17,7 @@ import {
   Select,
   MenuItem,
   FormControl,
+  InputLabel,
   Chip,
   Stack,
   Paper,
@@ -34,6 +35,7 @@ import {
   DialogContent,
   DialogActions,
   InputAdornment,
+  OutlinedInput,
 } from '@mui/material';
 import {
   Edit,
@@ -377,12 +379,10 @@ export default function ProductAdminPage() {
   const filtered = useMemo(() => {
     let list = products;
 
-    // Category filter
     if (categoryFilter !== 'all') {
       list = list.filter((p) => p.categories?.some((c: any) => c.id === categoryFilter));
     }
 
-    // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter((p) =>
@@ -406,29 +406,16 @@ export default function ProductAdminPage() {
   const getCoverSrc = (p: any) => p.cover_image?.url || p.cover_image || '/placeholder.png';
 
   return (
-    
-    <Box
-      sx={{
-        minHeight: '100vh',
-        bgcolor: '#fff', // White background
-        color: '#000',
-        fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-        margin: 0,
-        padding: 0,
-      }}
-    >
+    <Box sx={{ minHeight: '100vh', bgcolor: '#fff', color: '#000', fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif' }}>
 
       {/* Tabs */}
       <Box sx={{ bgcolor: '#fff', borderBottom: '1px solid #ddd' }}>
         <Box sx={{ px: { xs: 2, md: 4 } }}>
-          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 0 }}>
+          <Tabs value={tab} onChange={(_, v) => setTab(v)}>
             <Tab label={editId ? 'EDIT PRODUCT' : 'ADD PRODUCT'} />
             <Tab label="ALL PRODUCTS" />
             <Tab label="DISCOUNTED" />
-            
           </Tabs>
-          
-          
         </Box>
       </Box>
 
@@ -447,43 +434,52 @@ export default function ProductAdminPage() {
                   <Category sx={{ fontSize: 18 }} /> BASIC INFORMATION
                 </Typography>
                 <Stack spacing={2}>
-                  <TextField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} fullWidth size="small" />
-                  <TextField
-                    label="Description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    multiline
-                    rows={3}
-                    fullWidth
-                    size="small"
-                  />
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Product Title</InputLabel>
+                    <OutlinedInput value={title} onChange={(e) => setTitle(e.target.value)} />
+                  </FormControl>
+
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Description</InputLabel>
+                    <OutlinedInput
+                      multiline
+                      rows={3}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                    />
+                  </FormControl>
+
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                    <TextField
-                      label="Price (KES)"
-                      type="number"
-                      value={price}
-                      onChange={(e) => setPrice(Number(e.target.value) || '')}
-                      size="small"
-                      sx={{ flex: 1 }}
-                    />
-                    <TextField
-                      label="Discount %"
-                      type="number"
-                      value={discount}
-                      onChange={(e) => setDiscount(Number(e.target.value) || 0)}
-                      size="small"
-                      sx={{ flex: 1 }}
-                    />
-                    <TextField label="Final Price" value={finalPrice} disabled size="small" sx={{ flex: 1 }} />
+                    <FormControl size="small" sx={{ flex: 1 }}>
+                      <InputLabel>Price (KES)</InputLabel>
+                      <OutlinedInput
+                        type="number"
+                        value={price}
+                        onChange={(e) => setPrice(Number(e.target.value) || '')}
+                      />
+                    </FormControl>
+                    <FormControl size="small" sx={{ flex: 1 }}>
+                      <InputLabel>Discount %</InputLabel>
+                      <OutlinedInput
+                        type="number"
+                        value={discount}
+                        onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormControl size="small" sx={{ flex: 1 }}>
+                      <InputLabel>Final Price</InputLabel>
+                      <OutlinedInput value={finalPrice} disabled />
+                    </FormControl>
                   </Stack>
-                  <TextField
-                    label="Stock Quantity"
-                    type="number"
-                    value={stock}
-                    onChange={(e) => setStock(Number(e.target.value) || '')}
-                    fullWidth
-                    size="small"
-                  />
+
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Stock Quantity</InputLabel>
+                    <OutlinedInput
+                      type="number"
+                      value={stock}
+                      onChange={(e) => setStock(Number(e.target.value) || '')}
+                    />
+                  </FormControl>
                 </Stack>
               </Box>
 
@@ -496,8 +492,22 @@ export default function ProductAdminPage() {
                 </Typography>
                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
                   <FormControl size="small" sx={{ flex: 1 }}>
-                    <Select value={brandId} onChange={(e) => setBrandId(e.target.value)} displayEmpty>
-                      <MenuItem value="">None</MenuItem>
+                    <InputLabel>Brand</InputLabel>
+                    <Select
+                      value={brandId}
+                      onChange={(e) => setBrandId(e.target.value)}
+                      displayEmpty
+                      endAdornment={
+                        brandId && (
+                          <InputAdornment position="end" sx={{ mr: 1 }}>
+                            <IconButton size="small" onClick={() => setBrandId('')}>
+                              <CloseIcon fontSize="small" />
+                            </IconButton>
+                          </InputAdornment>
+                        )
+                      }
+                    >
+                      
                       {brands.map((b) => (
                         <MenuItem key={b.id} value={b.id.toString()}>
                           {b.name}
@@ -505,26 +515,30 @@ export default function ProductAdminPage() {
                       ))}
                     </Select>
                   </FormControl>
+
                   <FormControl size="small" sx={{ flex: 1 }}>
+                    <InputLabel>Categories</InputLabel>
                     <Select
                       multiple
                       value={selectedCats}
                       onChange={(e) => setSelectedCats(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
-                      renderValue={(sel) => (
+                      renderValue={(selected) => (
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {(sel as string[]).map((v) => {
-                            const cat = categories.find((c: any) => c.id.toString() === v);
-                            return (
-                              <Chip
-                                key={v}
-                                label={cat?.name}
-                                size="small"
-                                sx={{ bgcolor: '#e91e63', color: '#fff', height: 24 }}
-                              />
-                            );
+                          {(selected as string[]).map((value) => {
+                            const cat = categories.find((c: any) => c.id.toString() === value);
+                            return <Chip key={value} label={cat?.name} size="small" sx={{ bgcolor: '#e91e63', color: '#fff' }} />;
                           })}
                         </Box>
                       )}
+                      endAdornment={
+                        selectedCats.length > 0 && (
+                          <InputAdornment position="end" sx={{ mr: 1 }}>
+                            <IconButton size="small" onClick={() => setSelectedCats([])}>
+                              <CloseIcon fontSize="small" />
+                            </IconButton>
+                          </InputAdornment>
+                        )
+                      }
                     >
                       {categories.map((c) => (
                         <MenuItem key={c.id} value={c.id.toString()}>
@@ -538,58 +552,54 @@ export default function ProductAdminPage() {
 
               <Divider />
 
-              {/* Options */}
+              {/* Product Options */}
               <Box>
                 <Typography sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Palette sx={{ fontSize: 18 }} /> PRODUCT OPTIONS
                 </Typography>
                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                  {['RAM', 'STORAGE', 'COLOR'].map((type) => (
-                    <FormControl key={type} size="small" sx={{ flex: 1 }}>
-                      <Select
-                        multiple
-                        value={type === 'RAM' ? selectedRam : type === 'STORAGE' ? selectedStorage : selectedColors}
-                        onChange={(e) => {
-                          const val = typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value;
-                          if (type === 'RAM') setSelectedRam(val);
-                          else if (type === 'STORAGE') setSelectedStorage(val);
-                          else setSelectedColors(val);
-                        }}
-                        renderValue={(sel) => (
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                            {(sel as string[]).map((v) => {
-                              const o = options.find((o) => o.id.toString() === v);
-                              return (
-                                <Chip
-                                  key={v}
-                                  label={o?.value}
-                                  size="small"
-                                  sx={{ bgcolor: '#e91e63', color: '#fff', height: 24 }}
-                                />
-                              );
-                            })}
-                          </Box>
-                        )}
-                      >
-                        {options
-                          .filter((o) => o.type === type)
-                          .map((o) => (
+                  {['RAM', 'STORAGE', 'COLOR'].map((type) => {
+                    const value = type === 'RAM' ? selectedRam : type === 'STORAGE' ? selectedStorage : selectedColors;
+                    const setValue = type === 'RAM' ? setSelectedRam : type === 'STORAGE' ? setSelectedStorage : setSelectedColors;
+                    const filteredOptions = options.filter((o) => o.type === type);
+
+                    return (
+                      <FormControl key={type} size="small" sx={{ flex: 1 }}>
+                        <InputLabel>{type === 'RAM' ? 'RAM Options' : type === 'STORAGE' ? 'Storage Options' : 'Colors'}</InputLabel>
+                        <Select
+                          multiple
+                          value={value}
+                          onChange={(e) => {
+                            const val = typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value;
+                            setValue(val);
+                          }}
+                          renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {(selected as string[]).map((v) => {
+                                const o = options.find((opt) => opt.id.toString() === v);
+                                return <Chip key={v} label={o?.value} size="small" sx={{ bgcolor: '#e91e63', color: '#fff' }} />;
+                              })}
+                            </Box>
+                          )}
+                          endAdornment={
+                            value.length > 0 && (
+                              <InputAdornment position="end" sx={{ mr: 1 }}>
+                                <IconButton size="small" onClick={() => setValue([])}>
+                                  <CloseIcon fontSize="small" />
+                                </IconButton>
+                              </InputAdornment>
+                            )
+                          }
+                        >
+                          {filteredOptions.map((o) => (
                             <MenuItem key={o.id} value={o.id.toString()}>
-                              <Checkbox
-                                checked={
-                                  type === 'RAM'
-                                    ? selectedRam.includes(o.id.toString())
-                                    : type === 'STORAGE'
-                                    ? selectedStorage.includes(o.id.toString())
-                                    : selectedColors.includes(o.id.toString())
-                                }
-                              />{' '}
-                              {o.value}
+                              <Checkbox checked={value.includes(o.id.toString())} /> {o.value}
                             </MenuItem>
                           ))}
-                      </Select>
-                    </FormControl>
-                  ))}
+                        </Select>
+                      </FormControl>
+                    );
+                  })}
                 </Stack>
               </Box>
 
@@ -600,14 +610,22 @@ export default function ProductAdminPage() {
                 <Typography sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                   <LocalOffer sx={{ fontSize: 18 }} /> TAGS
                 </Typography>
-                <TextField
-                  label="Tags (comma separated)"
-                  value={tagNames.join(', ')}
-                  onChange={(e) => setTagNames(e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
-                  fullWidth
-                  size="small"
-                  helperText="e.g. new, bestseller, limited"
-                />
+                <FormControl fullWidth size="small">
+                  <InputLabel>Tags (comma separated)</InputLabel>
+                  <OutlinedInput
+                    value={tagNames.join(', ')}
+                    onChange={(e) => setTagNames(e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
+                    endAdornment={
+                      tagNames.length > 0 && (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={() => setTagNames([])}>
+                            <CloseIcon />
+                          </IconButton>
+                        </InputAdornment>
+                      )
+                    }
+                  />
+                </FormControl>
               </Box>
 
               <Divider />
@@ -618,21 +636,23 @@ export default function ProductAdminPage() {
                   <Typography sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                     <ImageIcon sx={{ fontSize: 18 }} /> COVER IMAGE
                   </Typography>
-                  <Box
-                    sx={{
-                      border: '2px dashed #ddd',
-                      p: 3,
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
+                  <Box sx={{ border: '2px dashed #ddd', p: 3, textAlign: 'center', cursor: 'pointer', position: 'relative' }}>
                     <input type="file" accept="image/*" onChange={(e) => handleCover(e.target.files)} id="cover-upload" style={{ display: 'none' }} />
                     <label htmlFor="cover-upload">
                       <AddPhotoAlternate sx={{ fontSize: 40, color: '#666' }} />
                       <Typography variant="body2" sx={{ color: '#666', mt: 1 }}>
-                        Drop or click
+                        Drop or click to upload cover
                       </Typography>
                     </label>
+                    {coverPreview && (
+                      <IconButton
+                        size="small"
+                        onClick={() => { setCoverFile(null); setCoverPreview(null); }}
+                        sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'rgba(0,0,0,0.5)', color: '#fff' }}
+                      >
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    )}
                   </Box>
                   {coverPreview && (
                     <Box sx={{ mt: 2, textAlign: 'center' }}>
@@ -643,16 +663,9 @@ export default function ProductAdminPage() {
 
                 <Box sx={{ flex: 1 }}>
                   <Typography sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <ImageIcon sx={{ fontSize: 18 }} /> GALLERY
+                    <ImageIcon sx={{ fontSize: 18 }} /> GALLERY IMAGES
                   </Typography>
-                  <Box
-                    sx={{
-                      border: '2px dashed #ddd',
-                      p: 3,
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
+                  <Box sx={{ border: '2px dashed #ddd', p: 3, textAlign: 'center', cursor: 'pointer' }}>
                     <input
                       type="file"
                       accept="image/*"
@@ -664,14 +677,14 @@ export default function ProductAdminPage() {
                     <label htmlFor="gallery-upload">
                       <ImageIcon sx={{ fontSize: 40, color: '#666' }} />
                       <Typography variant="body2" sx={{ color: '#666', mt: 1 }}>
-                        Add multiple
+                        Add multiple images
                       </Typography>
                     </label>
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 2 }}>
                     {galleryPreviews.map((src, i) => (
                       <Box key={i} sx={{ position: 'relative', width: 80, height: 80 }}>
-                        <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 4 }} />
                         <IconButton
                           size="small"
                           onClick={() => removeGallery(i)}
@@ -692,13 +705,13 @@ export default function ProductAdminPage() {
                 <Typography sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
                   <Memory sx={{ fontSize: 18 }} /> VARIANTS
                 </Typography>
-                <Button size="small" onClick={addVariant} sx={{ mb: 2 }}>
+                <Button size="small" onClick={addVariant} variant="outlined" sx={{ mb: 2 }}>
                   Add Variant
                 </Button>
                 <Stack spacing={2}>
                   {variants.map((v, i) => (
-                    <Paper key={i} sx={{ p: 2 }}>
-                      <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center">
+                    <Paper key={i} sx={{ p: 2, bgcolor: '#fafafa' }}>
+                      <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center" gap={1}>
                         <TextField size="small" label="SKU" value={v.sku} onChange={(e) => updateVariant(i, 'sku', e.target.value)} />
                         <TextField size="small" label="Price" type="number" value={v.price} onChange={(e) => updateVariant(i, 'price', e.target.value)} />
                         <TextField size="small" label="Stock" type="number" value={v.stock} onChange={(e) => updateVariant(i, 'stock', e.target.value)} />
@@ -716,8 +729,8 @@ export default function ProductAdminPage() {
               {/* Toggles & Save */}
               <Box>
                 <Stack direction="row" spacing={3} sx={{ mb: 3 }}>
-                  <FormControlLabel control={<Checkbox checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Active" />
-                  <FormControlLabel control={<Checkbox checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} />} label="Featured" />
+                  <FormControlLabel control={<Checkbox checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Product is Active" />
+                  <FormControlLabel control={<Checkbox checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} />} label="Featured Product" />
                 </Stack>
                 <Box sx={{ textAlign: 'center' }}>
                   <Button
@@ -727,10 +740,11 @@ export default function ProductAdminPage() {
                     sx={{
                       bgcolor: '#000',
                       color: '#fff',
-                      px: 5,
+                      px: 6,
                       py: 1.5,
                       fontWeight: 700,
                       textTransform: 'none',
+                      '&:hover': { bgcolor: '#333' },
                       '&:disabled': { bgcolor: '#ccc' },
                     }}
                   >
@@ -746,9 +760,25 @@ export default function ProductAdminPage() {
       {/* All Products Tab */}
       {tab === 1 && (
         <Box sx={{ px: { xs: 2, md: 4 }, py: 3 }}>
-          {/* Search + Filters */}
-          <Box sx={{ mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-            <Tabs value={categoryFilter} onChange={(_, v) => setCategoryFilter(v)} variant="scrollable" scrollButtons="auto">
+          <Box sx={{ mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, alignItems: 'center' }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Search products..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: <SearchIcon sx={{ mr: 1, color: '#999' }} />,
+                endAdornment: searchQuery && (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchQuery('')}>
+                      <CloseIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Tabs value={categoryFilter} onChange={(_, v) => setCategoryFilter(v)} variant="scrollable">
               <Tab label="All" value="all" />
               {categories.map((c) => (
                 <Tab key={c.id} label={c.name} value={c.id} />
@@ -801,7 +831,7 @@ export default function ProductAdminPage() {
                         />
                       </Box>
                     </Box>
-                    <Typography sx={{ fontWeight: 600, mb: 1, fontSize: '1rem' }}>{p.title || 'Untitled'}</Typography>
+                    <Typography sx={{ fontWeight: 600, mb: 1 }}>{p.title || 'Untitled'}</Typography>
                     <Typography sx={{ color: '#666', mb: 1, fontSize: '0.85rem', height: 40, overflow: 'hidden' }}>
                       {p.description || 'No description'}
                     </Typography>
@@ -863,12 +893,7 @@ export default function ProductAdminPage() {
                       <TableRow key={p.id}>
                         <TableCell>
                           <Box sx={{ width: 60, height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#f9f9f9' }}>
-                            <img
-                              src={getCoverSrc(p)}
-                              width={55}
-                              height={55}
-                              style={{ maxWidth: '90%', maxHeight: '90%', objectFit: 'contain' }}
-                            />
+                            <img src={getCoverSrc(p)} width={55} height={55} style={{ objectFit: 'contain' }} />
                           </Box>
                         </TableCell>
                         <TableCell sx={{ fontWeight: 600 }}>{p.title || 'Untitled'}</TableCell>
@@ -895,7 +920,7 @@ export default function ProductAdminPage() {
                         </TableCell>
                         <TableCell>{p.brand?.name || '—'}</TableCell>
                         <TableCell>
-                          <Button size="small" onClick={() => updateDiscount(p)} sx={{ fontWeight: 600 }}>
+                          <Button size="small" onClick={() => updateDiscount(p)} variant="contained">
                             Update
                           </Button>
                         </TableCell>
@@ -930,11 +955,7 @@ export default function ProductAdminPage() {
         onClose={() => setSnack((s) => ({ ...s, open: false }))}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert
-          severity={snack.sev}
-          onClose={() => setSnack((s) => ({ ...s, open: false }))}
-          sx={{ fontWeight: 600 }}
-        >
+        <Alert severity={snack.sev} onClose={() => setSnack((s) => ({ ...s, open: false }))} sx={{ fontWeight: 600 }}>
           {snack.msg}
         </Alert>
       </Snackbar>

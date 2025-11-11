@@ -19,10 +19,10 @@ import Link from 'next/link';
 const FooterContainer = styled(Box)(({ theme }) => ({
   backgroundColor: '#000',
   color: '#e0e0e0',
-  padding: theme.spacing(6, 2),
+  padding: theme.spacing(3, 2),
   fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
   [theme.breakpoints.up('sm')]: {
-    padding: theme.spacing(8, 4),
+
   },
 }));
 
