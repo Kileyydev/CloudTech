@@ -62,13 +62,6 @@ const NavLinkWrapper = styled(Box)(({ theme }) => ({
   margin: theme.spacing(0.3, 0),
   borderRadius: '8px',
   transition: 'all 0.2s ease-in-out',
-  '&:hover': {
-    backgroundColor: 'rgba(220, 26, 138, 0.1)',
-    transform: 'scale(1.05)',
-    '& .nav-item::after': {
-      width: '100%',
-    },
-  },
   width: '100%',
   alignItems: 'center',
   justifyContent: 'flex-start',
@@ -87,10 +80,6 @@ const NavLinkWrapper = styled(Box)(({ theme }) => ({
     padding: theme.spacing(0.6, 1),
     border: 'none',
     backgroundColor: 'transparent',
-    '&:hover': {
-      backgroundColor: 'transparent',
-      transform: 'none',
-    },
   },
   [theme.breakpoints.up('xl')]: {
     margin: theme.spacing(0, 1.4),
@@ -106,9 +95,7 @@ const NavItem = styled(Typography)(({ theme }) => ({
   userSelect: 'none',
   transition: 'color 0.2s ease-in-out',
   position: 'relative',
-  '&:hover': {
-    color: '#DC1A8A',
-  },
+  
   '&:focus': {
     color: '#DC1A8A',
     outline: '1.5px solid #DC1A8A',
@@ -145,10 +132,7 @@ const ToggleButton = styled(IconButton)(({ theme }) => ({
   padding: theme.spacing(0.5),
   margin: theme.spacing(0.5),
   borderRadius: '50%',
-  '&:hover': {
-    backgroundColor: '#B31774',
-    transform: 'scale(1.1)',
-  },
+  
   animation: 'bounce 2s ease-in-out infinite',
   '@keyframes bounce': {
     '0%, 100%': { transform: 'translateY(0)' },
@@ -174,7 +158,6 @@ const MainNavBar = () => {
     { href: '/mobile-accessories', label: 'Mobile Accessories' },
     { href: '/audio', label: 'Audio' },
     { href: '/gaming', label: 'Gaming' },
-    { href: '/storage', label: 'Storage' },
     { href: '/powerbank', label: 'PowerBank' },
     { href: '/content-creator-kit', label: 'Content Creator Kit' },
     { href : '/projectors', label: 'Projectors' },

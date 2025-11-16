@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { Box, Typography, styled, IconButton } from '@mui/material';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation } from 'swiper/modules';
@@ -59,18 +60,14 @@ const CategoryCard = styled(Box)(({ theme }) => ({
   },
 }));
 
-const CategoryImage = styled(Box)(({ theme }) => ({
+const CategoryImageContainer = styled(Box)(({ theme }) => ({
+  position: 'relative',
   width: 'clamp(60px, 22vw, 80px)',
   height: 'clamp(60px, 22vw, 80px)',
   borderRadius: '50%',
   backgroundColor: '#333',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
   overflow: 'hidden',
   marginBottom: theme.spacing(0.75),
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
   [theme.breakpoints.up('sm')]: {
     width: 'clamp(70px, 18vw, 90px)',
     height: 'clamp(70px, 18vw, 90px)',
@@ -86,11 +83,6 @@ const CategoryName = styled(Typography)(({ theme }) => ({
   fontWeight: 500,
   color: '#E0E0E0',
   marginBottom: theme.spacing(0.4),
-}));
-
-const ProductCount = styled(Typography)(({ theme }) => ({
-  fontSize: 'clamp(0.6rem, 1.5vw, 0.7rem)',
-  color: '#B0B0B0',
 }));
 
 const NavButton = styled(IconButton)(({ theme }) => ({
@@ -169,9 +161,17 @@ const TopCategoriesSection = () => {
           {categories.map((category, index) => (
             <SwiperSlide key={index} style={{ display: 'flex', justifyContent: 'center' }}>
               <CategoryCard>
-                <CategoryImage sx={{ backgroundImage: `url(${category.image})` }} />
+                <CategoryImageContainer>
+                  <Image
+                    src={category.image}
+                    alt={category.name}
+                    fill
+                    sizes="(max-width: 600px) 60px, (max-width: 960px) 70px, 80px"
+                    style={{ objectFit: 'cover' }}
+                    loading="lazy"
+                  />
+                </CategoryImageContainer>
                 <CategoryName>{category.name}</CategoryName>
-
               </CategoryCard>
             </SwiperSlide>
           ))}
@@ -186,7 +186,16 @@ const TopCategoriesSection = () => {
       <CategoriesWrapper>
         {categories.map((category, index) => (
           <CategoryCard key={index}>
-            <CategoryImage sx={{ backgroundImage: `url(${category.image})` }} />
+            <CategoryImageContainer>
+              <Image
+                src={category.image}
+                alt={category.name}
+                fill
+                sizes="(max-width: 600px) 60px, (max-width: 960px) 70px, 80px"
+                style={{ objectFit: 'cover' }}
+                loading="lazy"
+              />
+            </CategoryImageContainer>
             <CategoryName>{category.name}</CategoryName>
           </CategoryCard>
         ))}

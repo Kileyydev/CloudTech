@@ -596,7 +596,6 @@ const res = await fetch(`${API_BASE_URL}/products/?categories__slug=${slug}`, {
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <PhoneIphone sx={{ fontSize: 32, color: '#e91e63' }} />
             <Typography variant="h5" sx={{ fontWeight: 800, color: '#1a1a1a' }}>
               Mobile Accessories
             </Typography>

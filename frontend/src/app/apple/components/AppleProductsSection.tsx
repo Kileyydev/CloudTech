@@ -42,7 +42,6 @@ interface ProductT {
   type?: { value: string }[];
   connectivity?: { value: string }[];
   colors?: { value: string }[];
-  
 }
 
 const CACHE_KEY = 'apple_accessories_cache_v3';
@@ -87,9 +86,10 @@ const AppleAccessoriesSection = () => {
         ];
         let finalProducts: ProductT[] = [];
         for (const filter of filters) {
-          const res = await fetch(`${API_BASE_URL}/products/?${filter}`, {
-            cache: 'no-store',
-          });
+         const slug = 'apple'; // or use the correct slug for your category
+const res = await fetch(`${API_BASE_URL}/products/?categories__slug=${slug}`, {
+  cache: 'no-store',
+});
           if (!res.ok) continue;
           const text = await res.text();
           let data;
@@ -107,17 +107,17 @@ const AppleAccessoriesSection = () => {
           }
         }
         if (finalProducts.length === 0)
-          throw new Error('No apple accessories found');
+          throw new Error('No Apple products found');
         setProducts(finalProducts);
         localStorage.setItem(
           CACHE_KEY,
           JSON.stringify({ data: finalProducts, timestamp: Date.now() })
         );
       } catch (err: any) {
-        console.error('Apple fetch failed:', err);
+        console.error('Apple products fetch failed:', err);
         setSnackbar({
           open: true,
-          message: err.message || 'Failed to load apple accessories',
+          message: err.message || 'Failed to load Apple products',
           severity: 'error',
         });
       } finally {
@@ -350,7 +350,7 @@ const AppleAccessoriesSection = () => {
           {/* Brand */}
           {product.brand && (
             <Stack direction="row" alignItems="center" gap={0.8} mb={1}>
-             
+          
               <Typography sx={{ color: '#444', fontWeight: 600, fontSize: '0.8rem' }}>
                 {product.brand.name}
               </Typography>
@@ -588,9 +588,9 @@ const AppleAccessoriesSection = () => {
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-         
+          
           <Typography variant="h5" sx={{ fontWeight: 800, color: '#1a1a1a' }}>
-            Apple Accessories
+            Apple Products
           </Typography>
         </Box>
         <Button
@@ -630,7 +630,7 @@ const AppleAccessoriesSection = () => {
               : inStockProducts.length === 0
               ? (
                   <Typography color="text.secondary" sx={{ py: 5, pl: 2 }}>
-                    No apple accessories available right now.
+                    No Apple products available right now.
                   </Typography>
                 )
               : inStockProducts.map(renderCard)}
@@ -656,7 +656,7 @@ const AppleAccessoriesSection = () => {
           </Box>
         ) : inStockProducts.length === 0 ? (
           <Typography color="text.secondary" sx={{ textAlign: 'center', py: 5 }}>
-            No apple accessories available right now.
+            No Apple products available right now.
           </Typography>
         ) : (
           <Box

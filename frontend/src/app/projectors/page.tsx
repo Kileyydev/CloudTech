@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useEffect, useRef } from 'react';
 import {
   Box,
@@ -22,7 +21,7 @@ import {
   ShoppingCart,
   Add,
   Remove,
-  Videocam,
+  Headset,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
@@ -45,10 +44,10 @@ interface ProductT {
   colors?: { value: string }[];
 }
 
-const CACHE_KEY = 'projectors_cache_v3';
+const CACHE_KEY = 'projectors_accessories_cache_v3';
 const CACHE_DURATION = 1000 * 60 * 5; // 5 mins
 
-const ProjectorsAccessoriesSection = () => {
+const Projectors = () => {
   const router = useRouter();
   const { cart, addToCart, updateQuantity } = useCart();
   const [products, setProducts] = useState<ProductT[]>([]);
@@ -77,22 +76,20 @@ const ProjectorsAccessoriesSection = () => {
             return;
           }
         }
-
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE;
         if (!API_BASE_URL) throw new Error('API base URL not defined');
-
         const filters = [
-          'categories__slug=projectors',
           'category__slug=projectors',
+          'categories__slug=projectors',
           'category_slug=projectors',
           'category=projectors',
         ];
-
         let finalProducts: ProductT[] = [];
         for (const filter of filters) {
-          const res = await fetch(`${API_BASE_URL}/products/?${filter}`, {
-            cache: 'no-store',
-          });
+         const slug = 'projectors'; // or use the correct slug for your category
+const res = await fetch(`${API_BASE_URL}/products/?categories__slug=${slug}`, {
+  cache: 'no-store',
+});
           if (!res.ok) continue;
           const text = await res.text();
           let data;
@@ -109,10 +106,8 @@ const ProjectorsAccessoriesSection = () => {
             break;
           }
         }
-
         if (finalProducts.length === 0)
           throw new Error('No projectors found');
-
         setProducts(finalProducts);
         localStorage.setItem(
           CACHE_KEY,
@@ -129,7 +124,6 @@ const ProjectorsAccessoriesSection = () => {
         setLoading(false);
       }
     };
-
     loadProducts();
     return () => {
       mounted.current = false;
@@ -356,7 +350,7 @@ const ProjectorsAccessoriesSection = () => {
           {/* Brand */}
           {product.brand && (
             <Stack direction="row" alignItems="center" gap={0.8} mb={1}>
-              <Videocam sx={{ fontSize: 15, color: '#999' }} />
+          
               <Typography sx={{ color: '#444', fontWeight: 600, fontSize: '0.8rem' }}>
                 {product.brand.name}
               </Typography>
@@ -581,146 +575,133 @@ const ProjectorsAccessoriesSection = () => {
   const inStockProducts = products.filter(p => p.stock > 0);
 
   return (
-    <>
-      <Box sx={{ bgcolor: '#fdfdfd', py: { xs: 3, lg: 4 }, px: { xs: 2, lg: 3 } }}>
-        {/* Header */}
-        <Box
-          sx={{
-            mb: 3,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: 1.5,
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-         
-            <Typography variant="h5" sx={{ fontWeight: 800, color: '#1a1a1a', textUnderlineOffset: '2px' }}>
-              Projectors
-            </Typography>
-          </Box>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<ShoppingCart sx={{ fontSize: 16 }} />}
-            onClick={handleViewCart}
-            sx={{
-              bgcolor: '#000',
-              color: '#fff',
-              fontWeight: 700,
-              textTransform: 'none',
-              px: 2.5,
-              py: 1,
-              fontSize: '0.85rem',
-            }}
-            disabled={getCartItemCount() === 0}
-          >
-            Cart ({getCartItemCount()})
-          </Button>
-        </Box>
-
-        {/* Mobile & Tablet: Horizontal Scroll */}
-        <Box sx={{ display: { xs: 'block', lg: 'none' } }}>
-          <Box
-            sx={{
-              overflowX: 'auto',
-              display: 'flex',
-              pb: 2,
-              scrollbarWidth: 'none',
-              '&::-webkit-scrollbar': { display: 'none' },
-            }}
-          >
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              {loading
-                ? Array.from({ length: 6 }).map((_, i) => renderSkeletonCard())
-                : inStockProducts.length === 0
-                ? (
-                    <Typography color="text.secondary" sx={{ py: 5, pl: 2 }}>
-                      No projectors available right now.
-                    </Typography>
-                  )
-                : inStockProducts.map(renderCard)}
-            </Box>
-          </Box>
-        </Box>
-
-        {/* Large Screens: 4 per row, UNLIMITED rows (GRID) */}
-        <Box sx={{ display: { xs: 'none', lg: 'block' } }}>
-          {loading ? (
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 290px)',
-                gap: 2,
-                justifyContent: 'center',
-                maxWidth: 1240,
-                mx: 'auto',
-                px: { lg: 2 },
-              }}
-            >
-              {Array.from({ length: 12 }).map((_, i) => renderSkeletonCard())}
-            </Box>
-          ) : inStockProducts.length === 0 ? (
-            <Typography color="text.secondary" sx={{ textAlign: 'center', py: 5 }}>
-              No projectors available right now.
-            </Typography>
-          ) : (
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, 290px)',
-                gap: 2,
-                justifyContent: 'center',
-                maxWidth: 1240,
-                mx: 'auto',
-                px: { lg: 2 },
-              }}
-            >
-              {inStockProducts.map(renderCard)}
-            </Box>
-          )}
-        </Box>
-
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={3000}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert
-            onClose={handleCloseSnackbar}
-            severity={snackbar.severity}
-            sx={{
-              width: '100%',
-              fontWeight: 600,
-              ...(snackbar.severity === 'success' && {
-                bgcolor: '#4caf50',
-                color: '#fff',
-              }),
-              ...(snackbar.severity === 'error' && {
-                bgcolor: '#f44336',
-                color: '#fff',
-              }),
-            }}
-          >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-      </Box>
-
-      {/* Elegant Black Separator Line Below */}
+    <Box sx={{ bgcolor: '#fdfdfd', py: { xs: 3, lg: 4 }, px: { xs: 2, lg: 3 } }}>
+      {/* Header */}
       <Box
         sx={{
-          height: 5,
-          bgcolor: '#000',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          background: 'linear-gradient(to right, transparent, #000 15%, #000 85%, transparent)',
-          borderRadius: '2px',
+          mb: 3,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 1.5,
         }}
-      />
-    </>
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          
+          <Typography variant="h5" sx={{ fontWeight: 800, color: '#1a1a1a' }}>
+            Projectors 
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          size="small"
+          startIcon={<ShoppingCart sx={{ fontSize: 16 }} />}
+          onClick={handleViewCart}
+          sx={{
+            bgcolor: '#000',
+            color: '#fff',
+            fontWeight: 700,
+            textTransform: 'none',
+            px: 2.5,
+            py: 1,
+            fontSize: '0.85rem',
+          }}
+          disabled={getCartItemCount() === 0}
+        >
+          Cart ({getCartItemCount()})
+        </Button>
+      </Box>
+
+      {/* Mobile & Tablet: Horizontal Scroll */}
+      <Box sx={{ display: { xs: 'block', lg: 'none' } }}>
+        <Box
+          sx={{
+            overflowX: 'auto',
+            display: 'flex',
+            pb: 2,
+            scrollbarWidth: 'none',
+            '&::-webkit-scrollbar': { display: 'none' },
+          }}
+        >
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            {loading
+              ? Array.from({ length: 6 }).map((_, i) => renderSkeletonCard())
+              : inStockProducts.length === 0
+              ? (
+                  <Typography color="text.secondary" sx={{ py: 5, pl: 2 }}>
+                    No projectors available right now.
+                  </Typography>
+                )
+              : inStockProducts.map(renderCard)}
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Large Screens: 4 per row, UNLIMITED rows (GRID) */}
+      <Box sx={{ display: { xs: 'none', lg: 'block' } }}>
+        {loading ? (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 290px)',
+              gap: 2,
+              justifyContent: 'center',
+              maxWidth: 1240,
+              mx: 'auto',
+              px: { lg: 2 },
+            }}
+          >
+            {Array.from({ length: 12 }).map((_, i) => renderSkeletonCard())}
+          </Box>
+        ) : inStockProducts.length === 0 ? (
+          <Typography color="text.secondary" sx={{ textAlign: 'center', py: 5 }}>
+            No projectors available right now.
+          </Typography>
+        ) : (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(4, 290px)',
+              gap: 2,
+              justifyContent: 'center',
+              maxWidth: 1240,
+              mx: 'auto',
+              px: { lg: 2 },
+            }}
+          >
+            {inStockProducts.map(renderCard)}
+          </Box>
+        )}
+      </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{
+            width: '100%',
+            fontWeight: 600,
+            ...(snackbar.severity === 'success' && {
+              bgcolor: '#4caf50',
+              color: '#fff',
+            }),
+            ...(snackbar.severity === 'error' && {
+              bgcolor: '#f44336',
+              color: '#fff',
+            }),
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 };
 
-export default ProjectorsAccessoriesSection;
+export default Projectors;
