@@ -73,7 +73,6 @@ class GlobalOption(models.Model):
     value = models.CharField(max_length=50, blank=True, null=True)
 
     class Meta:
-        unique_together = ()
         ordering = ['type', 'value']
 
     def __str__(self):
@@ -81,7 +80,7 @@ class GlobalOption(models.Model):
 
 
 # ===================================================================
-# PRODUCT — PRICE NULLABLE + DEFAULTS
+# PRODUCT
 # ===================================================================
 class Product(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -98,27 +97,14 @@ class Product(models.Model):
     price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, default=0)
     stock = models.PositiveIntegerField(null=True, blank=True, default=0)
     discount = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        default=0,
+        max_digits=5, decimal_places=2, null=True, blank=True, default=0,
         validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
     final_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, default=0)
 
-    ram_options = models.ManyToManyField(
-        'GlobalOption', blank=True, related_name='ram_products',
-        limit_choices_to={'type': 'RAM'}
-    )
-    storage_options = models.ManyToManyField(
-        'GlobalOption', blank=True, related_name='storage_products',
-        limit_choices_to={'type': 'STORAGE'}
-    )
-    colors = models.ManyToManyField(
-        'GlobalOption', blank=True, related_name='color_products',
-        limit_choices_to={'type': 'COLOR'}
-    )
+    ram_options = models.ManyToManyField('GlobalOption', blank=True, related_name='ram_products', limit_choices_to={'type': 'RAM'})
+    storage_options = models.ManyToManyField('GlobalOption', blank=True, related_name='storage_products', limit_choices_to={'type': 'STORAGE'})
+    colors = models.ManyToManyField('GlobalOption', blank=True, related_name='color_products', limit_choices_to={'type': 'COLOR'})
 
     condition_options = models.JSONField(blank=True, null=True, default=dict)
     features = models.JSONField(blank=True, null=True, default=dict)
@@ -141,6 +127,7 @@ class Product(models.Model):
         return self.title or f"Product {self.id}"
 
     def save(self, *args, **kwargs):
+        # Generate slug
         if self.title and not self.slug:
             base = slugify(self.title)[:240]
             slug = base
@@ -150,7 +137,13 @@ class Product(models.Model):
                 i += 1
             self.slug = slug
 
-        # Normalize price & discount
+        # ←←←←← CRITICAL FIX: Convert int/float → Decimal
+        if self.price is not None and not isinstance(self.price, Decimal):
+            self.price = Decimal(str(self.price))
+        if self.discount is not None and not isinstance(self.discount, Decimal):
+            self.discount = Decimal(str(self.discount))
+
+        # Default values
         if self.price is None:
             self.price = Decimal('0.00')
         if self.discount is None:
@@ -162,9 +155,30 @@ class Product(models.Model):
 
         super().save(*args, **kwargs)
 
+    @property
+    def has_variants(self):
+        return self.variants.exists()
+
+    @property
+    def is_configurable(self):
+        return self.has_variants
+
+    @property
+    def display_price(self):
+        if self.has_variants:
+            lowest = self.variants.filter(is_active=True).order_by('price').first()
+            return lowest.final_price if lowest else self.final_price
+        return self.final_price
+
+    @property
+    def total_stock(self):
+        if self.has_variants:
+            return sum(v.stock for v in self.variants.all())
+        return self.stock
+
 
 # ===================================================================
-# PRODUCT VARIANT — NULLABLE + DEFAULTS
+# PRODUCT VARIANT — FIXED DECIMAL CONVERSION
 # ===================================================================
 class ProductVariant(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -180,12 +194,11 @@ class ProductVariant(models.Model):
     price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, default=0)
     compare_at_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, default=0)
     stock = models.PositiveIntegerField(null=True, blank=True, default=0)
-
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    final_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, default=0)
 
     class Meta:
-        unique_together = ()
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['sku']),
@@ -199,19 +212,31 @@ class ProductVariant(models.Model):
         if self.storage: parts.append(self.storage)
         return " — ".join(parts) if len(parts) > 1 else "Empty Variant"
 
+    def save(self, *args, **kwargs):
+        # ←←←←← CRITICAL FIX: Convert int/float → Decimal before quantize
+        if self.price is not None and not isinstance(self.price, Decimal):
+            self.price = Decimal(str(self.price))
+        if self.compare_at_price is not None and not isinstance(self.compare_at_price, Decimal):
+            self.compare_at_price = Decimal(str(self.compare_at_price))
+
+        if self.price is None:
+            self.price = Decimal('0.00')
+        if self.compare_at_price is None:
+            self.compare_at_price = Decimal('0.00')
+
+        # Final price = price (no discount on variants)
+        self.final_price = self.price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        super().save(*args, **kwargs)
+
 
 # ===================================================================
-# PRODUCT IMAGE — FIXED: Only update cover_image when is_primary=True
+# PRODUCT IMAGE
 # ===================================================================
 class ProductImage(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    product = models.ForeignKey(
-        Product, on_delete=models.CASCADE, related_name='images', null=True, blank=True
-    )
-    variant = models.ForeignKey(
-        ProductVariant, on_delete=models.CASCADE, related_name='images',
-        null=True, blank=True
-    )
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images', null=True, blank=True)
+    variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name='images', null=True, blank=True)
 
     image = CloudinaryField('image', blank=True, null=True)
     alt_text = models.CharField(max_length=255, blank=True, null=True)
@@ -220,25 +245,15 @@ class ProductImage(models.Model):
 
     class Meta:
         ordering = ['-is_primary', 'uploaded_at']
-        indexes = [
-            models.Index(fields=['product', 'is_primary']),
-        ]
+        indexes = [models.Index(fields=['product', 'is_primary'])]
 
     def __str__(self):
         return f"Image for {self.product.title if self.product else 'No Product'}"
 
     def save(self, *args, **kwargs):
-        # Only act if this image is marked as primary AND has an image
         if self.is_primary and self.product and self.image:
-            # Demote other primary images for this product
-            ProductImage.objects.filter(
-                product=self.product, is_primary=True
-            ).exclude(pk=self.pk).update(is_primary=False)
-
-            # Update product's cover_image ONLY if different
+            ProductImage.objects.filter(product=self.product, is_primary=True).exclude(pk=self.pk).update(is_primary=False)
             if self.product.cover_image != self.image:
                 self.product.cover_image = self.image
-                # Use update_fields to avoid triggering Product.save() loop
                 Product.objects.filter(pk=self.product.pk).update(cover_image=self.image)
-
         super().save(*args, **kwargs)

@@ -54,13 +54,21 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 # ===================================================================
 # PRODUCT VIEWSET — UPDATED FOR CATEGORY SLUG FILTER
 # ===================================================================
+
+class AllowAll(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return True
+
+
+# ==========================================================
+# PRODUCT VIEWSET — FULLY OPTIMIZED
+# ==========================================================
 class ProductViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAll]
     parser_classes = [MultiPartParser, FormParser]
 
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    # ✅ Added 'categories__slug' filter
-    filterset_fields = ['brand__id', 'categories__id', 'categories__slug']
+    filterset_fields = ['brand__id', 'categories__id', 'categories__slug', 'is_active', 'is_featured']
     search_fields = ['title', 'description', 'brand__name', 'tags__name']
     ordering_fields = ['price', 'created_at', 'discount', 'final_price']
     ordering = ['-created_at']
@@ -71,17 +79,19 @@ class ProductViewSet(viewsets.ModelViewSet):
         return ProductCreateUpdateSerializer
 
     def get_serializer(self, *args, **kwargs):
-        # Enable partial updates
         if self.action in ['update', 'partial_update']:
             kwargs.setdefault('partial', True)
         return super().get_serializer(*args, **kwargs)
 
     def get_queryset(self):
-        cache_key = f"products_all_{hash(frozenset(self.request.query_params.items()))}"
+        # Build cache key from sorted query params to avoid hash issues
+        query_params_tuple = tuple(sorted(self.request.query_params.items()))
+        cache_key = f"products_all_{hash(query_params_tuple)}"
         cached_qs = cache.get(cache_key)
         if cached_qs is not None:
             return cached_qs
 
+        # Prefetch related objects for efficiency
         queryset = Product.objects.select_related('brand').prefetch_related(
             'tags',
             'categories',
@@ -93,10 +103,11 @@ class ProductViewSet(viewsets.ModelViewSet):
             'variants'
         )
 
-        # ✅ Filter logic
+        # Apply filters
         category_slug = self.request.query_params.get('categories__slug')
-        brand_id = self.request.query_params.get('brand')
+        brand_id = self.request.query_params.get('brand__id')
         is_featured = self.request.query_params.get('is_featured')
+        is_active = self.request.query_params.get('is_active')
 
         if category_slug:
             queryset = queryset.filter(categories__slug=category_slug)
@@ -104,6 +115,8 @@ class ProductViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(brand_id=brand_id)
         if is_featured is not None:
             queryset = queryset.filter(is_featured=(is_featured.lower() == 'true'))
+        if is_active is not None:
+            queryset = queryset.filter(is_active=(is_active.lower() == 'true'))
 
         cache.set(cache_key, queryset, timeout=60 * 5)
         return queryset
@@ -113,9 +126,9 @@ class ProductViewSet(viewsets.ModelViewSet):
         context['request'] = self.request
         return context
 
-    # ===================================================================
+    # ==========================================================
     # FEATURED PRODUCTS
-    # ===================================================================
+    # ==========================================================
     @action(detail=False, methods=['get'], url_path='featured')
     @method_decorator(cache_page(60 * 5))
     def featured(self, request):
@@ -123,9 +136,9 @@ class ProductViewSet(viewsets.ModelViewSet):
         serializer = ProductListSerializer(queryset, many=True, context=self.get_serializer_context())
         return Response(serializer.data)
 
-    # ===================================================================
+    # ==========================================================
     # SAFE CREATE & UPDATE WITH ERROR LOGGING
-    # ===================================================================
+    # ==========================================================
     def create(self, request, *args, **kwargs):
         try:
             return super().create(request, *args, **kwargs)
@@ -141,7 +154,6 @@ class ProductViewSet(viewsets.ModelViewSet):
             print("🚨 ERROR in Product update:", e)
             traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 # ===================================================================
 # PRODUCT VARIANT VIEWSET

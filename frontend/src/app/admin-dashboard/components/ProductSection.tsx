@@ -297,8 +297,9 @@ export default function ProductAdminPage() {
       .filter((v) => Object.keys(v).length > 1);
 
     if (cleanVariants.length > 0) {
-      form.append('variants', JSON.stringify(cleanVariants));
-    }
+  const blob = new Blob([JSON.stringify(cleanVariants)], { type: 'application/json' });
+  form.append('variants', blob, 'variants.json');
+}
 
     if (coverFile) form.append('cover_image', coverFile);
     galleryFiles.forEach((f) => form.append('gallery_images', f));
@@ -715,6 +716,13 @@ export default function ProductAdminPage() {
                         <TextField size="small" label="SKU" value={v.sku} onChange={(e) => updateVariant(i, 'sku', e.target.value)} />
                         <TextField size="small" label="Price" type="number" value={v.price} onChange={(e) => updateVariant(i, 'price', e.target.value)} />
                         <TextField size="small" label="Stock" type="number" value={v.stock} onChange={(e) => updateVariant(i, 'stock', e.target.value)} />
+                        <TextField size="small" label="Color" value={v.color} onChange={(e) => updateVariant(i, 'color', e.target.value)} />
+                        <TextField size="small" label="RAM" value={v.ram} onChange={(e) => updateVariant(i, 'ram', e.target.value)} />
+                        <TextField size="small" label="Storage" value={v.storage} onChange={(e) => updateVariant(i, 'storage', e.target.value)} />
+                        <TextField size="small" label="Processor" value={v.processor} onChange={(e) => updateVariant(i, 'processor', e.target.value)} />
+                        <TextField size="small" label="Size" value={v.size} onChange={(e) => updateVariant(i, 'size', e.target.value)} />
+                        <TextField size="small" label="Compare at Price" type="number" value={v.compare_at_price} onChange={(e) => updateVariant(i, 'compare_at_price', e.target.value)} />
+
                         <IconButton size="small" color="error" onClick={() => removeVariant(i)}>
                           <CloseIcon />
                         </IconButton>
