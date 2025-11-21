@@ -1,414 +1,351 @@
-// src/app/product/[id]/page.tsx
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
+  Button,
   Stack,
+  IconButton,
+  Snackbar,
+  Alert,
+  Divider,
   Select,
   MenuItem,
-  Button,
-  Divider,
-  Paper,
-  Chip,
-  LinearProgress,
-  Alert,
-  Snackbar,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
-import { styled } from '@mui/material/styles';
-import AddShoppingCartIcon from '@mui/icons-material/AddShoppingCart';
+import {
+  Favorite,
+  FavoriteBorder,
+  ShoppingCart,
+  LocalShipping,
+  Sync,
+  Security,
+  CreditCard,
+  ChevronLeft,
+  ChevronRight,
+} from '@mui/icons-material';
+import Image from 'next/image';
+import { useParams, useRouter } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE + '/products/';
+interface Variant {
+  id: string;
+  color?: string;
+  storage?: string;
+  price: number;
+  compare_at_price?: number;
+  stock: number;
+}
 
-// ——————— ULTRA PROFESSIONAL STYLING ———————
+interface Product {
+  id: string;
+  title: string;
+  description: string;
+  cover_image?: any;
+  images?: any[];
+  price: number;
+  final_price?: number;
+  brand?: { name: string };
+  variants?: Variant[];
+  colors?: { value: string }[];
+  storage_options?: { value: string }[];
+}
 
-const Container = styled(Box)(({ theme }) => ({
-  maxWidth: 1400,
-  margin: '0 auto',
-  padding: theme.spacing(12, 4),
-  backgroundColor: '#ffffff',
-  minHeight: '100vh',
-  [theme.breakpoints.down('lg')]: { padding: theme.spacing(10, 3) },
-  [theme.breakpoints.down('md')]: { padding: theme.spacing(8, 2) },
-}));
+const getImageUrl = (img: any): string => {
+  if (!img) return '/images/fallback.jpg';
+  if (typeof img === 'string') return img.startsWith('http') ? img : `${process.env.NEXT_PUBLIC_MEDIA_BASE}${img}`;
+  if ('url' in img) return img.url.startsWith('http') ? img.url : `${process.env.NEXT_PUBLIC_MEDIA_BASE}${img.url}`;
+  if ('image' in img) return getImageUrl(img.image);
+  return '/images/fallback.jpg';
+};
 
-const Layout = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  gap: theme.spacing(10),
-  [theme.breakpoints.down('md')]: {
-    flexDirection: 'column',
-    gap: theme.spacing(8),
-  },
-}));
-
-const ImageSection = styled(Box)({
-  flex: '0 0 52%',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 32,
-});
-
-const MainImageWrapper = styled(Paper)({
-  width: '100%',
-  aspectRatio: '1 / 1',
-  borderRadius: 24,
-  overflow: 'hidden',
-  boxShadow: '0 20px 60px rgba(0,0,0,0.08)',
-  backgroundColor: '#fff',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  '& img': {
-    width: '100%',
-    height: '100%',
-    objectFit: 'contain',
-  },
-});
-
-const ThumbnailRow = styled(Box)({
-  display: 'flex',
-  gap: 16,
-  overflowX: 'auto',
-  paddingBottom: 8,
-});
-
-const Thumb = styled(Box)<{ active: boolean }>(({ active }) => ({
-  width: 110,
-  height: 110,
-  borderRadius: 16,
-  overflow: 'hidden',
-  cursor: 'pointer',
-  border: active ? '3px solid #000' : '2px solid #e0e0e0',
-  flexShrink: 0,
-  '& img': {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-  },
-}));
-
-const InfoSection = styled(Box)({
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'flex-start',
-  gap: 40,
-});
-
-const Title = styled(Typography)({
-  fontSize: '3.2rem',
-  fontWeight: 700,
-  lineHeight: 1.1,
-  color: '#000',
-  letterSpacing: '-0.5px',
-});
-
-const BrandName = styled(Typography)({
-  fontSize: '1.1rem',
-  color: '#666',
-  fontWeight: 500,
-  textTransform: 'uppercase',
-  letterSpacing: '1.5px',
-  marginBottom: 8,
-});
-
-const PriceDisplay = styled(Box)({
-  display: 'flex',
-  alignItems: 'baseline',
-  gap: 24,
-});
-
-const CurrentPrice = styled(Typography)({
-  fontSize: '3.4rem',
-  fontWeight: 700,
-  color: '#000',
-});
-
-const OriginalPrice = styled(Typography)({
-  fontSize: '2rem',
-  color: '#999',
-  textDecoration: 'line-through',
-});
-
-const Savings = styled(Chip)({
-  backgroundColor: '#000',
-  color: '#fff',
-  fontWeight: 600,
-  fontSize: '1rem',
-  height: 40,
-});
-
-const SelectField = styled(Select)({
-  '& .MuiOutlinedInput-notchedOutline': {
-    borderColor: '#000',
-    borderWidth: 2,
-  },
-  '&:hover .MuiOutlinedInput-notchedOutline': {
-    borderColor: '#000',
-  },
-  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-    borderColor: '#000',
-  },
-  '& .MuiSelect-select': {
-    padding: '16px 20px',
-    fontSize: '1.1rem',
-    fontWeight: 500,
-  },
-});
-
-const AddToCartBtn = styled(Button)({
-  backgroundColor: '#000',
-  color: '#fff',
-  padding: '20px 48px',
-  borderRadius: 16,
-  fontSize: '1.3rem',
-  fontWeight: 600,
-  textTransform: 'none',
-  boxShadow: 'none',
-  '&:hover': {
-    backgroundColor: '#222',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
-  },
-  '&:disabled': {
-    backgroundColor: '#ccc',
-    color: '#999',
-  },
-});
-
-const Description = styled(Typography)({
-  fontSize: '1.15rem',
-  lineHeight: '1.8',
-  color: '#444',
-  maxWidth: 680,
-});
-
-export default function ProductPage({ params }: { params: { id: string } }) {
-  const [product, setProduct] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState('');
-  const [selectedVariant, setSelectedVariant] = useState<any>(null);
-
-  const [color, setColor] = useState('');
-  const [storage, setStorage] = useState('');
-  const [ram, setRam] = useState('');
-
-  const [snack, setSnack] = useState({ open: false, msg: '', type: 'success' as 'success' | 'error' });
-
+export default function ProductDetailPage() {
+  const params = useParams();
+  const router = useRouter();
   const { addToCart } = useCart();
 
-  // Fetch product
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
+  const [wishlist, setWishlist] = useState<Set<string>>(new Set());
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
+
+  // Dropdown states
+  const [selectedColor, setSelectedColor] = useState('');
+  const [selectedStorage, setSelectedStorage] = useState('');
+
   useEffect(() => {
-    fetch(`${API_BASE}${params.id}/`, { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => {
+    const saved = localStorage.getItem('wishlist');
+    if (saved) setWishlist(new Set(JSON.parse(saved)));
+  }, []);
+
+  useEffect(() => {
+    const fetchProduct = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/products/${params.id}/`);
+        if (!res.ok) throw new Error('Not found');
+        const data = await res.json();
         setProduct(data);
-        const cover = data.cover_image?.url || data.cover_image || '/placeholder.png';
-        setSelectedImage(cover);
 
-        if (data.variants?.length > 0) {
-          const first = data.variants.find((v: any) => v.is_active && v.stock > 0) || data.variants[0];
-          setSelectedVariant(first);
-          setColor(first.color || '');
-          setStorage(first.storage || '');
-          setRam(first.ram || '');
-          if (first.image?.url) setSelectedImage(first.image.url);
+        // Extract unique options from variants
+        const colors = Array.from(new Set(data.variants?.map((v: any) => v.color).filter(Boolean))) as string[];
+        const storages = Array.from(new Set(data.variants?.map((v: any) => v.storage).filter(Boolean)))
+          .filter(Boolean)
+          .sort((a: any, b: any) => parseInt(a) - parseInt(b)) as string[];
+
+        // Auto-select first available variant
+        const available = data.variants?.find((v: Variant) => v.stock > 0);
+        if (available) {
+          setSelectedVariant(available);
+          setSelectedColor(available.color || '');
+          setSelectedStorage(available.storage || '');
         }
-      })
-      .catch(() => setSnack({ open: true, msg: 'Product not found', type: 'error' }))
-      .finally(() => setLoading(false));
-  }, [params.id]);
+      } catch {
+        router.push('/404');
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (params.id) fetchProduct();
+  }, [params.id, router]);
 
-  // Update selected variant when options change
+  // Re-calculate variant when color/storage changes
   useEffect(() => {
-    if (!product?.variants?.length) return;
+    if (!product?.variants || (!selectedColor && !selectedStorage)) return;
 
     const match = product.variants.find((v: any) =>
-      v.is_active &&
-      (!color || v.color === color) &&
-      (!storage || v.storage === storage) &&
-      (!ram || v.ram === ram)
+      (!selectedColor || v.color === selectedColor) &&
+      (!selectedStorage || v.storage === selectedStorage) &&
+      v.stock > 0
     );
 
     if (match) {
       setSelectedVariant(match);
-      if (match.image?.url) setSelectedImage(match.image.url);
     } else {
       setSelectedVariant(null);
     }
-  }, [color, storage, ram, product?.variants]);
+  }, [selectedColor, selectedStorage, product?.variants]);
 
-  const options = useMemo(() => {
-    if (!product?.variants) return { colors: [], storages: [], rams: [] };
+  const allImages = product
+    ? [getImageUrl(product.cover_image), ...(product.images || []).map((i: any) => getImageUrl(i))]
+    : [];
 
-    return {
-      colors: Array.from(new Set(product.variants.map((v: any) => v.color).filter(Boolean))) as string[],
-      storages: Array.from(new Set(product.variants.map((v: any) => v.storage).filter(Boolean)))
-        .filter(Boolean)
-        .sort((a: any, b: any) => parseInt(a) - parseInt(b)) as string[],
-      rams: Array.from(new Set(product.variants.map((v: any) => v.ram).filter(Boolean))) as string[],
-    };
-  }, [product?.variants]);
+  const toggleWishlist = () => {
+    if (!product) return;
+    const updated = new Set(wishlist);
+    updated.has(product.id) ? updated.delete(product.id) : updated.add(product.id);
+    setWishlist(updated);
+    localStorage.setItem('wishlist', JSON.stringify(Array.from(updated)));
+    setSnackbar({ open: true, message: updated.has(product.id) ? 'Added to wishlist ❤️' : 'Removed from wishlist', severity: 'success' });
+  };
 
-  const images = useMemo(() => {
-    const set = new Set<string>();
-    if (product?.cover_image?.url) set.add(product.cover_image.url);
-    product?.images?.forEach((i: any) => {
-      const url = i.image?.url || i.image;
-      if (url) set.add(url);
-    });
-    product?.variants?.forEach((v: any) => v.image?.url && set.add(v.image.url));
-    return Array.from(set);
-  }, [product]);
-
-  const price = selectedVariant
-    ? selectedVariant.compare_at_price > 0
-      ? selectedVariant.compare_at_price
-      : selectedVariant.price
-    : product?.final_price || product?.price;
-
-  const originalPrice = selectedVariant?.price || product?.price;
-  const savings = originalPrice - price;
-  const inStock = selectedVariant ? selectedVariant.stock > 0 : product?.stock > 0;
-
-  const handleAdd = () => {
-    if (product.variants?.length && !selectedVariant) {
-      setSnack({ open: true, msg: 'Please select all options', type: 'error' });
-      return;
-    }
-    if (!inStock) {
-      setSnack({ open: true, msg: 'Out of stock', type: 'error' });
+  const handleAddToCart = () => {
+    if (!product || !selectedVariant) {
+      setSnackbar({ open: true, message: 'Please select color and storage', severity: 'error' });
       return;
     }
 
     addToCart({
-      id: product.id,
-      title: `${product.title}${color || storage || ram ? ` • ${color} ${ram} ${storage}`.trim() : ''}`,
-      price,
+      id: Number(product.id),
+      title: `${product.title} • ${selectedColor} ${selectedStorage}`.trim(),
+      price: selectedVariant.price,
       quantity: 1,
-      cover_image: selectedImage,
-      stock: selectedVariant?.stock || product.stock,
+      stock: selectedVariant.stock,
+      cover_image: allImages[0],
+      selectedOptions: { color: selectedColor, storage: selectedStorage },
     });
 
-    setSnack({ open: true, msg: 'Added to cart', type: 'success' });
+    setSnackbar({ open: true, message: 'Added to cart! 🛒', severity: 'success' });
   };
 
-  if (loading) return <Box sx={{ pt: 20 }}><LinearProgress /></Box>;
-  if (!product) return <Typography sx={{ pt: 20, textAlign: 'center' }}>Product not found</Typography>;
+  if (loading || !product) {
+    return <Box sx={{ p: 8, textAlign: 'center', bgcolor: '#ffffffff', color: '#000' }}>Loading product...</Box>;
+  }
+
+  const displayPrice = selectedVariant?.price || product.final_price || product.price;
+  const originalPrice = selectedVariant?.compare_at_price || product.price;
+  const savings = originalPrice - displayPrice;
+
+  const uniqueColors = Array.from(new Set(product.variants?.map((v: any) => v.color).filter(Boolean))) as string[];
+  const uniqueStorages = Array.from(new Set(product.variants?.map((v: any) => v.storage).filter(Boolean)))
+    .filter(Boolean)
+    .sort((a: any, b: any) => parseInt(a) - parseInt(b)) as string[];
+
+  const inStock = selectedVariant ? selectedVariant.stock > 0 : false;
 
   return (
-    <Container>
-      <Layout>
-        {/* Images */}
-        <ImageSection>
-          <MainImageWrapper elevation={0}>
-            <img src={selectedImage} alt={product.title} />
-          </MainImageWrapper>
+    <Box sx={{ bgcolor: '#fafafa', minHeight: '100vh', color: '#000' }}>
+      <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 3, md: 6 }, py: 8 }}>
 
-          {images.length > 1 && (
-            <ThumbnailRow>
-              {images.map(img => (
-                <Thumb key={img} active={selectedImage === img} onClick={() => setSelectedImage(img)}>
-                  <img src={img} alt="" />
-                </Thumb>
-              ))}
-            </ThumbnailRow>
-          )}
-        </ImageSection>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: 10 }}>
 
-        {/* Details */}
-        <InfoSection>
-          <Box>
-            <BrandName>{product.brand?.name || 'Premium Brand'}</BrandName>
-            <Title>{product.title}</Title>
+          {/* LEFT: Images */}
+          <Box sx={{ flex: 1, position: 'sticky', top: 100, alignSelf: 'flex-start' }}>
+            <Box sx={{ bgcolor: '#fff', mb: 4, position: 'relative' }}>
+              <Image
+                src={allImages[selectedImageIndex] || '/images/fallback.jpg'}
+                alt={product.title}
+                width={800}
+                height={800}
+                style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+              />
+              {allImages.length > 1 && (
+                <>
+                  <IconButton sx={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', bgcolor: '#fff' }}
+                    onClick={() => setSelectedImageIndex(i => (i - 1 + allImages.length) % allImages.length)}>
+                    <ChevronLeft />
+                  </IconButton>
+                  <IconButton sx={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', bgcolor: '#fff' }}
+                    onClick={() => setSelectedImageIndex(i => (i + 1) % allImages.length)}>
+                    <ChevronRight />
+                  </IconButton>
+                </>
+              )}
+            </Box>
+
+            {allImages.length > 1 && (
+              <Stack direction="row" spacing={2} justifyContent="center">
+                {allImages.map((src, i) => (
+                  <Box
+                    key={i}
+                    onClick={() => setSelectedImageIndex(i)}
+                    sx={{
+                      width: 80, height: 80, border: '2px solid',
+                      borderColor: selectedImageIndex === i ? '#000' : '#ddd',
+                      overflow: 'hidden', cursor: 'pointer'
+                    }}
+                  >
+                    <Image src={src} alt="" width={80} height={80} style={{ objectFit: 'cover' }} />
+                  </Box>
+                ))}
+              </Stack>
+            )}
           </Box>
 
-          {/* Variant Selectors */}
-          {(options.colors.length > 0 || options.storages.length > 0 || options.rams.length > 0) && (
-            <Stack spacing={5}>
-              {options.colors.length > 0 && (
-                <Box>
-                  <Typography fontWeight={600} mb={1.5} fontSize="1.1rem">Color</Typography>
-                  <SelectField fullWidth value={color} onChange={e => setColor(e.target.value as string)} displayEmpty>
-                    <MenuItem value="" disabled>Select color</MenuItem>
-                    {options.colors.map(c => (
+          {/* RIGHT: Info */}
+          <Box sx={{ flex: 1 }}>
+            <Stack spacing={6}>
+
+              <Box>
+                <Typography variant="h3" fontWeight={900} lineHeight={1}>
+                  {product.title}
+                </Typography>
+                {product.brand && (
+                  <Typography variant="h5" color="#333" mt={1} fontWeight={600}>
+                    {product.brand.name}
+                  </Typography>
+                )}
+              </Box>
+
+              <Box>
+                <Typography variant="h2" fontWeight={900}>
+                  KES {displayPrice.toLocaleString()}
+                </Typography>
+                {savings > 0 && (
+                  <Stack direction="row" alignItems="center" spacing={2} mt={1}>
+                    <Typography variant="h5" color="#888" sx={{ textDecoration: 'line-through' }}>
+                      KES {originalPrice.toLocaleString()}
+                    </Typography>
+                    <Box sx={{ bgcolor: '#000', color: '#fff', px: 2, py: 0.5, fontWeight: 800 }}>
+                      Save KES {savings.toLocaleString()}
+                    </Box>
+                  </Stack>
+                )}
+              </Box>
+
+              <Divider sx={{ borderColor: '#000' }} />
+
+              {/* Color Dropdown */}
+              {uniqueColors.length > 0 && (
+                <FormControl fullWidth>
+                  <InputLabel sx={{ fontWeight: 700 }}>Color</InputLabel>
+                  <Select
+                    value={selectedColor}
+                    label="Color"
+                    onChange={(e) => setSelectedColor(e.target.value)}
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: '#000', borderWidth: 2 },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#000' },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#000' },
+                    }}
+                  >
+                    {uniqueColors.map(c => (
                       <MenuItem key={c} value={c}>{c}</MenuItem>
                     ))}
-                  </SelectField>
-                </Box>
+                  </Select>
+                </FormControl>
               )}
 
-              {options.rams.length > 0 && (
-                <Box>
-                  <Typography fontWeight={600} mb={1.5} fontSize="1.1rem">RAM</Typography>
-                  <SelectField fullWidth value={ram} onChange={e => setRam(e.target.value as string)}>
-                    {options.rams.map(r => (
-                      <MenuItem key={r} value={r}>{r}</MenuItem>
-                    ))}
-                  </SelectField>
-                </Box>
-              )}
-
-              {options.storages.length > 0 && (
-                <Box>
-                  <Typography fontWeight={600} mb={1.5} fontSize="1.1rem">Storage</Typography>
-                  <SelectField fullWidth value={storage} onChange={e => setStorage(e.target.value as string)}>
-                    {options.storages.map(s => (
+              {/* Storage Dropdown */}
+              {uniqueStorages.length > 0 && (
+                <FormControl fullWidth>
+                  <InputLabel sx={{ fontWeight: 700 }}>Storage</InputLabel>
+                  <Select
+                    value={selectedStorage}
+                    label="Storage"
+                    onChange={(e) => setSelectedStorage(e.target.value)}
+                    sx={{
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: '#000', borderWidth: 2 },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#000' },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#000' },
+                    }}
+                  >
+                    {uniqueStorages.map(s => (
                       <MenuItem key={s} value={s}>{s}</MenuItem>
                     ))}
-                  </SelectField>
-                </Box>
+                  </Select>
+                </FormControl>
               )}
+
+              {selectedVariant && selectedVariant.stock < 10 && selectedVariant.stock > 0 && (
+                <Typography color="#d32f2f" fontWeight={700}>
+                  Only {selectedVariant.stock} left in stock — order soon!
+                </Typography>
+              )}
+
+              <Stack direction="row" spacing={3}>
+                <Button
+                  variant="contained"
+                  size="large"
+                  startIcon={<ShoppingCart sx={{ fontSize: 32 }} />}
+                  onClick={handleAddToCart}
+                  disabled={!inStock || !selectedVariant}
+                  sx={{
+                    flex: 1, bgcolor: '#000', color: '#fff', py: 3.5,
+                    fontSize: '1.4rem', fontWeight: 900, textTransform: 'none'
+                  }}
+                >
+                  {inStock && selectedVariant ? 'Add to Cart' : 'Out of Stock'}
+                </Button>
+                <IconButton onClick={toggleWishlist} sx={{ border: '3px solid #000', width: 70, height: 70 }}>
+                  {wishlist.has(product.id) ? <Favorite sx={{ fontSize: 34 }} /> : <FavoriteBorder sx={{ fontSize: 34 }} />}
+                </IconButton>
+              </Stack>
+
+              <Box sx={{ p: 4, bgcolor: '#fff', border: '1px solid #000' }}>
+                <Stack spacing={3}>
+                  <Stack direction="row" alignItems="center" spacing={3}><LocalShipping /><Typography fontWeight={700}>Free delivery • 2–4 days</Typography></Stack>
+                  <Stack direction="row" alignItems="center" spacing={3}><Sync /><Typography fontWeight={700}>Free 30-day returns</Typography></Stack>
+                  <Stack direction="row" alignItems="center" spacing={3}><Security /><Typography fontWeight={700}>1-year warranty</Typography></Stack>
+                  <Stack direction="row" alignItems="center" spacing={3}><CreditCard /><Typography fontWeight={700}>Secure payment</Typography></Stack>
+                </Stack>
+              </Box>
+
             </Stack>
-          )}
-
-          {/* Price */}
-          <PriceDisplay>
-            <CurrentPrice>KES {price?.toLocaleString()}</CurrentPrice>
-            {savings > 0 && (
-              <>
-                <OriginalPrice>KES {originalPrice?.toLocaleString()}</OriginalPrice>
-                <Savings label={`Save KES ${savings.toLocaleString()}`} />
-              </>
-            )}
-          </PriceDisplay>
-
-          {selectedVariant && selectedVariant.stock < 10 && selectedVariant.stock > 0 && (
-            <Typography color="#d32f2f" fontWeight={600} fontSize="1.1rem">
-              Only {selectedVariant.stock} left in stock
-            </Typography>
-          )}
-
-          <AddToCartBtn
-            fullWidth
-            size="large"
-            startIcon={<AddShoppingCartIcon />}
-            onClick={handleAdd}
-            disabled={!inStock || (product.variants?.length > 0 && !selectedVariant)}
-          >
-            {inStock ? 'Add to Cart' : 'Out of Stock'}
-          </AddToCartBtn>
-
-          <Divider />
-
-          <Box>
-            <Typography variant="h6" fontWeight={700} mb={2}>Description</Typography>
-            <Description>{product.description || 'No description available.'}</Description>
           </Box>
-        </InfoSection>
-      </Layout>
+        </Box>
 
-      <Snackbar
-        open={snack.open}
-        autoHideDuration={4000}
-        onClose={() => setSnack({ ...snack, open: false })}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert severity={snack.type} variant="filled" sx={{ fontWeight: 600 }}>
-          {snack.msg}
+      </Box>
+
+      <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert severity={snackbar.severity} sx={{ fontWeight: 700 }}>
+          {snackbar.message}
         </Alert>
       </Snackbar>
-    </Container>
+    </Box>
   );
 }
