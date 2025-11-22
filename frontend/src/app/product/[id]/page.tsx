@@ -327,8 +327,8 @@ export default function ProductDetailPage() {
 
               <Box sx={{ p: 4, bgcolor: '#fff', border: '1px solid #000' }}>
                 <Stack spacing={3}>
-                  <Stack direction="row" alignItems="center" spacing={3}><LocalShipping /><Typography fontWeight={700}>Free delivery • 2–4 days</Typography></Stack>
-                  <Stack direction="row" alignItems="center" spacing={3}><Sync /><Typography fontWeight={700}>Free 30-day returns</Typography></Stack>
+                  <Stack direction="row" alignItems="center" spacing={3}><LocalShipping /><Typography fontWeight={700}>Free delivery within Nairobi CBD</Typography></Stack>
+                  <Stack direction="row" alignItems="center" spacing={3}><Sync /><Typography fontWeight={700}>Most repairs completed within 5 working days. Complex cases may take up to 21 working days.</Typography></Stack>
                   <Stack direction="row" alignItems="center" spacing={3}><Security /><Typography fontWeight={700}>1-year warranty</Typography></Stack>
                   <Stack direction="row" alignItems="center" spacing={3}><CreditCard /><Typography fontWeight={700}>Secure payment</Typography></Stack>
                 </Stack>
