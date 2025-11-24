@@ -189,7 +189,7 @@ export default function TestimonialsSection() {
           <Alert severity="error">{error}</Alert>
         ) : testimonials.length === 0 ? (
           <Typography sx={{ color: "#fff", textAlign: "center" }}>
-            No testimonials yet. Be the first to review!
+            No reviews yet. Be the first to review!
           </Typography>
         ) : (
           <>

@@ -36,7 +36,7 @@ const navItems = [
   { text: "Products", icon: <ShoppingCartIcon />, section: "products" },
   { text: "Orders", icon: <ReceiptLongIcon />, section: "orders" },
   { text: "Repairs", icon: <BuildIcon />, section: "repairs" },
-  { text: "Testimonials", icon: <StarIcon />, section: "testimonials" },
+  { text: "Reviews", icon: <StarIcon />, section: "testimonials" },
   { text: "Users", icon: <PeopleIcon />, section: "users" },
 ];
 

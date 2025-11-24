@@ -97,7 +97,7 @@ export default function CartPage() {
     mpesaCode: '',
     cashAmount: '',
   });
-  const [paymentMethod, setPaymentMethod] = useState<'paybill' | 'withdraw' | 'cod' | ''>('');
+  const [paymentMethod, setPaymentMethod] = useState< 'cod' | ''>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
   const [snackbar, setSnackbar] = useState({
@@ -164,10 +164,7 @@ export default function CartPage() {
       setError('Select payment method');
       return false;
     }
-    if ((paymentMethod === 'paybill' || paymentMethod === 'withdraw') && !checkoutDetails.mpesaCode) {
-      setError('Enter M-Pesa code');
-      return false;
-    }
+    
     if (paymentMethod === 'cod' && cashPaid < total) {
       setError(`Enter at least KES ${formatPrice(total)}`);
       return false;
@@ -187,16 +184,7 @@ export default function CartPage() {
       let paymentOk = true;
       let paymentMessage = '';
 
-      if (paymentMethod === 'paybill' || paymentMethod === 'withdraw') {
-        const { ok, message } = await verifyMpesaTransaction(checkoutDetails.mpesaCode, total, checkoutDetails.phone);
-        paymentOk = ok;
-        paymentMessage = message;
-        if (!ok) {
-          setError(message);
-          setIsProcessing(false);
-          return;
-        }
-      }
+    
 
       const tempOrderId = `TEMP-${Date.now()}`;
       const orderData = {
@@ -460,31 +448,10 @@ export default function CartPage() {
                   <FormControl>
                     <FormLabel>Payment</FormLabel>
                     <RadioGroup value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as any)}>
-                      <FormControlLabel value="paybill" control={<Radio />} label="M-Pesa Paybill 247247" />
-                      <FormControlLabel value="withdraw" control={<Radio />} label="Agent Withdraw" />
                       <FormControlLabel value="cod" control={<Radio />} label="Cash on Delivery" />
                     </RadioGroup>
                   </FormControl>
 
-                  <Collapse in={paymentMethod === 'paybill'}>
-                    <Alert severity="info">
-                      <strong>Paybill:</strong> 247247<br />
-                      <strong>Account:</strong> 0722244482<br />
-                      <strong>Amount:</strong> KES {formatPrice(total)}
-                      <TextField fullWidth size="small" label="M-Pesa Code *" placeholder="e.g. ABC123XYZ"
-                        value={checkoutDetails.mpesaCode}
-                        onChange={e => handleChange('mpesaCode', e.target.value)} sx={{ mt: 1 }} />
-                    </Alert>
-                  </Collapse>
-
-                  <Collapse in={paymentMethod === 'withdraw'}>
-                    <Alert severity="info">
-                      <strong>Agent:</strong> 2065355 | <strong>Store:</strong> 2061522<br />
-                      <TextField fullWidth size="small" label="M-Pesa Code *" placeholder="e.g. ABC123XYZ"
-                        value={checkoutDetails.mpesaCode}
-                        onChange={e => handleChange('mpesaCode', e.target.value)} sx={{ mt: 1 }} />
-                    </Alert>
-                  </Collapse>
 
                   <Collapse in={paymentMethod === 'cod'}>
                     <Alert severity="success">
