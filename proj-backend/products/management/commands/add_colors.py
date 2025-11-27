@@ -39,6 +39,14 @@ class Command(BaseCommand):
             "Blue Titanium",
             "Desert Titanium",
             "Bronze Titanium",
+            "Titanium Black",
+            "Titanium Silverblue",
+            "Titanium Gray",
+            "Titanium Whitesilver",
+            "Awesome Pink",
+            "Awesome Olive",
+            "Awesome Graphite",
+            "Awesome Lightgray",
         ]
 
         self.stdout.write(self.style.MIGRATE_HEADING("🌈 Checking and adding color options..."))

@@ -106,28 +106,6 @@ export default function HeroSection() {
           </Slide>
         ))}
       </Slider>
-
-      <Content maxWidth="lg">
-        <Typography
-          variant="subtitle1"
-          sx={{
-            fontWeight: 700,
-            fontSize: { lg: '1.35rem' },
-            letterSpacing: '0.2em',
-            color: '#000',
-            bgcolor: '#fff',
-            padding: '6px 16px',
-            display: 'inline-block',
-            textTransform: 'uppercase',
-          
-            mb: 2,
-          }}
-        >
-          Premium Electronics | Trade-in | Nationwide Delivery
-        </Typography>
-
-
-      </Content>
     </HeroWrapper>
   );
 }
