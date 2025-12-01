@@ -507,13 +507,13 @@ export default function ProductDetailPage() {
                 ))}
               </Stack>
             )}
-            {/* Description below images, aligned to the right */}
+            {/* Description below images, aligned to the center */}
             {product.description && (
               <Card sx={{ bgcolor: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.08)', borderRadius: 2, p: 4 }}>
-                <Typography variant="h6" fontWeight={700} color="#1a1a1a" mb={2.5} sx={{ textAlign: 'right' }}>
+                <Typography variant="h6" fontWeight={700} color="#1a1a1a" mb={2.5} sx={{ textAlign: 'center' }}>
                   Description
                 </Typography>
-                <Typography variant="body1" color="#444" lineHeight={1.8} sx={{ fontSize: '1rem', textAlign: 'right' }}>
+                <Typography variant="body1" color="#444" lineHeight={1.8} sx={{ fontSize: '1rem', textAlign: 'center' }}>
                   {product.description}
                 </Typography>
               </Card>
