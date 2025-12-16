@@ -144,7 +144,7 @@ export default function ProductDetailPage() {
     if (product.features) {
       const featureOrder = ['display', 'os', 'chipset', 'main_camera', 'selfie_lens', 'connectivity', 'battery'];
       featureOrder.forEach(key => {
-        if (product.features[key]) {
+        if (product.features && product.features[key]) {
           const formattedKey = key
             .split('_')
             .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -565,7 +565,7 @@ export default function ProductDetailPage() {
                     src={allImages[selectedImageIndex] || '/images/fallback.jpg'}
                     alt={product.title}
                     fill
-                    style={{ objectFit: 'contain', borderRadius: { xs: 1, md: 2 } }}
+                    style={{ objectFit: 'contain', borderRadius: 8 }}
                   />
                   {allImages.length > 1 && (
                     <>
