@@ -30,7 +30,6 @@ import {
   LocalShipping,
   Sync,
   Security,
-  CreditCard,
   ChevronLeft,
   ChevronRight,
   Home,
@@ -58,17 +57,16 @@ interface Product {
   price: number;
   final_price?: number;
   brand?: { name: string };
-  categories?: { name: string }[];
+  categories?: { name: string; slug?: string }[];
   variants?: Variant[];
   colors?: { value: string }[];
   storage_options?: { value: string }[];
-  type?: { value: string }[];
-  connectivity?: { value: string }[];
   ram_options?: { value: string }[];
   features?: Record<string, any>;
 }
 
 type ProductImage = { image?: { url: string } } | { url: string } | string;
+
 interface PopularProductT {
   id: number;
   title: string;
@@ -80,9 +78,6 @@ interface PopularProductT {
   cover_image?: ProductImage;
   images?: ProductImage[];
   brand?: { name: string };
-  type?: { value: string }[];
-  connectivity?: { value: string }[];
-  colors?: { value: string }[];
 }
 
 const getImageUrl = (img: any): string => {
@@ -103,44 +98,35 @@ export default function ProductDetailPage() {
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
   const [wishlist, setWishlist] = useState<Set<string>>(new Set());
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
-  // Dropdown states
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedStorage, setSelectedStorage] = useState('');
-  // Tab state
   const [tabValue, setTabValue] = useState(0);
 
-  // Popular products states
   const [popularProducts, setPopularProducts] = useState<PopularProductT[]>([]);
   const [loadingPopular, setLoadingPopular] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
   const CACHE_KEY = 'popular_products_cache_v1';
-  const CACHE_DURATION = 1000 * 60 * 5; // 5 mins
-  const slidesToShow = 4; // Number of cards to show at once
+  const CACHE_DURATION = 1000 * 60 * 5;
+  const slidesToShow = 4;
 
-  // WhatsApp phone number - replace with actual
-  const WHATSAPP_PHONE = '254712345678'; // Example Kenyan number
+  const WHATSAPP_PHONE = '254712345678';
 
-  // Key Features computation
   const keyFeatures = useMemo(() => {
     if (!product) return [];
     const feats: string[] = [];
 
-    // RAM
     if (product.ram_options && product.ram_options.length > 0) {
       feats.push(`RAM: ${product.ram_options.map((o: any) => o.value).join(', ')}`);
     }
 
-    // Storage
     if (product.storage_options && product.storage_options.length > 0) {
       feats.push(`Internal Storage: ${product.storage_options.map((o: any) => o.value).join(', ')}`);
     }
 
-    // Colors
     if (product.colors && product.colors.length > 0) {
       feats.push(`Colors: ${product.colors.map((o: any) => o.value).join(', ')}`);
     }
 
-    // Features JSON
     if (product.features) {
       const featureOrder = ['display', 'os', 'chipset', 'main_camera', 'selfie_lens', 'connectivity', 'battery'];
       featureOrder.forEach(key => {
@@ -152,7 +138,7 @@ export default function ProductDetailPage() {
           feats.push(`${formattedKey}: ${product.features[key]}`);
         }
       });
-      // Add any other features not in order
+
       Object.entries(product.features).forEach(([key, value]) => {
         if (!featureOrder.includes(key) && value) {
           const formattedKey = key
@@ -179,12 +165,12 @@ export default function ProductDetailPage() {
         if (!res.ok) throw new Error('Not found');
         const data = await res.json();
         setProduct(data);
-        // Extract unique options from variants
+
         const colors = Array.from(new Set(data.variants?.map((v: any) => v.color).filter(Boolean))) as string[];
         const storages = Array.from(new Set(data.variants?.map((v: any) => v.storage).filter(Boolean)))
           .filter(Boolean)
           .sort((a: any, b: any) => parseInt(a) - parseInt(b)) as string[];
-        // Auto-select first available variant
+
         const available = data.variants?.find((v: Variant) => v.stock > 0);
         if (available) {
           setSelectedVariant(available);
@@ -200,7 +186,6 @@ export default function ProductDetailPage() {
     if (params.id) fetchProduct();
   }, [params.id, router]);
 
-  // Re-calculate variant when color/storage changes
   useEffect(() => {
     if (!product?.variants || (!selectedColor && !selectedStorage)) return;
     const match = product.variants.find((v: any) =>
@@ -208,14 +193,10 @@ export default function ProductDetailPage() {
       (!selectedStorage || v.storage === selectedStorage) &&
       v.stock > 0
     );
-    if (match) {
-      setSelectedVariant(match);
-    } else {
-      setSelectedVariant(null);
-    }
+    if (match) setSelectedVariant(match);
+    else setSelectedVariant(null);
   }, [selectedColor, selectedStorage, product?.variants]);
 
-  // Fetch popular products - using general fetch with limit=10
   useEffect(() => {
     const loadPopularProducts = async () => {
       try {
@@ -228,9 +209,10 @@ export default function ProductDetailPage() {
             return;
           }
         }
+
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE;
         if (!API_BASE_URL) throw new Error('API base URL not defined');
-        // Fetch general active products, limit to 10 for carousel
+
         const res = await fetch(`${API_BASE_URL}/products/?is_active=true&limit=10`, {
           cache: 'no-store',
         });
@@ -242,18 +224,13 @@ export default function ProductDetailPage() {
         } catch {
           throw new Error('Failed to parse popular products');
         }
-        const list = Array.isArray(data)
-          ? data
-          : data.results || data.data || [];
+        const list = Array.isArray(data) ? data : data.results || data.data || [];
         if (list.length === 0) throw new Error('No popular products found');
+
         setPopularProducts(list);
-        localStorage.setItem(
-          CACHE_KEY,
-          JSON.stringify({ data: list, timestamp: Date.now() })
-        );
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ data: list, timestamp: Date.now() }));
       } catch (err: any) {
         console.error('Popular products fetch failed:', err);
-        // Fallback: try to fetch without limit or other params if needed
       } finally {
         setLoadingPopular(false);
       }
@@ -271,7 +248,11 @@ export default function ProductDetailPage() {
     updated.has(product.id) ? updated.delete(product.id) : updated.add(product.id);
     setWishlist(updated);
     localStorage.setItem('wishlist', JSON.stringify(Array.from(updated)));
-    setSnackbar({ open: true, message: updated.has(product.id) ? 'Added to wishlist ❤️' : 'Removed from wishlist', severity: 'success' });
+    setSnackbar({
+      open: true,
+      message: updated.has(product.id) ? 'Added to wishlist ❤️' : 'Removed from wishlist',
+      severity: 'success',
+    });
   };
 
   const handleAddToCart = () => {
@@ -317,25 +298,13 @@ export default function ProductDetailPage() {
     setSnackbar({ open: true, message: `${p.title} added to cart!`, severity: 'success' });
   };
 
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % Math.ceil(popularProducts.length / slidesToShow));
-  };
-
-  const prevSlide = () => {
+  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % Math.ceil(popularProducts.length / slidesToShow));
+  const prevSlide = () =>
     setCurrentSlide((prev) => (prev - 1 + Math.ceil(popularProducts.length / slidesToShow)) % Math.ceil(popularProducts.length / slidesToShow));
-  };
 
-  const handleLoadMore = () => {
-    router.push('/products');
-  };
-
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
-
-  const handleBreadcrumbClick = (path: string) => {
-    router.push(path);
-  };
+  const handleLoadMore = () => router.push('/products');
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => setTabValue(newValue);
+  const handleBreadcrumbClick = (path: string) => router.push(path);
 
   if (loading || !product) {
     return (
@@ -366,24 +335,16 @@ export default function ProductDetailPage() {
   const hasDiscount = savings > 0;
   const isOutOfStock = !selectedVariant || !inStock;
 
-  // Breadcrumb items
   const breadcrumbItems = [
     { label: 'Home', href: '/' },
     ...(product.categories || []).map((cat: any) => ({ label: cat.name, href: `/category/${cat.slug || cat.name.toLowerCase()}` })),
     { label: product.title, href: '#' },
   ];
 
-  // Popular products rendering
   const getPopularImageUrl = (img: ProductImage | undefined): string => {
     if (!img) return '/images/fallback.jpg';
-    if (typeof img === 'string')
-      return img.startsWith('http')
-        ? img
-        : `${process.env.NEXT_PUBLIC_MEDIA_BASE}${img}`;
-    if ('url' in img)
-      return img.url.startsWith('http')
-        ? img.url
-        : `${process.env.NEXT_PUBLIC_MEDIA_BASE}${img.url}`;
+    if (typeof img === 'string') return img.startsWith('http') ? img : `${process.env.NEXT_PUBLIC_MEDIA_BASE}${img}`;
+    if ('url' in img) return img.url.startsWith('http') ? img.url : `${process.env.NEXT_PUBLIC_MEDIA_BASE}${img.url}`;
     if ('image' in img) return getPopularImageUrl(img.image);
     return '/images/fallback.jpg';
   };
@@ -392,6 +353,7 @@ export default function ProductDetailPage() {
     const imageSrc = getPopularImageUrl(p.cover_image);
     const hasDiscount = p.discount && p.discount > 0;
     const displayPrice = hasDiscount && p.final_price ? p.final_price : p.price;
+
     return (
       <Card
         key={p.id}
@@ -525,7 +487,6 @@ export default function ProductDetailPage() {
 
   return (
     <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', color: '#1a1a1a' }}>
-      {/* Breadcrumbs */}
       <Box sx={{ bgcolor: '#fff', py: { xs: 1.5, md: 2 }, borderBottom: '1px solid #e0e0e0' }}>
         <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 3, md: 6 } }}>
           <Breadcrumbs aria-label="breadcrumb" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
@@ -547,9 +508,7 @@ export default function ProductDetailPage() {
 
       <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 3, md: 6 }, py: { xs: 3, lg: 6 } }}>
         <Stack spacing={{ xs: 4, md: 6 }}>
-          {/* Main Product Row */}
           <Stack direction={{ xs: 'column', lg: 'row' }} spacing={{ xs: 4, md: 6 }} alignItems="flex-start">
-            {/* LEFT: Images - Seamless, no card border */}
             <Box sx={{ flex: 1, position: 'sticky', top: 100, alignSelf: 'flex-start' }}>
               <Box
                 sx={{
@@ -565,7 +524,7 @@ export default function ProductDetailPage() {
                     src={allImages[selectedImageIndex] || '/images/fallback.jpg'}
                     alt={product.title}
                     fill
-                    style={{ objectFit: 'contain', borderRadius: 8 }}
+                    style={{ objectFit: 'contain' }}
                   />
                   {allImages.length > 1 && (
                     <>
@@ -628,14 +587,19 @@ export default function ProductDetailPage() {
               )}
             </Box>
 
-            {/* RIGHT: Product Info */}
             <Box sx={{ flex: 1 }}>
               <Card sx={{ bgcolor: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.06)', borderRadius: { xs: 2, md: 3 }, p: { xs: 2, md: 3, lg: 4 } }}>
                 <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
                   <Stack spacing={{ xs: 3, md: 4 }}>
-                    {/* Title & Brand */}
                     <Box>
-                      <Typography variant={{ xs: 'h5', md: 'h4' }} fontWeight={800} lineHeight={1.1} color="#1a1a1a" mb={{ xs: 1, md: 1.5 }}>
+                      <Typography
+                        variant="h4"
+                        fontWeight={800}
+                        lineHeight={1.1}
+                        color="#1a1a1a"
+                        mb={{ xs: 1, md: 1.5 }}
+                        sx={{ typography: { xs: 'h5', md: 'h4' } }}
+                      >
                         {product.title}
                       </Typography>
                       {product.brand && (
@@ -647,12 +611,19 @@ export default function ProductDetailPage() {
                       )}
                     </Box>
 
-                    {/* Price Section */}
                     <Box>
                       <Box sx={{ mb: { xs: 1, md: 2 } }}>
-                        {hasDiscount ? (
+                        {hasDiscount && (
                           <Stack direction="row" alignItems="center" spacing={{ xs: 1, md: 2 }}>
-                            <Typography variant={{ xs: 'body1', md: 'h6' }} color="#999" sx={{ textDecoration: 'line-through', fontSize: { xs: '1rem', md: '1.125rem' } }}>
+                            <Typography
+                              variant="body1"
+                              color="#999"
+                              sx={{
+                                textDecoration: 'line-through',
+                                fontSize: { xs: '1rem', md: '1.125rem' },
+                                typography: { xs: 'body1', md: 'h6' },
+                              }}
+                            >
                               KES {originalPrice.toLocaleString()}
                             </Typography>
                             <Chip
@@ -667,8 +638,13 @@ export default function ProductDetailPage() {
                               }}
                             />
                           </Stack>
-                        ) : null}
-                        <Typography variant={{ xs: 'h4', md: 'h3' }} fontWeight={800} color="#1a1a1a">
+                        )}
+                        <Typography
+                          variant="h3"
+                          fontWeight={800}
+                          color="#1a1a1a"
+                          sx={{ typography: { xs: 'h4', md: 'h3' } }}
+                        >
                           KES {displayPrice.toLocaleString()}
                         </Typography>
                       </Box>
@@ -676,7 +652,6 @@ export default function ProductDetailPage() {
 
                     <Divider sx={{ borderColor: '#e0e0e0', my: { xs: 1, md: 2 } }} />
 
-                    {/* Variant Selectors */}
                     <Stack spacing={{ xs: 2, md: 3 }}>
                       {uniqueColors.length > 0 && (
                         <FormControl fullWidth variant="outlined">
@@ -693,9 +668,7 @@ export default function ProductDetailPage() {
                             }}
                           >
                             {uniqueColors.map((c) => (
-                              <MenuItem key={c} value={c}>
-                                {c}
-                              </MenuItem>
+                              <MenuItem key={c} value={c}>{c}</MenuItem>
                             ))}
                           </Select>
                         </FormControl>
@@ -715,23 +688,19 @@ export default function ProductDetailPage() {
                             }}
                           >
                             {uniqueStorages.map((s) => (
-                              <MenuItem key={s} value={s}>
-                                {s}
-                              </MenuItem>
+                              <MenuItem key={s} value={s}>{s}</MenuItem>
                             ))}
                           </Select>
                         </FormControl>
                       )}
                     </Stack>
 
-                    {/* Stock Warning */}
                     {isOutOfStock && (
                       <Alert severity="error" icon={false} sx={{ borderRadius: 2, fontWeight: 600, px: { xs: 2, md: 3 }, py: { xs: 1, md: 1.5 }, bgcolor: alpha('#d32f2f', 0.1), color: '#d32f2f' }}>
                         This combination is out of stock. Please select another color or storage option.
                       </Alert>
                     )}
 
-                    {/* Actions */}
                     <Stack spacing={{ xs: 2, md: 3 }}>
                       <Button
                         variant="contained"
@@ -770,11 +739,7 @@ export default function ProductDetailPage() {
                           fontWeight: 700,
                           textTransform: 'none',
                           borderRadius: 2,
-                          '&:hover': { 
-                            borderColor: '#128C7E', 
-                            color: '#128C7E',
-                            bgcolor: alpha('#25D366', 0.04),
-                          },
+                          '&:hover': { borderColor: '#128C7E', color: '#128C7E', bgcolor: alpha('#25D366', 0.04) },
                           '&[disabled]': { borderColor: '#ccc', color: '#ccc' },
                         }}
                       >
@@ -790,12 +755,7 @@ export default function ProductDetailPage() {
                           color: wishlist.has(product.id) ? '#e91e63' : '#666',
                           borderRadius: 2,
                           transition: 'all 0.3s ease',
-                          '&:hover': { 
-                            borderColor: '#e91e63', 
-                            color: '#e91e63',
-                            transform: 'scale(1.05)',
-                            boxShadow: '0 4px 12px rgba(233,30,99,0.2)',
-                          },
+                          '&:hover': { borderColor: '#e91e63', color: '#e91e63', transform: 'scale(1.05)', boxShadow: '0 4px 12px rgba(233,30,99,0.2)' },
                         }}
                       >
                         {wishlist.has(product.id) ? <Favorite sx={{ fontSize: { xs: 24, md: 28 } }} /> : <FavoriteBorder sx={{ fontSize: { xs: 24, md: 28 } }} />}
@@ -807,7 +767,6 @@ export default function ProductDetailPage() {
             </Box>
           </Stack>
 
-          {/* Tabs for Description and Key Features */}
           {(product.description || keyFeatures.length > 0) && (
             <Card sx={{ bgcolor: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.06)', borderRadius: { xs: 2, md: 3 } }}>
               <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
@@ -818,7 +777,7 @@ export default function ProductDetailPage() {
               </Box>
               <CardContent sx={{ p: { xs: 2, md: 3, lg: 4 } }}>
                 {tabValue === 0 && product.description && (
-                  <Typography variant="body1" color="#444" lineHeight={1.8} sx={{ fontSize: { xs: '0.875rem', md: '1rem' }, textAlign: 'left' }}>
+                  <Typography variant="body1" color="#444" lineHeight={1.8} sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
                     {product.description}
                   </Typography>
                 )}
@@ -851,14 +810,14 @@ export default function ProductDetailPage() {
                         >
                           <Typography
                             component="span"
-                            variant={{ xs: 'body2', md: 'subtitle1' }}
+                            variant="subtitle1"
                             fontWeight={700}
                             color="#1a1a1a"
-                            sx={{ mr: 1 }}
+                            sx={{ mr: 1, typography: { xs: 'body2', md: 'subtitle1' } }}
                           >
                             {keyPart}:
                           </Typography>
-                          <Typography component="span" variant="body1" color="#444" fontSize={{ xs: '0.875rem', md: '1rem' }}>
+                          <Typography component="span" variant="body1" color="#444" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
                             {valuePart}
                           </Typography>
                         </Box>
@@ -870,41 +829,52 @@ export default function ProductDetailPage() {
             </Card>
           )}
 
-          {/* Horizontal Delivery Info Cards - Below Tabs */}
           <Card sx={{ bgcolor: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.06)', borderRadius: { xs: 2, md: 3 }, overflow: 'hidden', mt: { xs: 3, md: 4 } }}>
             <CardContent sx={{ p: 0 }}>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0} divider={<Divider orientation="vertical" flexItem />}>
                 <Stack direction="row" alignItems="center" spacing={{ xs: 1.5, md: 2 }} sx={{ flex: 1, p: { xs: 2, md: 3 }, borderRight: { xs: 'none', sm: '1px solid #e0e0e0' } }}>
                   <LocalShipping sx={{ fontSize: { xs: 24, md: 32 }, color: '#e91e63' }} />
                   <Box>
-                    <Typography variant={{ xs: 'subtitle1', md: 'h6' }} fontWeight={700} color="#1a1a1a" mb={0.5}>
+                    <Typography
+                      variant="h6"
+                      fontWeight={700}
+                      color="#1a1a1a"
+                      mb={0.5}
+                      sx={{ typography: { xs: 'subtitle1', md: 'h6' } }}
+                    >
                       Free Delivery
                     </Typography>
-                    <Typography variant="body2" color="#666">
-                      Within Nairobi CBD
-                    </Typography>
+                    <Typography variant="body2" color="#666">Within Nairobi CBD</Typography>
                   </Box>
                 </Stack>
                 <Stack direction="row" alignItems="center" spacing={{ xs: 1.5, md: 2 }} sx={{ flex: 1, p: { xs: 2, md: 3 }, borderRight: { xs: 'none', sm: '1px solid #e0e0e0' } }}>
                   <Sync sx={{ fontSize: { xs: 24, md: 32 }, color: '#e91e63' }} />
                   <Box>
-                    <Typography variant={{ xs: 'subtitle1', md: 'h6' }} fontWeight={700} color="#1a1a1a" mb={0.5}>
+                    <Typography
+                      variant="h6"
+                      fontWeight={700}
+                      color="#1a1a1a"
+                      mb={0.5}
+                      sx={{ typography: { xs: 'subtitle1', md: 'h6' } }}
+                    >
                       Fast Repairs
                     </Typography>
-                    <Typography variant="body2" color="#666">
-                      5 working days or less
-                    </Typography>
+                    <Typography variant="body2" color="#666">5 working days or less</Typography>
                   </Box>
                 </Stack>
                 <Stack direction="row" alignItems="center" spacing={{ xs: 1.5, md: 2 }} sx={{ flex: 1, p: { xs: 2, md: 3 } }}>
                   <Security sx={{ fontSize: { xs: 24, md: 32 }, color: '#e91e63' }} />
                   <Box>
-                    <Typography variant={{ xs: 'subtitle1', md: 'h6' }} fontWeight={700} color="#1a1a1a" mb={0.5}>
+                    <Typography
+                      variant="h6"
+                      fontWeight={700}
+                      color="#1a1a1a"
+                      mb={0.5}
+                      sx={{ typography: { xs: 'subtitle1', md: 'h6' } }}
+                    >
                       1-Year Warranty
                     </Typography>
-                    <Typography variant="body2" color="#666">
-                      Peace of mind guaranteed
-                    </Typography>
+                    <Typography variant="body2" color="#666">Peace of mind guaranteed</Typography>
                   </Box>
                 </Stack>
               </Stack>
@@ -913,109 +883,83 @@ export default function ProductDetailPage() {
         </Stack>
       </Box>
 
-      {/* What Others Are Buying Section - Sliding Carousel */}
       {inStockPopular.length > 0 && (
-        <>
-          <Box sx={{ bgcolor: '#f8f9fa', py: { xs: 6, md: 8 }, mt: { xs: 4, md: 6 } }}>
-            <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 3, md: 6 } }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={{ xs: 3, md: 5 }}>
-                <Typography variant={{ xs: 'h5', md: 'h4' }} fontWeight={800} color="#1a1a1a">
-                  What others are buying
-                </Typography>
-                <Stack direction="row" spacing={1}>
-                  <IconButton
-                    onClick={prevSlide}
-                    disabled={currentSlide === 0}
-                    sx={{ 
-                      bgcolor: alpha('#e91e63', 0.1), 
-                      color: '#e91e63', 
-                      width: { xs: 40, md: 48 }, 
-                      height: { xs: 40, md: 48 },
-                      '&:hover': { bgcolor: alpha('#e91e63', 0.2) }, 
-                      '&[disabled]': { color: '#ccc', bgcolor: 'transparent' } 
-                    }}
-                  >
-                    <ChevronLeft />
-                  </IconButton>
-                  <IconButton
-                    onClick={nextSlide}
-                    disabled={currentSlide === totalSlides - 1}
-                    sx={{ 
-                      bgcolor: alpha('#e91e63', 0.1), 
-                      color: '#e91e63', 
-                      width: { xs: 40, md: 48 }, 
-                      height: { xs: 40, md: 48 },
-                      '&:hover': { bgcolor: alpha('#e91e63', 0.2) }, 
-                      '&[disabled]': { color: '#ccc', bgcolor: 'transparent' } 
-                    }}
-                  >
-                    <ChevronRight />
-                  </IconButton>
-                </Stack>
+        <Box sx={{ bgcolor: '#f8f9fa', py: { xs: 6, md: 8 }, mt: { xs: 4, md: 6 } }}>
+          <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 3, md: 6 } }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={{ xs: 3, md: 5 }}>
+              <Typography
+                variant="h4"
+                fontWeight={800}
+                color="#1a1a1a"
+                sx={{ typography: { xs: 'h5', md: 'h4' } }}
+              >
+                What others are buying
+              </Typography>
+              <Stack direction="row" spacing={1}>
+                <IconButton onClick={prevSlide} disabled={currentSlide === 0} sx={{ bgcolor: alpha('#e91e63', 0.1), color: '#e91e63', width: { xs: 40, md: 48 }, height: { xs: 40, md: 48 }, '&:hover': { bgcolor: alpha('#e91e63', 0.2) }, '&[disabled]': { color: '#ccc', bgcolor: 'transparent' } }}>
+                  <ChevronLeft />
+                </IconButton>
+                <IconButton onClick={nextSlide} disabled={currentSlide === totalSlides - 1} sx={{ bgcolor: alpha('#e91e63', 0.1), color: '#e91e63', width: { xs: 40, md: 48 }, height: { xs: 40, md: 48 }, '&:hover': { bgcolor: alpha('#e91e63', 0.2) }, '&[disabled]': { color: '#ccc', bgcolor: 'transparent' } }}>
+                  <ChevronRight />
+                </IconButton>
               </Stack>
-              <Box sx={{ position: 'relative', overflow: 'hidden', borderRadius: { xs: 2, md: 3 } }}>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                    transform: `translateX(-${(currentSlide * 100) / slidesToShow}%)`,
-                    width: `${(inStockPopular.length / slidesToShow) * 100}%`,
-                  }}
-                >
-                  {inStockPopular.map((p) => (
-                    <Box key={p.id} sx={{ width: `${100 / slidesToShow}%`, px: { xs: 0.5, md: 1 } }}>
-                      {renderPopularCard(p)}
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
-              {/* Indicators */}
-              {totalSlides > 1 && (
-                <Stack direction="row" justifyContent="center" spacing={{ xs: 0.5, md: 1 }} mt={{ xs: 2, md: 3 }}>
-                  {Array.from({ length: totalSlides }).map((_, i) => (
-                    <Box
-                      key={i}
-                      onClick={() => setCurrentSlide(i)}
-                      sx={{
-                        width: { xs: 10, md: 12 },
-                        height: { xs: 10, md: 12 },
-                        borderRadius: '50%',
-                        bgcolor: i === currentSlide ? '#e91e63' : alpha('#e91e63', 0.3),
-                        cursor: 'pointer',
-                        transition: 'all 0.3s ease',
-                        '&:hover': { bgcolor: '#e91e63', transform: 'scale(1.2)' },
-                      }}
-                    />
-                  ))}
-                </Stack>
-              )}
-              {/* Load More Button */}
-              <Box sx={{ textAlign: 'center', mt: { xs: 3, md: 5 } }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<ShoppingCart sx={{ fontSize: { xs: 18, md: 20 } }} />}
-                  onClick={handleLoadMore}
-                  sx={{
-                    borderColor: '#e91e63',
-                    color: '#e91e63',
-                    fontWeight: 700,
-                    px: { xs: 4, md: 6 },
-                    py: { xs: 1.5, md: 2 },
-                    borderRadius: 2,
-                    fontSize: { xs: '0.875rem', md: '1rem' },
-                    '&:hover': { 
-                      borderColor: '#c2185b', 
-                      color: '#c2185b',
-                      boxShadow: '0 4px 12px rgba(233,30,99,0.2)',
-                    },
-                  }}
-                >
-                  Load More Products
-                </Button>
+            </Stack>
+            <Box sx={{ position: 'relative', overflow: 'hidden', borderRadius: { xs: 2, md: 3 } }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transform: `translateX(-${(currentSlide * 100) / slidesToShow}%)`,
+                  width: `${(inStockPopular.length / slidesToShow) * 100}%`,
+                }}
+              >
+                {inStockPopular.map((p) => (
+                  <Box key={p.id} sx={{ width: `${100 / slidesToShow}%`, px: { xs: 0.5, md: 1 } }}>
+                    {renderPopularCard(p)}
+                  </Box>
+                ))}
               </Box>
             </Box>
+            {totalSlides > 1 && (
+              <Stack direction="row" justifyContent="center" spacing={{ xs: 0.5, md: 1 }} mt={{ xs: 2, md: 3 }}>
+                {Array.from({ length: totalSlides }).map((_, i) => (
+                  <Box
+                    key={i}
+                    onClick={() => setCurrentSlide(i)}
+                    sx={{
+                      width: { xs: 10, md: 12 },
+                      height: { xs: 10, md: 12 },
+                      borderRadius: '50%',
+                      bgcolor: i === currentSlide ? '#e91e63' : alpha('#e91e63', 0.3),
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      '&:hover': { bgcolor: '#e91e63', transform: 'scale(1.2)' },
+                    }}
+                  />
+                ))}
+              </Stack>
+            )}
+            <Box sx={{ textAlign: 'center', mt: { xs: 3, md: 5 } }}>
+              <Button
+                variant="outlined"
+                startIcon={<ShoppingCart sx={{ fontSize: { xs: 18, md: 20 } }} />}
+                onClick={handleLoadMore}
+                sx={{
+                  borderColor: '#e91e63',
+                  color: '#e91e63',
+                  fontWeight: 700,
+                  px: { xs: 4, md: 6 },
+                  py: { xs: 1.5, md: 2 },
+                  borderRadius: 2,
+                  fontSize: { xs: '0.875rem', md: '1rem' },
+                  '&:hover': { borderColor: '#c2185b', color: '#c2185b', boxShadow: '0 4px 12px rgba(233,30,99,0.2)' },
+                }}
+              >
+                Load More Products
+              </Button>
+            </Box>
           </Box>
-        </>
+        </Box>
       )}
 
       <Snackbar
