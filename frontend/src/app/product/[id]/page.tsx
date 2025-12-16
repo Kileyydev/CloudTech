@@ -17,6 +17,10 @@ import {
   CardContent,
   CardMedia,
   Chip,
+  Tabs,
+  Tab,
+  Breadcrumbs,
+  Link,
   alpha,
 } from '@mui/material';
 import {
@@ -29,8 +33,8 @@ import {
   CreditCard,
   ChevronLeft,
   ChevronRight,
-  Add,
-  Remove,
+  Home,
+  Message,
 } from '@mui/icons-material';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
@@ -54,11 +58,14 @@ interface Product {
   price: number;
   final_price?: number;
   brand?: { name: string };
+  categories?: { name: string }[];
   variants?: Variant[];
   colors?: { value: string }[];
   storage_options?: { value: string }[];
   type?: { value: string }[];
   connectivity?: { value: string }[];
+  ram_options?: { value: string }[];
+  features?: Record<string, any>;
 }
 
 type ProductImage = { image?: { url: string } } | { url: string } | string;
@@ -99,6 +106,8 @@ export default function ProductDetailPage() {
   // Dropdown states
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedStorage, setSelectedStorage] = useState('');
+  // Tab state
+  const [tabValue, setTabValue] = useState(0);
 
   // Popular products states
   const [popularProducts, setPopularProducts] = useState<PopularProductT[]>([]);
@@ -107,6 +116,56 @@ export default function ProductDetailPage() {
   const CACHE_KEY = 'popular_products_cache_v1';
   const CACHE_DURATION = 1000 * 60 * 5; // 5 mins
   const slidesToShow = 4; // Number of cards to show at once
+
+  // WhatsApp phone number - replace with actual
+  const WHATSAPP_PHONE = '254712345678'; // Example Kenyan number
+
+  // Key Features computation
+  const keyFeatures = useMemo(() => {
+    if (!product) return [];
+    const feats: string[] = [];
+
+    // RAM
+    if (product.ram_options && product.ram_options.length > 0) {
+      feats.push(`RAM: ${product.ram_options.map((o: any) => o.value).join(', ')}`);
+    }
+
+    // Storage
+    if (product.storage_options && product.storage_options.length > 0) {
+      feats.push(`Internal Storage: ${product.storage_options.map((o: any) => o.value).join(', ')}`);
+    }
+
+    // Colors
+    if (product.colors && product.colors.length > 0) {
+      feats.push(`Colors: ${product.colors.map((o: any) => o.value).join(', ')}`);
+    }
+
+    // Features JSON
+    if (product.features) {
+      const featureOrder = ['display', 'os', 'chipset', 'main_camera', 'selfie_lens', 'connectivity', 'battery'];
+      featureOrder.forEach(key => {
+        if (product.features[key]) {
+          const formattedKey = key
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          feats.push(`${formattedKey}: ${product.features[key]}`);
+        }
+      });
+      // Add any other features not in order
+      Object.entries(product.features).forEach(([key, value]) => {
+        if (!featureOrder.includes(key) && value) {
+          const formattedKey = key
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+          feats.push(`${formattedKey}: ${value}`);
+        }
+      });
+    }
+
+    return feats;
+  }, [product]);
 
   useEffect(() => {
     const saved = localStorage.getItem('wishlist');
@@ -140,6 +199,21 @@ export default function ProductDetailPage() {
     };
     if (params.id) fetchProduct();
   }, [params.id, router]);
+
+  // Re-calculate variant when color/storage changes
+  useEffect(() => {
+    if (!product?.variants || (!selectedColor && !selectedStorage)) return;
+    const match = product.variants.find((v: any) =>
+      (!selectedColor || v.color === selectedColor) &&
+      (!selectedStorage || v.storage === selectedStorage) &&
+      v.stock > 0
+    );
+    if (match) {
+      setSelectedVariant(match);
+    } else {
+      setSelectedVariant(null);
+    }
+  }, [selectedColor, selectedStorage, product?.variants]);
 
   // Fetch popular products - using general fetch with limit=10
   useEffect(() => {
@@ -187,21 +261,6 @@ export default function ProductDetailPage() {
     loadPopularProducts();
   }, []);
 
-  // Re-calculate variant when color/storage changes
-  useEffect(() => {
-    if (!product?.variants || (!selectedColor && !selectedStorage)) return;
-    const match = product.variants.find((v: any) =>
-      (!selectedColor || v.color === selectedColor) &&
-      (!selectedStorage || v.storage === selectedStorage) &&
-      v.stock > 0
-    );
-    if (match) {
-      setSelectedVariant(match);
-    } else {
-      setSelectedVariant(null);
-    }
-  }, [selectedColor, selectedStorage, product?.variants]);
-
   const allImages = product
     ? [getImageUrl(product.cover_image), ...(product.images || []).map((i: any) => getImageUrl(i))]
     : [];
@@ -232,6 +291,16 @@ export default function ProductDetailPage() {
     setSnackbar({ open: true, message: 'Added to cart! 🛒', severity: 'success' });
   };
 
+  const handleOrderViaWhatsApp = () => {
+    if (!product || !selectedVariant) {
+      setSnackbar({ open: true, message: 'Please select color and storage first', severity: 'error' });
+      return;
+    }
+    const message = `Hi, I'd like to order ${product.title} (${selectedColor}, ${selectedStorage}) for KES ${selectedVariant.price.toLocaleString()}.`;
+    const whatsappUrl = `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   const handlePopularAddToCart = (p: PopularProductT) => {
     if (p.stock <= 0) {
       setSnackbar({ open: true, message: 'Out of stock', severity: 'error' });
@@ -260,17 +329,25 @@ export default function ProductDetailPage() {
     router.push('/products');
   };
 
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
+
+  const handleBreadcrumbClick = (path: string) => {
+    router.push(path);
+  };
+
   if (loading || !product) {
     return (
-      <Box sx={{ bgcolor: '#fdfdfd', minHeight: '100vh', py: 8 }}>
+      <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', py: 8 }}>
         <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 3, md: 6 } }}>
           <Stack direction={{ xs: 'column', lg: 'row' }} spacing={4} alignItems="flex-start">
-            <Box sx={{ flex: 1, height: 500, bgcolor: '#fff', borderRadius: 1, boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }} />
+            <Box sx={{ flex: 1, height: { xs: 250, sm: 350, md: 450 }, bgcolor: '#fff', borderRadius: 2, boxShadow: '0 4px 16px rgba(0,0,0,0.06)' }} />
             <Box sx={{ flex: 1 }}>
-              <Box sx={{ height: 60, bgcolor: '#fff', borderRadius: 1, mb: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }} />
-              <Box sx={{ height: 80, bgcolor: '#fff', borderRadius: 1, mb: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }} />
-              <Box sx={{ height: 100, bgcolor: '#fff', borderRadius: 1, mb: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }} />
-              <Box sx={{ height: 120, bgcolor: '#fff', borderRadius: 1, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }} />
+              <Box sx={{ height: { xs: 40, md: 60 }, bgcolor: '#fff', borderRadius: 2, mb: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }} />
+              <Box sx={{ height: { xs: 60, md: 80 }, bgcolor: '#fff', borderRadius: 2, mb: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }} />
+              <Box sx={{ height: { xs: 80, md: 100 }, bgcolor: '#fff', borderRadius: 2, mb: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }} />
+              <Box sx={{ height: { xs: 100, md: 120 }, bgcolor: '#fff', borderRadius: 2, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }} />
             </Box>
           </Stack>
         </Box>
@@ -287,6 +364,14 @@ export default function ProductDetailPage() {
     .sort((a: any, b: any) => parseInt(a) - parseInt(b)) as string[];
   const inStock = selectedVariant ? selectedVariant.stock > 0 : false;
   const hasDiscount = savings > 0;
+  const isOutOfStock = !selectedVariant || !inStock;
+
+  // Breadcrumb items
+  const breadcrumbItems = [
+    { label: 'Home', href: '/' },
+    ...(product.categories || []).map((cat: any) => ({ label: cat.name, href: `/category/${cat.slug || cat.name.toLowerCase()}` })),
+    { label: product.title, href: '#' },
+  ];
 
   // Popular products rendering
   const getPopularImageUrl = (img: ProductImage | undefined): string => {
@@ -318,9 +403,9 @@ export default function ProductDetailPage() {
           boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
           display: 'flex',
           flexDirection: 'column',
-          borderRadius: 1,
-          transition: 'box-shadow 0.2s',
-          '&:hover': { boxShadow: '0 8px 24px rgba(0,0,0,0.12)' },
+          borderRadius: 2,
+          transition: 'box-shadow 0.3s ease',
+          '&:hover': { boxShadow: '0 12px 40px rgba(0,0,0,0.15)', transform: 'translateY(-4px)' },
           flexShrink: 0,
         }}
       >
@@ -329,7 +414,7 @@ export default function ProductDetailPage() {
             height: 150,
             p: 2,
             cursor: 'pointer',
-            bgcolor: '#f9f9f9',
+            bgcolor: '#f8f9fa',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -346,69 +431,71 @@ export default function ProductDetailPage() {
               width: '100%',
               height: '100%',
               objectFit: 'contain',
+              transition: 'transform 0.3s ease',
+              '&:hover': { transform: 'scale(1.05)' },
             }}
           />
           {hasDiscount && (
-            <Box
+            <Chip
+              label={`${p.discount}% OFF`}
               sx={{
                 position: 'absolute',
-                top: 8,
-                left: 8,
+                top: 12,
+                left: 12,
                 bgcolor: '#e91e63',
                 color: '#fff',
                 fontWeight: 800,
                 fontSize: '0.75rem',
-                px: 1,
-                py: 0.5,
-                borderRadius: 1,
+                height: 24,
+                borderRadius: 12,
+                boxShadow: '0 2px 8px rgba(233,30,99,0.3)',
               }}
-            >
-              {p.discount}% OFF
-            </Box>
+            />
           )}
         </Box>
-        <CardContent sx={{ p: 2, pb: 2, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+        <CardContent sx={{ p: 3, pb: 3, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
           <Typography
+            variant="h6"
+            fontWeight={700}
+            color="#1a1a1a"
+            mb={1}
             sx={{
-              fontWeight: 700,
-              color: '#1a1a1a',
-              mb: 1,
-              fontSize: '0.9rem',
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
               cursor: 'pointer',
+              '&:hover': { color: '#e91e63' },
             }}
             onClick={() => router.push(`/product/${p.id}`)}
           >
             {p.title}
           </Typography>
           {p.brand && (
-            <Typography sx={{ color: '#666', fontSize: '0.8rem', mb: 1 }}>
+            <Typography variant="body2" color="#666" fontWeight={600} mb={2}>
               {p.brand.name}
             </Typography>
           )}
-          <Box sx={{ mb: 1.5 }}>
+          <Box sx={{ mb: 2 }}>
             {hasDiscount ? (
               <Stack direction="row" alignItems="center" spacing={1}>
-                <Typography sx={{ textDecoration: 'line-through', color: '#999', fontSize: '0.8rem' }}>
+                <Typography variant="body2" color="#999" sx={{ textDecoration: 'line-through' }}>
                   KES {p.price.toLocaleString()}
                 </Typography>
-                <Typography sx={{ fontWeight: 800, color: '#e91e63', fontSize: '1rem' }}>
+                <Typography variant="h6" fontWeight={800} color="#e91e63">
                   KES {displayPrice.toLocaleString()}
                 </Typography>
               </Stack>
             ) : (
-              <Typography sx={{ fontWeight: 800, color: '#1a1a1a', fontSize: '1rem' }}>
+              <Typography variant="h6" fontWeight={800} color="#1a1a1a">
                 KES {displayPrice.toLocaleString()}
               </Typography>
             )}
           </Box>
           <Button
             fullWidth
-            size="small"
-            startIcon={<ShoppingCart sx={{ fontSize: 16 }} />}
+            variant="contained"
+            startIcon={<ShoppingCart sx={{ fontSize: 18 }} />}
             onClick={(e) => {
               e.stopPropagation();
               handlePopularAddToCart(p);
@@ -419,10 +506,11 @@ export default function ProductDetailPage() {
               color: '#fff',
               fontWeight: 700,
               textTransform: 'none',
-              py: 0.8,
-              fontSize: '0.8rem',
+              py: 1.5,
               borderRadius: 1,
-              '&[disabled]': { bgcolor: '#eee', color: '#999' },
+              boxShadow: '0 2px 8px rgba(233,30,99,0.2)',
+              '&:hover': { bgcolor: '#c2185b', boxShadow: '0 4px 12px rgba(233,30,99,0.3)' },
+              '&[disabled]': { bgcolor: '#f5f5f5', color: '#999' },
             }}
           >
             {p.stock === 0 ? 'Out of Stock' : 'Add to Cart'}
@@ -436,296 +524,446 @@ export default function ProductDetailPage() {
   const totalSlides = Math.max(1, Math.ceil(inStockPopular.length / slidesToShow));
 
   return (
-    <Box sx={{ bgcolor: '#fdfdfd', minHeight: '100vh', color: '#1a1a1a' }}>
+    <Box sx={{ bgcolor: '#f8f9fa', minHeight: '100vh', color: '#1a1a1a' }}>
+      {/* Breadcrumbs */}
+      <Box sx={{ bgcolor: '#fff', py: { xs: 1.5, md: 2 }, borderBottom: '1px solid #e0e0e0' }}>
+        <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 3, md: 6 } }}>
+          <Breadcrumbs aria-label="breadcrumb" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+            {breadcrumbItems.map((item, index) => (
+              <Link
+                key={index}
+                underline="hover"
+                color="inherit"
+                onClick={() => item.href !== '#' && handleBreadcrumbClick(item.href)}
+                sx={{ cursor: 'pointer', '&:hover': { color: '#e91e63' } }}
+              >
+                {index === 0 ? <Home sx={{ fontSize: { xs: 14, md: 16 }, mr: 0.5 }} /> : null}
+                {item.label}
+              </Link>
+            ))}
+          </Breadcrumbs>
+        </Box>
+      </Box>
+
       <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 3, md: 6 }, py: { xs: 3, lg: 6 } }}>
-        <Stack direction={{ xs: 'column', lg: 'row' }} spacing={6} alignItems="flex-start">
-          {/* LEFT: Images + Description below */}
-          <Box sx={{ flex: 1, position: 'sticky', top: 100, alignSelf: 'flex-start' }}>
-            <Card sx={{ bgcolor: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.08)', borderRadius: 2, overflow: 'hidden', mb: 3 }}>
-              <Box sx={{ position: 'relative', p: 4 }}>
-                <Image
-                  src={allImages[selectedImageIndex] || '/images/fallback.jpg'}
-                  alt={product.title}
-                  width={800}
-                  height={800}
-                  style={{ width: '100%', height: 500, objectFit: 'contain' }}
-                />
-                {allImages.length > 1 && (
-                  <>
-                    <IconButton
-                      sx={{
-                        position: 'absolute',
-                        left: 16,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        bgcolor: 'rgba(255,255,255,0.95)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                        '&:hover': { bgcolor: '#fff' },
-                      }}
-                      onClick={() => setSelectedImageIndex((i) => (i - 1 + allImages.length) % allImages.length)}
-                    >
-                      <ChevronLeft />
-                    </IconButton>
-                    <IconButton
-                      sx={{
-                        position: 'absolute',
-                        right: 16,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        bgcolor: 'rgba(255,255,255,0.95)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                        '&:hover': { bgcolor: '#fff' },
-                      }}
-                      onClick={() => setSelectedImageIndex((i) => (i + 1) % allImages.length)}
-                    >
-                      <ChevronRight />
-                    </IconButton>
-                  </>
-                )}
-              </Box>
-            </Card>
-            {allImages.length > 1 && (
-              <Stack direction="row" spacing={2} justifyContent="center" mb={4}>
-                {allImages.map((src, i) => (
-                  <Box
-                    key={i}
-                    onClick={() => setSelectedImageIndex(i)}
-                    sx={{
-                      width: 80,
-                      height: 80,
-                      border: '2px solid',
-                      borderColor: selectedImageIndex === i ? '#e91e63' : '#e0e0e0',
-                      borderRadius: 1,
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: selectedImageIndex === i ? '0 2px 8px rgba(233,30,99,0.2)' : 'none',
-                    }}
-                  >
-                    <Image src={src} alt="" width={80} height={80} style={{ objectFit: 'cover' }} />
-                  </Box>
-                ))}
-              </Stack>
-            )}
-            {/* Description below images, aligned to the center */}
-            {product.description && (
-              <Card sx={{ bgcolor: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.08)', borderRadius: 2, p: 4 }}>
-                <Typography variant="h6" fontWeight={700} color="#1a1a1a" mb={2.5} sx={{ textAlign: 'center' }}>
-                  Description
-                </Typography>
-                <Typography variant="body1" color="#444" lineHeight={1.8} sx={{ fontSize: '1rem', textAlign: 'center' }}>
-                  {product.description}
-                </Typography>
-              </Card>
-            )}
-          </Box>
-
-          {/* RIGHT: Info (without description) */}
-          <Box sx={{ flex: 1 }}>
-            <Card sx={{ bgcolor: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.08)', borderRadius: 2, p: { xs: 3, md: 4 } }}>
-              <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
-                <Stack spacing={4}>
-                  {/* Title & Brand */}
-                  <Box>
-                    <Typography variant="h4" fontWeight={800} lineHeight={1.2} color="#1a1a1a" mb={1.5}>
-                      {product.title}
-                    </Typography>
-                    {product.brand && (
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Typography variant="body2" color="#666" fontWeight={600}>
-                          {product.brand.name}
-                        </Typography>
-                      </Stack>
-                    )}
-                  </Box>
-
-                  {/* Price Section */}
-                  <Box>
-                    <Box sx={{ mb: hasDiscount ? 1 : 0 }}>
-                      {hasDiscount ? (
-                        <Stack direction="row" alignItems="center" spacing={2}>
-                          <Typography variant="h5" color="#999" sx={{ textDecoration: 'line-through', fontSize: '1rem' }}>
-                            KES {originalPrice.toLocaleString()}
-                          </Typography>
-                          <Chip
-                            label={`Save KES ${savings.toLocaleString()}`}
-                            sx={{
-                              bgcolor: alpha('#e91e63', 0.1),
-                              color: '#e91e63',
-                              fontWeight: 700,
-                              fontSize: '0.875rem',
-                            }}
-                          />
-                        </Stack>
-                      ) : null}
-                      <Typography variant="h3" fontWeight={800} color="#1a1a1a">
-                        KES {displayPrice.toLocaleString()}
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Divider sx={{ borderColor: '#e0e0e0' }} />
-
-                  {/* Variant Selectors */}
-                  <Stack spacing={3}>
-                    {uniqueColors.length > 0 && (
-                      <FormControl fullWidth>
-                        <InputLabel sx={{ fontWeight: 700, color: '#1a1a1a' }}>Color</InputLabel>
-                        <Select
-                          value={selectedColor}
-                          label="Color"
-                          onChange={(e) => setSelectedColor(e.target.value as string)}
-                          sx={{
-                            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e91e63', borderWidth: 2 },
-                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#e91e63' },
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#e91e63' },
-                          }}
-                        >
-                          {uniqueColors.map((c) => (
-                            <MenuItem key={c} value={c}>
-                              {c}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    )}
-                    {uniqueStorages.length > 0 && (
-                      <FormControl fullWidth>
-                        <InputLabel sx={{ fontWeight: 700, color: '#1a1a1a' }}>Storage</InputLabel>
-                        <Select
-                          value={selectedStorage}
-                          label="Storage"
-                          onChange={(e) => setSelectedStorage(e.target.value as string)}
-                          sx={{
-                            '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e91e63', borderWidth: 2 },
-                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#e91e63' },
-                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#e91e63' },
-                          }}
-                        >
-                          {uniqueStorages.map((s) => (
-                            <MenuItem key={s} value={s}>
-                              {s}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    )}
-                  </Stack>
-
-                  {/* Stock Warning */}
-                  {selectedVariant && selectedVariant.stock < 10 && selectedVariant.stock > 0 && (
-                    <Alert severity="warning" sx={{ fontWeight: 600 }}>
-                      Only {selectedVariant.stock} left in stock — order soon!
-                    </Alert>
+        <Stack spacing={{ xs: 4, md: 6 }}>
+          {/* Main Product Row */}
+          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={{ xs: 4, md: 6 }} alignItems="flex-start">
+            {/* LEFT: Images - Seamless, no card border */}
+            <Box sx={{ flex: 1, position: 'sticky', top: 100, alignSelf: 'flex-start' }}>
+              <Box
+                sx={{
+                  bgcolor: '#fff',
+                  borderRadius: { xs: 2, md: 3 },
+                  overflow: 'hidden',
+                  mb: { xs: 2, md: 3 },
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.06)',
+                }}
+              >
+                <Box sx={{ position: 'relative', p: { xs: 1.5, md: 4 }, height: { xs: 250, sm: 350, md: 450, lg: 500 } }}>
+                  <Image
+                    src={allImages[selectedImageIndex] || '/images/fallback.jpg'}
+                    alt={product.title}
+                    fill
+                    style={{ objectFit: 'contain', borderRadius: { xs: 1, md: 2 } }}
+                  />
+                  {allImages.length > 1 && (
+                    <>
+                      <IconButton
+                        sx={{
+                          position: 'absolute',
+                          left: { xs: 4, md: 16 },
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          bgcolor: 'rgba(255,255,255,0.95)',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                          '&:hover': { bgcolor: '#fff' },
+                          zIndex: 1,
+                        }}
+                        onClick={() => setSelectedImageIndex((i) => Math.max(0, (i - 1 + allImages.length) % allImages.length))}
+                      >
+                        <ChevronLeft />
+                      </IconButton>
+                      <IconButton
+                        sx={{
+                          position: 'absolute',
+                          right: { xs: 4, md: 16 },
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          bgcolor: 'rgba(255,255,255,0.95)',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                          '&:hover': { bgcolor: '#fff' },
+                          zIndex: 1,
+                        }}
+                        onClick={() => setSelectedImageIndex((i) => (i + 1) % allImages.length)}
+                      >
+                        <ChevronRight />
+                      </IconButton>
+                    </>
                   )}
+                </Box>
+              </Box>
+              {allImages.length > 1 && (
+                <Stack direction="row" spacing={{ xs: 1, md: 2 }} justifyContent="center" mb={4}>
+                  {allImages.map((src, i) => (
+                    <Box
+                      key={i}
+                      onClick={() => setSelectedImageIndex(i)}
+                      sx={{
+                        width: { xs: 50, sm: 60, md: 70 },
+                        height: { xs: 50, sm: 60, md: 70 },
+                        border: '2px solid transparent',
+                        borderRadius: { xs: 1.5, md: 2 },
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        boxShadow: selectedImageIndex === i ? '0 4px 12px rgba(233,30,99,0.3)' : '0 2px 4px rgba(0,0,0,0.1)',
+                        '&:hover': { borderColor: '#e91e63', transform: 'scale(1.05)' },
+                      }}
+                    >
+                      <Image src={src} alt="" fill style={{ objectFit: 'cover' }} />
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Box>
 
-                  {/* Actions */}
-                  <Stack spacing={3}>
-                    <Stack direction="row" spacing={3}>
+            {/* RIGHT: Product Info */}
+            <Box sx={{ flex: 1 }}>
+              <Card sx={{ bgcolor: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.06)', borderRadius: { xs: 2, md: 3 }, p: { xs: 2, md: 3, lg: 4 } }}>
+                <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
+                  <Stack spacing={{ xs: 3, md: 4 }}>
+                    {/* Title & Brand */}
+                    <Box>
+                      <Typography variant={{ xs: 'h5', md: 'h4' }} fontWeight={800} lineHeight={1.1} color="#1a1a1a" mb={{ xs: 1, md: 1.5 }}>
+                        {product.title}
+                      </Typography>
+                      {product.brand && (
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Typography variant="body2" color="#666" fontWeight={600}>
+                            by {product.brand.name}
+                          </Typography>
+                        </Stack>
+                      )}
+                    </Box>
+
+                    {/* Price Section */}
+                    <Box>
+                      <Box sx={{ mb: { xs: 1, md: 2 } }}>
+                        {hasDiscount ? (
+                          <Stack direction="row" alignItems="center" spacing={{ xs: 1, md: 2 }}>
+                            <Typography variant={{ xs: 'body1', md: 'h6' }} color="#999" sx={{ textDecoration: 'line-through', fontSize: { xs: '1rem', md: '1.125rem' } }}>
+                              KES {originalPrice.toLocaleString()}
+                            </Typography>
+                            <Chip
+                              label={`Save KES ${savings.toLocaleString()}`}
+                              sx={{
+                                bgcolor: alpha('#e91e63', 0.1),
+                                color: '#e91e63',
+                                fontWeight: 700,
+                                fontSize: { xs: '0.75rem', md: '0.875rem' },
+                                height: { xs: 24, md: 28 },
+                                borderRadius: { xs: 12, md: 14 },
+                              }}
+                            />
+                          </Stack>
+                        ) : null}
+                        <Typography variant={{ xs: 'h4', md: 'h3' }} fontWeight={800} color="#1a1a1a">
+                          KES {displayPrice.toLocaleString()}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <Divider sx={{ borderColor: '#e0e0e0', my: { xs: 1, md: 2 } }} />
+
+                    {/* Variant Selectors */}
+                    <Stack spacing={{ xs: 2, md: 3 }}>
+                      {uniqueColors.length > 0 && (
+                        <FormControl fullWidth variant="outlined">
+                          <InputLabel sx={{ fontWeight: 700, color: '#1a1a1a' }}>Select Color</InputLabel>
+                          <Select
+                            value={selectedColor}
+                            label="Select Color"
+                            onChange={(e) => setSelectedColor(e.target.value as string)}
+                            sx={{
+                              '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e0e0e0', borderWidth: 1 },
+                              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#e91e63' },
+                              '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#e91e63' },
+                              borderRadius: 2,
+                            }}
+                          >
+                            {uniqueColors.map((c) => (
+                              <MenuItem key={c} value={c}>
+                                {c}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      )}
+                      {uniqueStorages.length > 0 && (
+                        <FormControl fullWidth variant="outlined">
+                          <InputLabel sx={{ fontWeight: 700, color: '#1a1a1a' }}>Select Storage</InputLabel>
+                          <Select
+                            value={selectedStorage}
+                            label="Select Storage"
+                            onChange={(e) => setSelectedStorage(e.target.value as string)}
+                            sx={{
+                              '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e0e0e0', borderWidth: 1 },
+                              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#e91e63' },
+                              '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#e91e63' },
+                              borderRadius: 2,
+                            }}
+                          >
+                            {uniqueStorages.map((s) => (
+                              <MenuItem key={s} value={s}>
+                                {s}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      )}
+                    </Stack>
+
+                    {/* Stock Warning */}
+                    {isOutOfStock && (
+                      <Alert severity="error" icon={false} sx={{ borderRadius: 2, fontWeight: 600, px: { xs: 2, md: 3 }, py: { xs: 1, md: 1.5 }, bgcolor: alpha('#d32f2f', 0.1), color: '#d32f2f' }}>
+                        This combination is out of stock. Please select another color or storage option.
+                      </Alert>
+                    )}
+
+                    {/* Actions */}
+                    <Stack spacing={{ xs: 2, md: 3 }}>
                       <Button
                         variant="contained"
                         size="large"
-                        startIcon={<ShoppingCart sx={{ fontSize: 24 }} />}
+                        startIcon={<ShoppingCart sx={{ fontSize: { xs: 20, md: 24 } }} />}
                         onClick={handleAddToCart}
-                        disabled={!inStock || !selectedVariant}
+                        disabled={isOutOfStock}
                         sx={{
-                          flex: 1,
+                          height: { xs: 48, md: 56 },
                           bgcolor: '#e91e63',
                           color: '#fff',
-                          py: 2,
-                          fontSize: '1.1rem',
+                          py: { xs: 1.5, md: 2 },
+                          fontSize: { xs: '1rem', md: '1.125rem' },
                           fontWeight: 700,
                           textTransform: 'none',
-                          borderRadius: 1,
-                          boxShadow: '0 4px 16px rgba(233,30,99,0.3)',
-                          '&:hover': { bgcolor: '#c2185b', boxShadow: '0 6px 20px rgba(233,30,99,0.4)' },
-                          '&[disabled]': { bgcolor: '#eee', color: '#999' },
+                          borderRadius: 2,
+                          boxShadow: '0 4px 20px rgba(233,30,99,0.3)',
+                          '&:hover': { bgcolor: '#c2185b', boxShadow: '0 8px 25px rgba(233,30,99,0.4)', transform: 'translateY(-1px)' },
+                          '&[disabled]': { bgcolor: '#f5f5f5', color: '#999', boxShadow: 'none' },
                         }}
                       >
-                        {inStock && selectedVariant ? 'Add to Cart' : 'Out of Stock'}
+                        {isOutOfStock ? 'Out of Stock' : 'Add to Cart'}
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        size="large"
+                        startIcon={<Message sx={{ fontSize: { xs: 20, md: 24 } }} />}
+                        onClick={handleOrderViaWhatsApp}
+                        disabled={isOutOfStock}
+                        sx={{
+                          height: { xs: 48, md: 56 },
+                          borderColor: '#25D366',
+                          color: '#25D366',
+                          py: { xs: 1.5, md: 2 },
+                          fontSize: { xs: '1rem', md: '1.125rem' },
+                          fontWeight: 700,
+                          textTransform: 'none',
+                          borderRadius: 2,
+                          '&:hover': { 
+                            borderColor: '#128C7E', 
+                            color: '#128C7E',
+                            bgcolor: alpha('#25D366', 0.04),
+                          },
+                          '&[disabled]': { borderColor: '#ccc', color: '#ccc' },
+                        }}
+                      >
+                        Order via WhatsApp
                       </Button>
                       <IconButton
                         onClick={toggleWishlist}
+                        size="large"
                         sx={{
-                          border: '2px solid #e91e63',
-                          width: 56,
-                          height: 56,
-                          color: wishlist.has(product.id) ? '#e91e63' : '#999',
-                          '&:hover': { borderColor: '#c2185b', color: '#e91e63' },
+                          border: '2px solid #e0e0e0',
+                          width: { xs: 56, md: 64 },
+                          height: { xs: 56, md: 64 },
+                          color: wishlist.has(product.id) ? '#e91e63' : '#666',
+                          borderRadius: 2,
+                          transition: 'all 0.3s ease',
+                          '&:hover': { 
+                            borderColor: '#e91e63', 
+                            color: '#e91e63',
+                            transform: 'scale(1.05)',
+                            boxShadow: '0 4px 12px rgba(233,30,99,0.2)',
+                          },
                         }}
                       >
-                        {wishlist.has(product.id) ? <Favorite sx={{ fontSize: 28 }} /> : <FavoriteBorder sx={{ fontSize: 28 }} />}
+                        {wishlist.has(product.id) ? <Favorite sx={{ fontSize: { xs: 24, md: 28 } }} /> : <FavoriteBorder sx={{ fontSize: { xs: 24, md: 28 } }} />}
                       </IconButton>
                     </Stack>
                   </Stack>
+                </CardContent>
+              </Card>
+            </Box>
+          </Stack>
 
-                  {/* Features */}
-                  <Card sx={{ bgcolor: '#f9f9f9', boxShadow: 'none', border: '1px solid #e0e0e0' }}>
-                    <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
-                      <Stack spacing={2.5}>
-                        <Stack direction="row" alignItems="flex-start" spacing={2.5}>
-                          <LocalShipping sx={{ fontSize: 24, color: '#e91e63', mt: 0.5 }} />
-                          <Typography fontWeight={600} lineHeight={1.6}>Free delivery within Nairobi CBD</Typography>
-                        </Stack>
-                        <Stack direction="row" alignItems="flex-start" spacing={2.5}>
-                          <Sync sx={{ fontSize: 24, color: '#e91e63', mt: 0.5 }} />
-                          <Typography fontWeight={600} lineHeight={1.6}>Most repairs completed within 5 working days. Complex cases may take up to 21 working days.</Typography>
-                        </Stack>
-                        <Stack direction="row" alignItems="flex-start" spacing={2.5}>
-                          <Security sx={{ fontSize: 24, color: '#e91e63', mt: 0.5 }} />
-                          <Typography fontWeight={600} lineHeight={1.6}>1-year warranty</Typography>
-                        </Stack>
-                        <Stack direction="row" alignItems="flex-start" spacing={2.5}>
-                          <CreditCard sx={{ fontSize: 24, color: '#e91e63', mt: 0.5 }} />
-                          <Typography fontWeight={600} lineHeight={1.6}>Secure payment</Typography>
-                        </Stack>
-                      </Stack>
-                    </CardContent>
-                  </Card>
-                </Stack>
+          {/* Tabs for Description and Key Features */}
+          {(product.description || keyFeatures.length > 0) && (
+            <Card sx={{ bgcolor: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.06)', borderRadius: { xs: 2, md: 3 } }}>
+              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                <Tabs value={tabValue} onChange={handleTabChange} aria-label="product details tabs" variant="fullWidth" sx={{ '& .MuiTab-root': { fontWeight: 600, textTransform: 'none', py: { xs: 1.5, md: 2 } } }}>
+                  {product.description && <Tab label="Description" />}
+                  {keyFeatures.length > 0 && <Tab label="Specifications" />}
+                </Tabs>
+              </Box>
+              <CardContent sx={{ p: { xs: 2, md: 3, lg: 4 } }}>
+                {tabValue === 0 && product.description && (
+                  <Typography variant="body1" color="#444" lineHeight={1.8} sx={{ fontSize: { xs: '0.875rem', md: '1rem' }, textAlign: 'left' }}>
+                    {product.description}
+                  </Typography>
+                )}
+                {tabValue === 1 && keyFeatures.length > 0 && (
+                  <Stack component="ul" spacing={{ xs: 1.5, md: 2 }} sx={{ pl: 0, listStyle: 'none' }}>
+                    {keyFeatures.map((feat, i) => {
+                      const [keyPart, ...valueParts] = feat.split(': ');
+                      const valuePart = valueParts.join(': ');
+                      return (
+                        <Box
+                          key={i}
+                          component="li"
+                          sx={{
+                            position: 'relative',
+                            pl: { xs: 3, md: 4 },
+                            py: { xs: 1, md: 1.5 },
+                            bgcolor: alpha('#e91e63', 0.02),
+                            borderRadius: { xs: 1, md: 1.5 },
+                            '&:before': {
+                              content: '"•"',
+                              position: 'absolute',
+                              left: { xs: 8, md: 12 },
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              color: '#e91e63',
+                              fontSize: { xs: '1.1rem', md: '1.3rem' },
+                              lineHeight: 1,
+                            },
+                          }}
+                        >
+                          <Typography
+                            component="span"
+                            variant={{ xs: 'body2', md: 'subtitle1' }}
+                            fontWeight={700}
+                            color="#1a1a1a"
+                            sx={{ mr: 1 }}
+                          >
+                            {keyPart}:
+                          </Typography>
+                          <Typography component="span" variant="body1" color="#444" fontSize={{ xs: '0.875rem', md: '1rem' }}>
+                            {valuePart}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                )}
               </CardContent>
             </Card>
-          </Box>
+          )}
+
+          {/* Horizontal Delivery Info Cards - Below Tabs */}
+          <Card sx={{ bgcolor: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.06)', borderRadius: { xs: 2, md: 3 }, overflow: 'hidden', mt: { xs: 3, md: 4 } }}>
+            <CardContent sx={{ p: 0 }}>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={0} divider={<Divider orientation="vertical" flexItem />}>
+                <Stack direction="row" alignItems="center" spacing={{ xs: 1.5, md: 2 }} sx={{ flex: 1, p: { xs: 2, md: 3 }, borderRight: { xs: 'none', sm: '1px solid #e0e0e0' } }}>
+                  <LocalShipping sx={{ fontSize: { xs: 24, md: 32 }, color: '#e91e63' }} />
+                  <Box>
+                    <Typography variant={{ xs: 'subtitle1', md: 'h6' }} fontWeight={700} color="#1a1a1a" mb={0.5}>
+                      Free Delivery
+                    </Typography>
+                    <Typography variant="body2" color="#666">
+                      Within Nairobi CBD
+                    </Typography>
+                  </Box>
+                </Stack>
+                <Stack direction="row" alignItems="center" spacing={{ xs: 1.5, md: 2 }} sx={{ flex: 1, p: { xs: 2, md: 3 }, borderRight: { xs: 'none', sm: '1px solid #e0e0e0' } }}>
+                  <Sync sx={{ fontSize: { xs: 24, md: 32 }, color: '#e91e63' }} />
+                  <Box>
+                    <Typography variant={{ xs: 'subtitle1', md: 'h6' }} fontWeight={700} color="#1a1a1a" mb={0.5}>
+                      Fast Repairs
+                    </Typography>
+                    <Typography variant="body2" color="#666">
+                      5 working days or less
+                    </Typography>
+                  </Box>
+                </Stack>
+                <Stack direction="row" alignItems="center" spacing={{ xs: 1.5, md: 2 }} sx={{ flex: 1, p: { xs: 2, md: 3 } }}>
+                  <Security sx={{ fontSize: { xs: 24, md: 32 }, color: '#e91e63' }} />
+                  <Box>
+                    <Typography variant={{ xs: 'subtitle1', md: 'h6' }} fontWeight={700} color="#1a1a1a" mb={0.5}>
+                      1-Year Warranty
+                    </Typography>
+                    <Typography variant="body2" color="#666">
+                      Peace of mind guaranteed
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
         </Stack>
       </Box>
 
       {/* What Others Are Buying Section - Sliding Carousel */}
       {inStockPopular.length > 0 && (
         <>
-          <Box sx={{ bgcolor: '#fff', py: 6, mt: 6 }}>
+          <Box sx={{ bgcolor: '#f8f9fa', py: { xs: 6, md: 8 }, mt: { xs: 4, md: 6 } }}>
             <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 3, md: 6 } }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={4}>
-                <Typography variant="h5" fontWeight={800} color="#1a1a1a">
+              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={{ xs: 3, md: 5 }}>
+                <Typography variant={{ xs: 'h5', md: 'h4' }} fontWeight={800} color="#1a1a1a">
                   What others are buying
                 </Typography>
                 <Stack direction="row" spacing={1}>
                   <IconButton
                     onClick={prevSlide}
                     disabled={currentSlide === 0}
-                    sx={{ bgcolor: alpha('#e91e63', 0.1), color: '#e91e63', '&:hover': { bgcolor: alpha('#e91e63', 0.2) }, '&[disabled]': { color: '#ccc' } }}
+                    sx={{ 
+                      bgcolor: alpha('#e91e63', 0.1), 
+                      color: '#e91e63', 
+                      width: { xs: 40, md: 48 }, 
+                      height: { xs: 40, md: 48 },
+                      '&:hover': { bgcolor: alpha('#e91e63', 0.2) }, 
+                      '&[disabled]': { color: '#ccc', bgcolor: 'transparent' } 
+                    }}
                   >
                     <ChevronLeft />
                   </IconButton>
                   <IconButton
                     onClick={nextSlide}
                     disabled={currentSlide === totalSlides - 1}
-                    sx={{ bgcolor: alpha('#e91e63', 0.1), color: '#e91e63', '&:hover': { bgcolor: alpha('#e91e63', 0.2) }, '&[disabled]': { color: '#ccc' } }}
+                    sx={{ 
+                      bgcolor: alpha('#e91e63', 0.1), 
+                      color: '#e91e63', 
+                      width: { xs: 40, md: 48 }, 
+                      height: { xs: 40, md: 48 },
+                      '&:hover': { bgcolor: alpha('#e91e63', 0.2) }, 
+                      '&[disabled]': { color: '#ccc', bgcolor: 'transparent' } 
+                    }}
                   >
                     <ChevronRight />
                   </IconButton>
                 </Stack>
               </Stack>
-              <Box sx={{ position: 'relative', overflow: 'hidden', borderRadius: 2 }}>
+              <Box sx={{ position: 'relative', overflow: 'hidden', borderRadius: { xs: 2, md: 3 } }}>
                 <Box
                   sx={{
                     display: 'flex',
-                    transition: 'transform 0.5s ease-in-out',
+                    transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
                     transform: `translateX(-${(currentSlide * 100) / slidesToShow}%)`,
                     width: `${(inStockPopular.length / slidesToShow) * 100}%`,
                   }}
                 >
                   {inStockPopular.map((p) => (
-                    <Box key={p.id} sx={{ width: `${100 / slidesToShow}%`, px: 1 }}>
+                    <Box key={p.id} sx={{ width: `${100 / slidesToShow}%`, px: { xs: 0.5, md: 1 } }}>
                       {renderPopularCard(p)}
                     </Box>
                   ))}
@@ -733,36 +971,43 @@ export default function ProductDetailPage() {
               </Box>
               {/* Indicators */}
               {totalSlides > 1 && (
-                <Stack direction="row" justifyContent="center" spacing={0.5} mt={2}>
+                <Stack direction="row" justifyContent="center" spacing={{ xs: 0.5, md: 1 }} mt={{ xs: 2, md: 3 }}>
                   {Array.from({ length: totalSlides }).map((_, i) => (
                     <Box
                       key={i}
                       onClick={() => setCurrentSlide(i)}
                       sx={{
-                        width: 12,
-                        height: 12,
+                        width: { xs: 10, md: 12 },
+                        height: { xs: 10, md: 12 },
                         borderRadius: '50%',
-                        bgcolor: i === currentSlide ? '#e91e63' : '#e0e0e0',
+                        bgcolor: i === currentSlide ? '#e91e63' : alpha('#e91e63', 0.3),
                         cursor: 'pointer',
-                        transition: 'background-color 0.2s',
+                        transition: 'all 0.3s ease',
+                        '&:hover': { bgcolor: '#e91e63', transform: 'scale(1.2)' },
                       }}
                     />
                   ))}
                 </Stack>
               )}
               {/* Load More Button */}
-              <Box sx={{ textAlign: 'center', mt: 4 }}>
+              <Box sx={{ textAlign: 'center', mt: { xs: 3, md: 5 } }}>
                 <Button
                   variant="outlined"
+                  startIcon={<ShoppingCart sx={{ fontSize: { xs: 18, md: 20 } }} />}
                   onClick={handleLoadMore}
                   sx={{
                     borderColor: '#e91e63',
                     color: '#e91e63',
                     fontWeight: 700,
-                    px: 4,
-                    py: 1.5,
-                    borderRadius: 1,
-                    '&:hover': { borderColor: '#c2185b', color: '#c2185b' },
+                    px: { xs: 4, md: 6 },
+                    py: { xs: 1.5, md: 2 },
+                    borderRadius: 2,
+                    fontSize: { xs: '0.875rem', md: '1rem' },
+                    '&:hover': { 
+                      borderColor: '#c2185b', 
+                      color: '#c2185b',
+                      boxShadow: '0 4px 12px rgba(233,30,99,0.2)',
+                    },
                   }}
                 >
                   Load More Products
@@ -770,19 +1015,6 @@ export default function ProductDetailPage() {
               </Box>
             </Box>
           </Box>
-          <Box
-            sx={{
-              height: 4,
-              bgcolor: '#e91e63',
-              width: '100%',
-              boxShadow: '0 2px 8px rgba(233,30,99,0.3)',
-              background: 'linear-gradient(to right, transparent, #e91e63 20%, #e91e63 80%, transparent)',
-              borderRadius: '2px',
-              mx: 'auto',
-              maxWidth: 1400,
-              px: { xs: 3, md: 6 },
-            }}
-          />
         </>
       )}
 
@@ -792,7 +1024,7 @@ export default function ProductDetailPage() {
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert severity={snackbar.severity} sx={{ fontWeight: 700, width: '100%' }}>
+        <Alert severity={snackbar.severity} sx={{ fontWeight: 700, width: '100%', borderRadius: 2 }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

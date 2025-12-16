@@ -14,32 +14,21 @@ const CategoriesContainer = styled(Box)(({ theme }) => ({
   backgroundColor: '#000',
   position: 'relative',
   overflow: 'hidden',
-  [theme.breakpoints.down('sm')]: {
-    padding: theme.spacing(0.75, 0),
-  },
-  [theme.breakpoints.up('md')]: {
-    padding: theme.spacing(2, 0),
-  },
-  [theme.breakpoints.up('lg')]: {
-    padding: theme.spacing(2.5, 0),
-  },
-  [theme.breakpoints.up('xl')]: {
-    padding: theme.spacing(3, 0),
-  },
+  [theme.breakpoints.down('sm')]: { padding: theme.spacing(0.75, 0) },
+  [theme.breakpoints.up('md')]: { padding: theme.spacing(2, 0) },
+  [theme.breakpoints.up('lg')]: { padding: theme.spacing(2.5, 0) },
+  [theme.breakpoints.up('xl')]: { padding: theme.spacing(3, 0) },
 }));
 
+// Title with full bold + underline
 const Title = styled(Typography)(({ theme }) => ({
   fontSize: 'clamp(1.6rem, 3.8vw, 1.8rem)',
   fontWeight: 700,
   color: '#FFFFFF',
   textAlign: 'center',
   marginBottom: theme.spacing(1.5),
+  textDecoration: 'underline',
   textTransform: 'uppercase',
-  letterSpacing: '1.2px',
-  [theme.breakpoints.down('sm')]: {
-    fontSize: 'clamp(1.2rem, 3.3vw, 1.3rem)',
-    marginBottom: theme.spacing(0.75),
-  },
 }));
 
 const CategoryCard = styled(Box)(({ theme }) => ({
@@ -51,13 +40,8 @@ const CategoryCard = styled(Box)(({ theme }) => ({
   flexShrink: 0,
   padding: theme.spacing(0, 0.5),
   boxShadow: '0 3px 6px rgba(0, 0, 0, 0.1)',
-  [theme.breakpoints.up('sm')]: {
-    width: 'clamp(100px, 22vw, 120px)',
-  },
-  [theme.breakpoints.up('lg')]: {
-    width: 'clamp(100px, 12vw, 120px)',
-    padding: theme.spacing(0.5),
-  },
+  [theme.breakpoints.up('sm')]: { width: 'clamp(100px, 22vw, 120px)' },
+  [theme.breakpoints.up('lg')]: { width: 'clamp(100px, 12vw, 120px)', padding: theme.spacing(0.5) },
 }));
 
 const CategoryImageContainer = styled(Box)(({ theme }) => ({
@@ -68,14 +52,8 @@ const CategoryImageContainer = styled(Box)(({ theme }) => ({
   backgroundColor: '#333',
   overflow: 'hidden',
   marginBottom: theme.spacing(0.75),
-  [theme.breakpoints.up('sm')]: {
-    width: 'clamp(70px, 18vw, 90px)',
-    height: 'clamp(70px, 18vw, 90px)',
-  },
-  [theme.breakpoints.up('lg')]: {
-    width: 'clamp(80px, 10vw, 100px)',
-    height: 'clamp(80px, 10vw, 100px)',
-  },
+  [theme.breakpoints.up('sm')]: { width: 'clamp(70px, 18vw, 90px)', height: 'clamp(70px, 18vw, 90px)' },
+  [theme.breakpoints.up('lg')]: { width: 'clamp(80px, 10vw, 100px)', height: 'clamp(80px, 10vw, 100px)' },
 }));
 
 const CategoryName = styled(Typography)(({ theme }) => ({
@@ -91,75 +69,59 @@ const NavButton = styled(IconButton)(({ theme }) => ({
   transform: 'translateY(-50%)',
   color: '#FFFFFF',
   backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  '&:hover': {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-  },
+  '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.7)' },
   zIndex: 10,
   fontSize: 'clamp(1rem, 2.3vw, 1.2rem)',
-  [theme.breakpoints.down('sm')]: {
-    fontSize: 'clamp(0.9rem, 1.8vw, 1rem)',
-  },
-  [theme.breakpoints.up('lg')]: {
-    display: 'none',
-  },
+  [theme.breakpoints.down('sm')]: { fontSize: 'clamp(0.9rem, 1.8vw, 1rem)' },
+  [theme.breakpoints.up('lg')]: { display: 'none' },
 }));
 
-const NavButtonLeft = styled(NavButton)({
-  left: 0,
-});
-
-const NavButtonRight = styled(NavButton)({
-  right: 0,
-});
+const NavButtonLeft = styled(NavButton)({ left: 0 });
+const NavButtonRight = styled(NavButton)({ right: 0 });
 
 const CategoriesWrapper = styled(Box)(({ theme }) => ({
   display: 'none',
-  [theme.breakpoints.up('lg')]: {
-    display: 'flex',
-    flexWrap: 'nowrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: theme.spacing(0.25), // 2px gap
-  },
+  [theme.breakpoints.up('lg')]: { display: 'flex', flexWrap: 'nowrap', justifyContent: 'center', alignItems: 'center', gap: theme.spacing(0.25) },
 }));
 
 const TopCategoriesSection = () => {
   const categories = [
     { name: 'Storage', image: '/images/storage.jpg' },
-    { name: 'Mobile Phones',  image: '/images/iphone1.jpg' },
-    { name: 'Mobile Accessories',  image: '/images/cable2.jpg' },
-    { name: 'Laptops',  image: '/images/laptop1.jpg' },
-    { name: 'Audio',  image: '/images/headphone.jpg' },
+    { name: 'Mobile Phones', image: '/images/iphone1.jpg' },
+    { name: 'Mobile Accessories', image: '/images/cable2.jpg' },
+    { name: 'Laptops', image: '/images/laptop1.jpg' },
+    { name: 'Audio', image: '/images/headphone.jpg' },
     { name: 'Gaming Console', image: '/images/ps5.png' },
-    { name: 'Projectors',  image: '/images/projector.jpg' },
-    { name: 'iPads',  image: '/images/ipad1.jpg' },
-    { name: 'Power Banks',  image: '/images/powerbank.jpg' },
-    { name: 'Content Creator Kits',  image: '/images/osmo1.jpg' },
+    { name: 'Projectors', image: '/images/projector.jpg' },
+    { name: 'iPads', image: '/images/ipad1.jpg' },
+    { name: 'Power Banks', image: '/images/powerbank.jpg' },
+    { name: 'Content Creator Kits', image: '/images/osmo1.jpg' },
   ];
 
   return (
     <CategoriesContainer>
       <Title>Top Categories</Title>
+
+      {/* Mobile / Swiper */}
       <Box sx={{ display: { xs: 'block', lg: 'none' } }}>
         <Swiper
           modules={[Navigation]}
-          navigation={{
-            prevEl: '.swiper-button-prev',
-            nextEl: '.swiper-button-next',
-          }}
+          navigation={{ prevEl: '.swiper-button-prev', nextEl: '.swiper-button-next' }}
           spaceBetween={2}
           slidesPerView={2.2}
-          breakpoints={{
-            600: { slidesPerView: 3.2, spaceBetween: 2 },
-            960: { slidesPerView: 3.2, spaceBetween: 2 },
-          }}
-          style={{
-            width: '100%',
-            padding: '0 24px', // Extra padding for nav buttons
-          }}
+          breakpoints={{ 600: { slidesPerView: 3.2, spaceBetween: 2 }, 960: { slidesPerView: 3.2, spaceBetween: 2 } }}
+          style={{ width: '100%', padding: '0 24px' }}
         >
           {categories.map((category, index) => (
-            <SwiperSlide key={index} style={{ display: 'flex', justifyContent: 'center' }}>
+            <SwiperSlide
+              key={index}
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                opacity: 0,
+                animation: `fadeIn 0.3s ease forwards ${index * 0.1}s`,
+              }}
+            >
               <CategoryCard>
                 <CategoryImageContainer>
                   <Image
@@ -168,7 +130,9 @@ const TopCategoriesSection = () => {
                     fill
                     sizes="(max-width: 600px) 60px, (max-width: 960px) 70px, 80px"
                     style={{ objectFit: 'cover' }}
-                    loading="lazy"
+                    priority={false}
+                    placeholder="blur"
+                    blurDataURL="/images/placeholder.png"
                   />
                 </CategoryImageContainer>
                 <CategoryName>{category.name}</CategoryName>
@@ -183,23 +147,36 @@ const TopCategoriesSection = () => {
           </NavButtonRight>
         </Swiper>
       </Box>
+
+      {/* Desktop */}
       <CategoriesWrapper>
         {categories.map((category, index) => (
-          <CategoryCard key={index}>
+          <CategoryCard
+            key={index}
+            sx={{ opacity: 0, animation: `fadeIn 0.3s ease forwards ${index * 0.1}s` }}
+          >
             <CategoryImageContainer>
               <Image
                 src={category.image}
                 alt={category.name}
                 fill
-                sizes="(max-width: 600px) 60px, (max-width: 960px) 70px, 80px"
+                sizes="80px"
                 style={{ objectFit: 'cover' }}
-                loading="lazy"
+                priority={false}
+                placeholder="blur"
+                blurDataURL="/images/placeholder.png"
               />
             </CategoryImageContainer>
             <CategoryName>{category.name}</CategoryName>
           </CategoryCard>
         ))}
       </CategoriesWrapper>
+
+      <style jsx global>{`
+        @keyframes fadeIn {
+          to { opacity: 1; }
+        }
+      `}</style>
     </CategoriesContainer>
   );
 };

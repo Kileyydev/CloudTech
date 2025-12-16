@@ -61,7 +61,7 @@ export default function TickerBar() {
     { icon: <LocalShipping fontSize="inherit" />, text: 'Delivery Country-wide' },
     { icon: <LocationOn fontSize="inherit" />, text: 'Cookie House 3rd Flr Shop 301' },
     { icon: <Phone fontSize="inherit" />, text: '0722244482 / 0711357878' },
-    { icon: <ShoppingBag fontSize="inherit" />, text: 'Happy Shopping…' },
+    { icon: <ShoppingBag fontSize="inherit" />, text: 'Happy Shopping!' },
   ];
 
   return (

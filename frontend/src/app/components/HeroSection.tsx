@@ -2,83 +2,150 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Box, Container, Typography, styled } from '@mui/material';
+import { Box, Typography, styled } from '@mui/material';
 import Image from 'next/image';
 import Link from 'next/link';
 
 const SLIDES = [
-  '/images/hero3.jpg',
-  '/images/laptop.jpg',
-  '/images/samsung1.jpg',
+
+  {
+    image: '/images/mac.jpg', // PNG with transparent bg
+    title: 'MacBook Pro 2025',
+    subtitle: 'Experience power, speed and style',
+    link: '/shop/mac',
+    bgColor: '#000000',
+    isMac: true,
+  },
+  {
+    image: '/images/hero9.png',
+    title: 'Premium Electronics',
+    subtitle: 'Powering your everyday life',
+    link: '/shop',
+    bgColor: '#DC1A8A',
+  },
+  {
+    image: '/images/hero6.png',
+    title: 'Next-Gen Smartphones',
+    subtitle: 'Stay ahead, stay connected',
+    link: '/shop/phones',
+    bgColor: '#fff',
+  },
 ];
 
-const HeroWrapper = styled(Box)(({ theme }) => ({
-  position: 'relative',
+const SIDE_CARDS = [
+  {
+    image: '/images/pods.png',
+    title: 'Work Smarter',
+    subtitle: 'High-performance laptops',
+    link: '/shop/laptops',
+    bgColor: '#DC1A8A',
+  },
+  {
+    image: '/images/watch6.jpg',
+    title: 'Stay Connected',
+    subtitle: 'Latest smartphones',
+    link: '/shop/phones',
+    bgColor: '#000',
+  },
+];
+
+const HeroWrapper = styled(Box)({
+  display: 'flex',
   minHeight: 'clamp(480px, 80vh, 720px)',
   overflow: 'hidden',
-  display: 'flex',
-  alignItems: 'flex-end', // Push content to bottom
-  justifyContent: 'center',
-  paddingBottom: '60px', // Space for text + button
-
-  // HIDE on md and smaller
-  [theme.breakpoints.down('lg')]: {
-    display: 'none',
-  },
-}));
-
-const Slider = styled(Box)({
-  position: 'absolute',
-  inset: 0,
 });
 
-const Slide = styled(Box)<{ active: boolean }>(({ active }) => ({
+const SliderArea = styled(Box)({
+  position: 'relative',
+  flex: '0 0 72%',
+  overflow: 'hidden',
+  display: 'flex',
+});
+
+const Slide = styled(Box)<{ active: boolean; bgColor?: string }>(({ active, bgColor }) => ({
   position: 'absolute',
   inset: 0,
-  opacity: active ? 1 : 0,
-  transition: 'opacity 1.6s ease-in-out',
+  display: 'flex',
+  backgroundColor: bgColor || '#000',
+  transition: 'transform 1.2s ease-in-out',
+  transform: active ? 'translateX(0)' : 'translateX(100%)',
 }));
 
-const Content = styled(Container)(({ theme }) => ({
+const SlideTextArea = styled(Box)<{ isMac?: boolean; bgColor?: string }>(({ isMac, bgColor }) => {
+  const lightBg = ['#fff', '#FFE0F0', '#FFF0E0', '#f5f5f5'].includes(bgColor || '');
+  return {
+    flex: isMac ? '0 0 45%' : '0 0 40%',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    padding: '40px',
+    color: lightBg ? '#000' : '#fff', // dynamic text color
+    zIndex: 2,
+  };
+});
+
+const SlideImageArea = styled(Box)<{ isMac?: boolean }>(({ isMac }) => ({
+  flex: isMac ? '0 0 55%' : '0 0 60%',
   position: 'relative',
-  zIndex: 2,
-  textAlign: 'center',
-  paddingBottom: theme.spacing(4),
+  overflow: 'hidden',
 }));
 
-const Pink = styled('span')({ color: '#DC1A8A' });
-const Black = styled('span')({ color: '#000' });
+const StretchImage = styled(Image)({
+  objectFit: 'contain', // ensures full image visible
+  objectPosition: 'right center',
+  width: '100%',
+  height: '100%',
+});
 
-const ShopNow = styled(Link)(({ theme }) => ({
-  display: 'inline-block',
-  padding: '14px 52px',
-  background: '#fff',
-  color: '#000',
-  fontWeight: 700,
-  fontSize: '1.25rem',
-  textDecoration: 'none',
-  boxShadow: '0 8px 22px rgba(0,0,0,0.15)',
+const SideColumn = styled(Box)({
+  flex: '0 0 28%',
+  display: 'flex',
+  flexDirection: 'column',
+});
 
-  transition: 'all .3s ease',
+const SideCard = styled(Box)<{ bgColor: string }>(({ bgColor }) => ({
   position: 'relative',
-  marginTop: theme.spacing(3),
-
-  '&:after': {
-    content: '""',
-    position: 'absolute',
-    bottom: '12px',
-    left: '50%',
-    width: '65%',
-    height: '3px',
-    background: '#000',
-    transform: 'translateX(-50%)',
-  },
-
-  '&:hover': {
-    transform: 'translateY(-2px)',
-    boxShadow: '0 12px 28px rgba(0,0,0,0.2)',
-  },
+  flex: 1,
+  display: 'flex',
+  backgroundColor: bgColor,
+  overflow: 'hidden',
 }));
+
+const SideTextArea = styled(Box)<{ bgColor?: string }>(({ bgColor }) => {
+  const lightBg = ['#fff', '#FFE0F0', '#FFF0E0'].includes(bgColor || '');
+  return {
+    flex: '0 0 50%',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    padding: '24px',
+    color: lightBg ? '#000' : '#fff',
+    zIndex: 2,
+  };
+});
+
+const SideImageFrame = styled(Box)({
+  flex: '0 0 50%',
+  position: 'relative',
+  width: '100%',
+  height: '100%',
+});
+
+const ShopNow = styled(Link)<{ bgColor?: string }>(({ bgColor }) => {
+  const lightBg = ['#fff', '#FFE0F0', '#FFF0E0'].includes(bgColor || '');
+  return {
+    display: 'inline-block',
+    marginTop: '12px',
+    padding: '10px 28px',
+    background: lightBg ? '#000' : '#fff',
+    color: lightBg ? '#fff' : '#000',
+    fontWeight: 700,
+    textDecoration: 'none',
+    fontSize: '0.95rem',
+    transition: 'transform .3s ease',
+    '&:hover': { transform: 'translateY(-2px)' },
+  };
+});
 
 export default function HeroSection() {
   const [active, setActive] = useState(0);
@@ -89,23 +156,53 @@ export default function HeroSection() {
   }, []);
 
   return (
-    <HeroWrapper id="hero">
-      <Slider>
-        {SLIDES.map((src, i) => (
-          <Slide key={src} active={i === active}>
-            <Image
-              src={src}
-              alt="Premium electronics hero"
-              fill
-              priority={i === 0}
-              quality={95}
-              sizes="100vw"
-              style={{ objectFit: 'cover' }}
-              onError={(e) => (e.currentTarget.src = '/images/fallback.jpg')}
-            />
+    <HeroWrapper>
+      {/* LEFT SLIDER */}
+      <SliderArea>
+        {SLIDES.map((slide, i) => (
+          <Slide key={slide.image} active={i === active} bgColor={slide.bgColor}>
+            <SlideTextArea isMac={slide.isMac} bgColor={slide.bgColor}>
+              <Typography variant={slide.isMac ? 'h3' : 'h4'} fontWeight={700}>
+                {slide.title}
+              </Typography>
+              <Typography sx={{ mt: 2, opacity: 0.8 }}>{slide.subtitle}</Typography>
+              <ShopNow href={slide.link} bgColor={slide.bgColor}>
+                Shop Now
+              </ShopNow>
+            </SlideTextArea>
+            <SlideImageArea isMac={slide.isMac}>
+              <StretchImage src={slide.image} alt={slide.title} fill />
+            </SlideImageArea>
           </Slide>
         ))}
-      </Slider>
+      </SliderArea>
+
+      {/* RIGHT CARDS */}
+      <SideColumn>
+        {SIDE_CARDS.map((card, i) => (
+          <SideCard key={i} bgColor={card.bgColor}>
+            <SideTextArea bgColor={card.bgColor}>
+              <Typography variant="h5" fontWeight={700}>
+                {card.title}
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 1, opacity: 0.8 }}>
+                {card.subtitle}
+              </Typography>
+              <ShopNow href={card.link} bgColor={card.bgColor}>
+                Shop Now
+              </ShopNow>
+            </SideTextArea>
+            <SideImageFrame>
+              <StretchImage
+                src={card.image}
+                alt={card.title}
+                fill
+                style={{ objectFit: 'contain', objectPosition: 'right center' }}
+              />
+            </SideImageFrame>
+          </SideCard>
+        ))}
+      </SideColumn>
     </HeroWrapper>
   );
 }
