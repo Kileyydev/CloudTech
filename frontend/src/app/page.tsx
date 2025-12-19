@@ -21,7 +21,7 @@ export default function Home() {
       <TopCategoriesSection />
       <PromoSection />
       <DealsSection /> 
-      <RepairSection />
+     
       <TestimonialsSection />
     </div>
   );

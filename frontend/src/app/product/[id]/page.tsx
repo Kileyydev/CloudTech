@@ -109,7 +109,7 @@ export default function ProductDetailPage() {
   const CACHE_DURATION = 1000 * 60 * 5;
   const slidesToShow = 4;
 
-  const WHATSAPP_PHONE = '254712345678';
+  const WHATSAPP_PHONE = '254722244482';
 
   const keyFeatures = useMemo(() => {
     if (!product) return [];

@@ -190,21 +190,6 @@ export default function Footer() {
                 <FooterLink>Apple</FooterLink>
               </MuiLink>
             </Link>
-            <Link href="/mobile-accessories" passHref legacyBehavior>
-              <MuiLink underline="none">
-                <FooterLink>Mobile Accessories</FooterLink>
-              </MuiLink>
-            </Link>
-            <Link href="/storage" passHref legacyBehavior>
-              <MuiLink underline="none">
-                <FooterLink>Storage</FooterLink>
-              </MuiLink>
-            </Link>
-            <Link href="/content-creator-kits" passHref legacyBehavior>
-              <MuiLink underline="none">
-                <FooterLink>Content Creator Kits</FooterLink>
-              </MuiLink>
-            </Link>
             <Link href="/trade-in" passHref legacyBehavior>
               <MuiLink underline="none">
                 <FooterLink>Trade-in</FooterLink>

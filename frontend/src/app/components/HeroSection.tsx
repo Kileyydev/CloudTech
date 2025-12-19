@@ -5,11 +5,11 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography, styled } from '@mui/material';
 import Image from 'next/image';
 import Link from 'next/link';
+import Snowfall from 'react-snowfall'; // Your holiday superstar ✨
 
 const SLIDES = [
-
   {
-    image: '/images/mac.jpg', // PNG with transparent bg
+    image: '/images/mac.jpg',
     title: 'MacBook Pro 2025',
     subtitle: 'Experience power, speed and style',
     link: '/shop/mac',
@@ -50,6 +50,7 @@ const SIDE_CARDS = [
 ];
 
 const HeroWrapper = styled(Box)({
+  position: 'relative',
   display: 'flex',
   minHeight: 'clamp(480px, 80vh, 720px)',
   overflow: 'hidden',
@@ -79,8 +80,9 @@ const SlideTextArea = styled(Box)<{ isMac?: boolean; bgColor?: string }>(({ isMa
     flexDirection: 'column',
     justifyContent: 'center',
     padding: '40px',
-    color: lightBg ? '#000' : '#fff', // dynamic text color
-    zIndex: 2,
+    color: lightBg ? '#000' : '#fff',
+    position: 'relative',
+    zIndex: 1,
   };
 });
 
@@ -91,7 +93,7 @@ const SlideImageArea = styled(Box)<{ isMac?: boolean }>(({ isMac }) => ({
 }));
 
 const StretchImage = styled(Image)({
-  objectFit: 'contain', // ensures full image visible
+  objectFit: 'contain',
   objectPosition: 'right center',
   width: '100%',
   height: '100%',
@@ -120,7 +122,8 @@ const SideTextArea = styled(Box)<{ bgColor?: string }>(({ bgColor }) => {
     justifyContent: 'center',
     padding: '24px',
     color: lightBg ? '#000' : '#fff',
-    zIndex: 2,
+    position: 'relative',
+    zIndex: 1,
   };
 });
 
@@ -157,6 +160,25 @@ export default function HeroSection() {
 
   return (
     <HeroWrapper>
+      {/* ❄️ Slow, Dreamy Snow Falling ON TOP – Pure Holiday Serenity ❄️ */}
+      <Snowfall
+        snowflakeCount={180}           // Fewer flakes for calmer feel
+        speed={[0.3, 1.2]}             // Much slower fall – so peaceful
+        wind={[-0.3, 0.3]}             // Barely any sway, just gentle drift
+        radius={[0.8, 3.0]}            // Soft, delicate flakes
+        color="#ffffff"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 10,
+          pointerEvents: 'none',
+          opacity: 0.85,               // Soft and ethereal
+        }}
+      />
+
       {/* LEFT SLIDER */}
       <SliderArea>
         {SLIDES.map((slide, i) => (
