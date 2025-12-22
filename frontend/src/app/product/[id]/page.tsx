@@ -19,7 +19,7 @@ import { ArrowBackIos, ArrowForwardIos } from '@mui/icons-material';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
-import WhatOthersAreBuying from '@/app/components/WhatOthersAreBuying';
+
 
 const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE}/products/`;
 
@@ -250,7 +250,7 @@ export default function ProductDetailsPage() {
             </Box>
           </Stack>
         </Paper>
-        <WhatOthersAreBuying excludeProductId={product.id} />
+
       </Box>
     </>
   );
