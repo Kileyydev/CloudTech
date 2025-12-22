@@ -20,6 +20,7 @@ import {
   CardContent,
   Rating,
   Snackbar,
+  Chip,
 } from '@mui/material';
 import {
   ArrowBackIos,
@@ -28,12 +29,16 @@ import {
   ShoppingCart,
   Add,
   Remove,
+  WhatsApp,
+  SwapHoriz,
 } from '@mui/icons-material';
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
 
 const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE}/products/`;
+const WHATSAPP_NUMBER = '2547XXXXXXXX'; // ← Replace with your actual WhatsApp business number
+const TRADEIN_PAGE = '/trade-in'; // ← Adjust if your trade-in page has a different route
 
 type ProductImage = { image?: { url: string } } | { url: string } | string;
 
@@ -62,7 +67,6 @@ export default function ProductDetailsPage() {
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [error, setError] = useState('');
 
-  // Featured products (same as FeaturedSection)
   const [featuredProducts, setFeaturedProducts] = useState<ProductT[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(true);
   const [wishlist, setWishlist] = useState<Set<number>>(new Set());
@@ -92,9 +96,8 @@ export default function ProductDetailsPage() {
         if (!res.ok) throw new Error('Failed to fetch featured');
         const data = await res.json();
         const list = Array.isArray(data) ? data : data.results || data.data || [];
-        // Shuffle for randomness
         const shuffled = [...list].sort(() => Math.random() - 0.5);
-        setFeaturedProducts(shuffled.slice(0, 20)); // More products for smooth sliding
+        setFeaturedProducts(shuffled.slice(0, 20));
       } catch (err) {
         console.error('Featured fetch error:', err);
       } finally {
@@ -185,7 +188,6 @@ export default function ProductDetailsPage() {
         }}
         onClick={() => router.push(`/product/${product.id}`)}
       >
-        {/* Wishlist */}
         <IconButton
           onClick={(e) => handleWishlistToggle(product.id, e)}
           sx={{
@@ -203,7 +205,6 @@ export default function ProductDetailsPage() {
           />
         </IconButton>
 
-        {/* Discount badge */}
         {hasDiscount && (
           <Box
             sx={{
@@ -223,7 +224,6 @@ export default function ProductDetailsPage() {
           </Box>
         )}
 
-        {/* Image + Hover Overlay */}
         <Box
           sx={{
             position: 'relative',
@@ -458,7 +458,6 @@ export default function ProductDetailsPage() {
     </Box>
   );
 
-  /* ================= SLIDER CONTROLS ================= */
   const scrollLeft = () => {
     if (sliderRef.current) {
       sliderRef.current.scrollBy({ left: -290, behavior: 'smooth' });
@@ -471,7 +470,6 @@ export default function ProductDetailsPage() {
     }
   };
 
-  /* ================= SAFE HOOKS ================= */
   const images = useMemo(() => {
     if (!product) return [];
     return [
@@ -490,7 +488,9 @@ export default function ProductDetailsPage() {
   const inStockVariants = product.variants?.filter((v: any) => v.stock > 0) ?? [];
   const displayPrice = selectedVariant?.price ?? product.final_price ?? product.price;
 
-  /* ================= MAIN PRODUCT CART ================= */
+  const cartItem = cart[product.id];
+  const currentQuantity = cartItem ? cartItem.quantity : 0;
+
   const handleAddToCart = () => {
     setError('');
     if (!selectedVariant) {
@@ -515,14 +515,19 @@ export default function ProductDetailsPage() {
     }
   };
 
+  const handleWhatsAppOrder = () => {
+    const message = `Hi! I'm interested in ordering: ${product.title}`;
+    const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <>
       <Box sx={{ px: { xs: 2, md: 6 }, py: 5, bgcolor: '#fff', minHeight: '100vh' }}>
         <Paper sx={{ p: { xs: 2, md: 4 } }} elevation={0}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={5}>
-            {/* ================= IMAGES ================= */}
+            {/* IMAGES */}
             <Box sx={{ flex: 1 }}>
-              {/* Main Image */}
               <Box
                 sx={{
                   position: 'relative',
@@ -552,7 +557,6 @@ export default function ProductDetailsPage() {
                 </IconButton>
               </Box>
 
-              {/* Thumbnails */}
               {images.length > 1 && (
                 <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 2 }}>
                   {images.map((img, i) => (
@@ -578,7 +582,7 @@ export default function ProductDetailsPage() {
               )}
             </Box>
 
-            {/* ================= DETAILS ================= */}
+            {/* DETAILS */}
             <Box sx={{ flex: 1 }}>
               <Typography variant="h4" fontWeight={700}>
                 {product.title}
@@ -599,7 +603,7 @@ export default function ProductDetailsPage() {
                 ))}
               </Stack>
 
-              {/* ================= VARIANT TABLE ================= */}
+              {/* VARIANT TABLE */}
               {inStockVariants.length > 0 && (
                 <>
                   <Typography fontWeight={700} sx={{ mb: 1 }}>
@@ -633,6 +637,15 @@ export default function ProductDetailsPage() {
                                 size="small"
                                 variant={selectedVariant?.id === v.id ? 'contained' : 'outlined'}
                                 onClick={() => setSelectedVariant(v)}
+                                sx={{
+                                  bgcolor: selectedVariant?.id === v.id ? '#e91e63' : undefined,
+                                  color: selectedVariant?.id === v.id ? '#fff' : undefined,
+                                  borderColor: '#e91e63',
+                                  '&:hover': {
+                                    bgcolor: '#e91e63',
+                                    color: '#fff',
+                                  },
+                                }}
                               >
                                 Select
                               </Button>
@@ -651,20 +664,104 @@ export default function ProductDetailsPage() {
                 </Alert>
               )}
 
+              {/* Add to Cart with Counter */}
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ mt: 3 }}>
+                {currentQuantity > 0 ? (
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1 }}>
+                    <IconButton
+                      size="medium"
+                      onClick={() => updateQuantity(product.id, -1)}
+                      sx={{ bgcolor: '#f0f0f0' }}
+                    >
+                      <Remove />
+                    </IconButton>
+                    <Chip
+                      label={currentQuantity}
+                      color="primary"
+                      sx={{ bgcolor: '#e91e63', color: '#fff', fontWeight: 700, minWidth: 60 }}
+                    />
+                    <IconButton
+                      size="medium"
+                      onClick={handleAddToCart}
+                      disabled={!selectedVariant || currentQuantity >= (selectedVariant?.stock ?? 0)}
+                      sx={{ bgcolor: '#e91e63', color: '#fff' }}
+                    >
+                      <Add />
+                    </IconButton>
+                  </Stack>
+                ) : (
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    startIcon={<ShoppingCart />}
+                    disabled={!selectedVariant}
+                    onClick={handleAddToCart}
+                    sx={{
+                      py: 1.8,
+                      fontSize: '1.1rem',
+                      fontWeight: 700,
+                      bgcolor: '#e91e63',
+                      '&:hover': { bgcolor: '#c2185b' },
+                    }}
+                  >
+                    Add to Cart
+                  </Button>
+                )}
+              </Stack>
+
+              {/* WhatsApp Order Button */}
               <Button
                 fullWidth
-                sx={{ mt: 3, py: 1.5, fontWeight: 700 }}
-                variant="contained"
-                disabled={!selectedVariant}
-                onClick={handleAddToCart}
+                variant="outlined"
+                startIcon={<WhatsApp />}
+                onClick={handleWhatsAppOrder}
+                sx={{
+                  mt: 2,
+                  py: 1.5,
+                  fontWeight: 700,
+                  borderColor: '#25D366',
+                  color: '#25D366',
+                  '&:hover': {
+                    bgcolor: '#25D366',
+                    color: '#fff',
+                    borderColor: '#25D366',
+                  },
+                }}
               >
-                Add to Cart
+                Order via WhatsApp
               </Button>
             </Box>
           </Stack>
         </Paper>
 
-        {/* ================= SLIDING FEATURED PRODUCTS SECTION ================= */}
+        {/* TRADE-IN SECTION */}
+        <Box sx={{ px: { xs: 2, md: 6 }, py: 5, bgcolor: '#f8f8f8', mt: 4 }}>
+          <Paper sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              Want to Trade in Your Old Device?
+            </Typography>
+            <Typography color="text.secondary" sx={{ mb: 3 }}>
+              Get an instant estimate for your old gadget and save more on this purchase!
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<SwapHoriz />}
+              onClick={() => router.push(TRADEIN_PAGE)}
+              size="large"
+              sx={{
+                bgcolor: '#e91e63',
+                py: 1.5,
+                px: 4,
+                fontSize: '1.1rem',
+                '&:hover': { bgcolor: '#c2185b' },
+              }}
+            >
+              Calculate Trade-in Value
+            </Button>
+          </Paper>
+        </Box>
+
+        {/* FEATURED PRODUCTS SECTION */}
         <Box sx={{ bgcolor: '#fdfdfd', py: { xs: 4, md: 6 }, px: { xs: 2, md: 6 }, position: 'relative' }}>
           <Box sx={{ textAlign: 'center', mb: 3 }}>
             <Typography
@@ -683,7 +780,6 @@ export default function ProductDetailsPage() {
             </Typography>
           </Box>
 
-          {/* Navigation Arrows */}
           <IconButton
             onClick={scrollLeft}
             sx={{
@@ -714,7 +810,6 @@ export default function ProductDetailsPage() {
             <ArrowForwardIos />
           </IconButton>
 
-          {/* Horizontal Slider */}
           <Box
             ref={sliderRef}
             sx={{
