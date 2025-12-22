@@ -37,8 +37,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCart } from '@/app/components/cartContext';
 
 const API_BASE = `${process.env.NEXT_PUBLIC_API_BASE}/products/`;
-const WHATSAPP_NUMBER = '2547XXXXXXXX'; // ← Replace with your actual WhatsApp business number
-const TRADEIN_PAGE = '/trade-in'; // ← Adjust if your trade-in page has a different route
+const WHATSAPP_NUMBER = '254722244482';
+const TRADEIN_PAGE = '/trade-in';
 
 type ProductImage = { image?: { url: string } } | { url: string } | string;
 
@@ -516,7 +516,7 @@ export default function ProductDetailsPage() {
   };
 
   const handleWhatsAppOrder = () => {
-    const message = `Hi! I'm interested in ordering: ${product.title}`;
+    const message = `Hi! Can I get more information on ${product.title}`;
     const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
@@ -526,8 +526,9 @@ export default function ProductDetailsPage() {
       <Box sx={{ px: { xs: 2, md: 6 }, py: 5, bgcolor: '#fff', minHeight: '100vh' }}>
         <Paper sx={{ p: { xs: 2, md: 4 } }} elevation={0}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={5}>
-            {/* IMAGES */}
+            {/* LEFT COLUMN: Images + Trade-in */}
             <Box sx={{ flex: 1 }}>
+              {/* Main Image */}
               <Box
                 sx={{
                   position: 'relative',
@@ -557,6 +558,7 @@ export default function ProductDetailsPage() {
                 </IconButton>
               </Box>
 
+              {/* Thumbnails */}
               {images.length > 1 && (
                 <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 2 }}>
                   {images.map((img, i) => (
@@ -580,9 +582,44 @@ export default function ProductDetailsPage() {
                   ))}
                 </Stack>
               )}
+
+              {/* TRADE-IN SECTION - now below image on the left */}
+              <Paper
+                elevation={3}
+                sx={{
+                  mt: 4,
+                  p: 3,
+                  borderRadius: 2,
+                  bgcolor: '#fff8f8',
+                  border: '1px solid #ffebee',
+                  textAlign: 'center',
+                }}
+              >
+                <Typography variant="h6" fontWeight={700} color="#e91e63" gutterBottom>
+                  Trade-in Your Old Device?
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Get an instant estimate and save more on this purchase!
+                </Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<SwapHoriz />}
+                  onClick={() => router.push(TRADEIN_PAGE)}
+                  size="medium"
+                  fullWidth
+                  sx={{
+                    bgcolor: '#e91e63',
+                    py: 1.2,
+                    fontWeight: 700,
+                    '&:hover': { bgcolor: '#c2185b' },
+                  }}
+                >
+                  Calculate Trade-in Value
+                </Button>
+              </Paper>
             </Box>
 
-            {/* DETAILS */}
+            {/* RIGHT COLUMN: Product Details */}
             <Box sx={{ flex: 1 }}>
               <Typography variant="h4" fontWeight={700}>
                 {product.title}
@@ -733,33 +770,6 @@ export default function ProductDetailsPage() {
             </Box>
           </Stack>
         </Paper>
-
-        {/* TRADE-IN SECTION */}
-        <Box sx={{ px: { xs: 2, md: 6 }, py: 5, bgcolor: '#f8f8f8', mt: 4 }}>
-          <Paper sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="h5" fontWeight={700} gutterBottom>
-              Want to Trade in Your Old Device?
-            </Typography>
-            <Typography color="text.secondary" sx={{ mb: 3 }}>
-              Get an instant estimate for your old gadget and save more on this purchase!
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<SwapHoriz />}
-              onClick={() => router.push(TRADEIN_PAGE)}
-              size="large"
-              sx={{
-                bgcolor: '#e91e63',
-                py: 1.5,
-                px: 4,
-                fontSize: '1.1rem',
-                '&:hover': { bgcolor: '#c2185b' },
-              }}
-            >
-              Calculate Trade-in Value
-            </Button>
-          </Paper>
-        </Box>
 
         {/* FEATURED PRODUCTS SECTION */}
         <Box sx={{ bgcolor: '#fdfdfd', py: { xs: 4, md: 6 }, px: { xs: 2, md: 6 }, position: 'relative' }}>
